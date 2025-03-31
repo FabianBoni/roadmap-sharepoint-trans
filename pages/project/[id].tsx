@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { clientDataService } from '@/utils/clientDataService';
 
 // Define the Project interface
 interface Project {
@@ -54,14 +55,11 @@ const ProjectDetailPage: React.FC = () => {
   useEffect(() => {
     if (id) {
       setLoading(true);
-      fetch(`/api/projects/${id}`)
-        .then(response => {
-          if (!response.ok) {
+      clientDataService.getProjectById(id as string)
+        .then((data: React.SetStateAction<Project | null>) => {
+          if (!data) {
             throw new Error('Project not found');
           }
-          return response.json();
-        })
-        .then((data: Project) => {
           setProject(data);
           setLoading(false);
         })

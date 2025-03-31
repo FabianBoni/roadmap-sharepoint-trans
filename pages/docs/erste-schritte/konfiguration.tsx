@@ -22,7 +22,7 @@ const KonfigurationDocsPage: React.FC = () => {
                     <h3 className="text-xl font-bold mt-6 mb-3">Datenbankkonfiguration</h3>
 
                     <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto">
-                        <code>DATABASE_URL="postgresql://benutzername:passwort@localhost:5432/roadmap_jsd"</code>
+                        <code>DATABASE_URL=&quot;postgresql://benutzername:passwort@localhost:5432/roadmap_jsd&quot;</code>
                     </pre>
 
                     <p className="mt-4">

@@ -50,7 +50,7 @@ const AdminDashboardDocsPage: React.FC = () => {
                     <h3 className="text-xl font-bold mt-6 mb-3">Projekte anzeigen</h3>
 
                     <p>
-                        Die Registerkarte "Projekte" zeigt eine Tabelle aller Projekte im System, einschließlich:
+                        Die Registerkarte &quot;Projekte&quot; zeigt eine Tabelle aller Projekte im System, einschließlich:
                     </p>
 
                     <ul className="list-disc pl-6 my-4">
@@ -67,7 +67,7 @@ const AdminDashboardDocsPage: React.FC = () => {
                     </p>
 
                     <ol className="list-decimal pl-6 my-4">
-                        <li>Klicken Sie auf die Schaltfläche "Neues Projekt" in der oberen rechten Ecke</li>
+                        <li>Klicken Sie auf die Schaltfläche &quot;Neues Projekt&quot; in der oberen rechten Ecke</li>
                         <li>Füllen Sie das Projektformular mit den erforderlichen Informationen aus:
                             <ul className="list-disc pl-6 my-2">
                                 <li>Titel</li>
@@ -79,7 +79,7 @@ const AdminDashboardDocsPage: React.FC = () => {
                                 <li>Benutzerdefinierte Felder</li>
                             </ul>
                         </li>
-                        <li>Klicken Sie auf "Projekt erstellen", um zu speichern</li>
+                        <li>Klicken Sie auf &quot;Projekt erstellen&quot;, um zu speichern</li>
                     </ol>
 
                     <h3 className="text-xl font-bold mt-6 mb-3">Ein Projekt bearbeiten</h3>
@@ -90,9 +90,9 @@ const AdminDashboardDocsPage: React.FC = () => {
 
                     <ol className="list-decimal pl-6 my-4">
                         <li>Suchen Sie das Projekt in der Tabelle</li>
-                        <li>Klicken Sie auf die Schaltfläche "Bearbeiten" in der Spalte "Aktionen"</li>
+                        <li>Klicken Sie auf die Schaltfläche &quot;Bearbeiten&quot; in der Spalte &quot;Aktionen&quot;</li>
                         <li>Aktualisieren Sie die Projektinformationen im Formular</li>
-                        <li>Klicken Sie auf "Projekt aktualisieren", um Änderungen zu speichern</li>
+                        <li>Klicken Sie auf &quot;Projekt aktualisieren&quot;, um Änderungen zu speichern</li>
                     </ol>
 
                     <h3 className="text-xl font-bold mt-6 mb-3">Ein Projekt löschen</h3>
@@ -103,8 +103,8 @@ const AdminDashboardDocsPage: React.FC = () => {
 
                     <ol className="list-decimal pl-6 my-4">
                         <li>Suchen Sie das Projekt in der Tabelle</li>
-                        <li>Klicken Sie auf die Schaltfläche "Löschen" in der Spalte "Aktionen"</li>
-                        <li>Bestätigen Sie die Löschung, indem Sie auf "Bestätigen" klicken, wenn Sie dazu aufgefordert werden</li>
+                        <li>Klicken Sie auf die Schaltfläche &quot;Löschen&quot; in der Spalte &quot;Aktionen&quot;</li>
+                        <li>Bestätigen Sie die Löschung, indem Sie auf &quot;Bestätigen&quot; klicken, wenn Sie dazu aufgefordert werden</li>
                     </ol>
 
                     <div className="bg-gray-800 p-4 rounded-md my-4">
@@ -125,8 +125,8 @@ const AdminDashboardDocsPage: React.FC = () => {
                     </p>
 
                     <ol className="list-decimal pl-6 my-4">
-                        <li>Wechseln Sie zur Registerkarte "Kategorien"</li>
-                        <li>Klicken Sie auf die Schaltfläche "Neue Kategorie"</li>
+                        <li>Wechseln Sie zur Registerkarte &quot;Kategorien&quot;</li>
+                        <li>Klicken Sie auf die Schaltfläche &quot;Neue Kategorie&quot;</li>
                         <li>Füllen Sie das Kategorieformular aus:
                             <ul className="list-disc pl-6 my-2">
                                 <li>Name</li>
@@ -134,7 +134,7 @@ const AdminDashboardDocsPage: React.FC = () => {
                                 <li>Symbol (wählen Sie aus den verfügbaren Optionen)</li>
                             </ul>
                         </li>
-                        <li>Klicken Sie auf "Kategorie erstellen", um zu speichern</li>
+                        <li>Klicken Sie auf &quot;Kategorie erstellen&quot;, um zu speichern</li>
                     </ol>
 
                     <h3 className="text-xl font-bold mt-6 mb-3">Eine Kategorie bearbeiten</h3>
@@ -145,9 +145,9 @@ const AdminDashboardDocsPage: React.FC = () => {
 
                     <ol className="list-decimal pl-6 my-4">
                         <li>Suchen Sie die Kategorie in der Tabelle</li>
-                        <li>Klicken Sie auf die Schaltfläche "Bearbeiten"</li>
+                        <li>Klicken Sie auf die Schaltfläche &quot;Bearbeiten&quot;</li>
                         <li>Aktualisieren Sie die Kategorieinformationen</li>
-                        <li>Klicken Sie auf "Kategorie aktualisieren", um Änderungen zu speichern</li>
+                        <li>Klicken Sie auf &quot;Kategorie aktualisieren&quot;, um Änderungen zu speichern</li>
                     </ol>
 
                     <h3 className="text-xl font-bold mt-6 mb-3">Eine Kategorie löschen</h3>
@@ -158,7 +158,7 @@ const AdminDashboardDocsPage: React.FC = () => {
 
                     <ol className="list-decimal pl-6 my-4">
                         <li>Suchen Sie die Kategorie in der Tabelle</li>
-                        <li>Klicken Sie auf die Schaltfläche "Löschen"</li>
+                        <li>Klicken Sie auf die Schaltfläche &quot;Löschen&quot;</li>
                         <li>Bestätigen Sie die Löschung</li>
                     </ol>
 
@@ -180,8 +180,8 @@ const AdminDashboardDocsPage: React.FC = () => {
                     </p>
 
                     <ol className="list-decimal pl-6 my-4">
-                        <li>Wechseln Sie zur Registerkarte "Feldtypen"</li>
-                        <li>Klicken Sie auf die Schaltfläche "Neues Feld"</li>
+                        <li>Wechseln Sie zur Registerkarte &quot;Feldtypen&quot;</li>
+                        <li>Klicken Sie auf die Schaltfläche &quot;Neues Feld&quot;</li>
                         <li>Füllen Sie das Feldtyp-Formular aus:
                             <ul className="list-disc pl-6 my-2">
                                 <li>Name</li>
@@ -189,7 +189,7 @@ const AdminDashboardDocsPage: React.FC = () => {
                                 <li>Beschreibung</li>
                             </ul>
                         </li>
-                        <li>Klicken Sie auf "Feldtyp erstellen", um zu speichern</li>
+                        <li>Klicken Sie auf &quot;Feldtyp erstellen&quot;, um zu speichern</li>
                     </ol>
 
                     <h3 className="text-xl font-bold mt-6 mb-3">Einen Feldtyp bearbeiten</h3>
@@ -200,9 +200,9 @@ const AdminDashboardDocsPage: React.FC = () => {
 
                     <ol className="list-decimal pl-6 my-4">
                         <li>Suchen Sie den Feldtyp in der Tabelle</li>
-                        <li>Klicken Sie auf die Schaltfläche "Bearbeiten"</li>
+                        <li>Klicken Sie auf die Schaltfläche &quot;Bearbeiten&quot;</li>
                         <li>Aktualisieren Sie die Feldtypinformationen</li>
-                        <li>Klicken Sie auf "Feldtyp aktualisieren", um Änderungen zu speichern</li>
+                        <li>Klicken Sie auf &quot;Feldtyp aktualisieren&quot;, um Änderungen zu speichern</li>
                     </ol>
 
                     <h3 className="text-xl font-bold mt-6 mb-3">Einen Feldtyp löschen</h3>
@@ -213,7 +213,7 @@ const AdminDashboardDocsPage: React.FC = () => {
 
                     <ol className="list-decimal pl-6 my-4">
                         <li>Suchen Sie den Feldtyp in der Tabelle</li>
-                        <li>Klicken Sie auf die Schaltfläche "Löschen"</li>
+                        <li>Klicken Sie auf die Schaltfläche &quot;Löschen&quot;</li>
                         <li>Bestätigen Sie die Löschung</li>
                     </ol>
 

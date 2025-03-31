@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { format } from 'date-fns';
 
 // Define interfaces for our types
@@ -44,12 +44,16 @@ export const Roadmap: React.FC = () => {
     dueDate: ''
   });
 
+  function assertType<T>(value: unknown): T {
+    return value as T;
+  }
+
   // Simulate loading data from an API
   useEffect(() => {
     const fetchData = async () => {
       // In a real app, this would be an API call
       // For now, we'll use mock data
-      const mockData = {
+      const mockData: {[key: string]: RoadmapColumn} = {
         planned: {
           id: 'planned',
           title: 'Planned',
@@ -98,14 +102,14 @@ export const Roadmap: React.FC = () => {
         }
       };
       
-      setColumns(mockData as any);
+      setColumns(assertType<{[key: string]: RoadmapColumn}>(mockData));
       setLoading(false);
     };
     
     fetchData();
   }, []);
 
-  const onDragEnd = (result: any) => {
+  const onDragEnd = (result: DropResult) => {
     if (!result.destination) return;
     
     const { source, destination } = result;

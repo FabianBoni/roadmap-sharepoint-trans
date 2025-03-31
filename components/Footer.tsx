@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import React from 'react';
 
 interface FooterProps {
@@ -17,16 +18,16 @@ const Footer: React.FC<FooterProps> = ({ version = 'Alpha' }) => {
           <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-6">
             <div className="text-center md:text-left">
               <h4 className="text-sm font-medium text-gray-300 mb-1">Kontakt</h4>
-              <a href="mailto:info@jsd.bs.ch" className="text-xs text-gray-400 hover:text-yellow-400 transition-colors">
+              <Link href="mailto:info@jsd.bs.ch" className="text-xs text-gray-400 hover:text-yellow-400 transition-colors">
                 fabian.boni@jsd.bs.ch
-              </a>
+              </Link>
             </div>
             
             <div className="text-center md:text-left">
               <h4 className="text-sm font-medium text-gray-300 mb-1">Ressourcen</h4>
               <div className="flex flex-col space-y-1">
-                <a href="/admin" className="text-xs text-gray-400 hover:text-yellow-400 transition-colors">Admin</a>
-                <a href="/docs/pages" className="text-xs text-gray-400 hover:text-yellow-400 transition-colors">Dokumentation</a>
+                <Link href="/admin" className="text-xs text-gray-400 hover:text-yellow-400 transition-colors">Admin</Link>
+                <Link href="/docs/pages" className="text-xs text-gray-400 hover:text-yellow-400 transition-colors">Dokumentation</Link>
               </div>
             </div>
             

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { clientDataService } from '@/utils/clientDataService';
 
 interface FieldTypeFormProps {
   fieldTypeId?: string; // If provided, we're editing an existing field type
@@ -30,23 +31,19 @@ const FieldTypeForm: React.FC<FieldTypeFormProps> = ({ fieldTypeId, onCancel }) 
     if (fieldTypeId) {
       setLoading(true);
       setError(null);
-      
-      fetch(`/api/fieldTypes/${fieldTypeId}`)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Error fetching field type: ${response.statusText}`);
-          }
-          return response.json();
-        })
+
+      clientDataService.getFieldTypeById(fieldTypeId)
         .then(data => {
+          if (!data) {
+            throw new Error('Field type not found');
+          }
           setFormData({
             name: data.name,
-            type: data.type,
+            type: data.type as 'PROCESS' | 'TECHNOLOGY' | 'SERVICE' | 'DATA',
             description: data.description,
           });
           setLoading(false);
-        })
-        .catch(err => {
+        }).catch(err => {
           console.error('Error fetching field type:', err);
           setError('Failed to load field type data');
           setLoading(false);
@@ -63,12 +60,12 @@ const FieldTypeForm: React.FC<FieldTypeFormProps> = ({ fieldTypeId, onCancel }) 
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    
+
     try {
       // Determine if we're creating or updating
       const url = fieldTypeId ? `/api/fieldTypes/${fieldTypeId}` : '/api/fieldTypes';
       const method = fieldTypeId ? 'PUT' : 'POST';
-      
+
       const response = await fetch(url, {
         method,
         headers: {
@@ -76,12 +73,12 @@ const FieldTypeForm: React.FC<FieldTypeFormProps> = ({ fieldTypeId, onCancel }) 
         },
         body: JSON.stringify(formData),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to save field type');
       }
-      
+
       // Redirect to admin page on success
       router.push('/admin');
     } catch (err) {
@@ -91,7 +88,7 @@ const FieldTypeForm: React.FC<FieldTypeFormProps> = ({ fieldTypeId, onCancel }) 
       setSubmitting(false);
     }
   };
-  
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -99,25 +96,25 @@ const FieldTypeForm: React.FC<FieldTypeFormProps> = ({ fieldTypeId, onCancel }) 
       </div>
     );
   }
-  
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold">{fieldTypeId ? 'Edit Field Type' : 'Create New Field Type'}</h1>
-        <button 
+        <button
           onClick={onCancel}
           className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded"
         >
           Cancel
         </button>
       </div>
-      
+
       {error && (
         <div className="bg-red-900 border border-red-800 text-white px-4 py-3 rounded mb-6">
           {error}
         </div>
       )}
-      
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-gray-800 p-6 rounded-lg shadow-md">
           <div className="space-y-4">
@@ -134,7 +131,7 @@ const FieldTypeForm: React.FC<FieldTypeFormProps> = ({ fieldTypeId, onCancel }) 
                 className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">
                 Type
@@ -151,7 +148,7 @@ const FieldTypeForm: React.FC<FieldTypeFormProps> = ({ fieldTypeId, onCancel }) 
                 <option value="DATA">Data</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">
                 Description
@@ -166,7 +163,7 @@ const FieldTypeForm: React.FC<FieldTypeFormProps> = ({ fieldTypeId, onCancel }) 
             </div>
           </div>
         </div>
-        
+
         {/* Submit Button */}
         <div className="flex justify-end space-x-4">
           <button

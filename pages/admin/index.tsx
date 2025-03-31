@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { clientDataService } from '@/utils/clientDataService';
+import { validateToken } from '@/utils/auth';
 
 interface Project {
   id: string;
@@ -40,42 +42,38 @@ const AdminPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
-
+  
       try {
         // Fetch projects
-        const projectsResponse = await fetch('/api/projects');
-        if (!projectsResponse.ok) {
-          throw new Error(`Error fetching projects: ${projectsResponse.statusText}`);
-        }
-        const projectsData = await projectsResponse.json();
-
+        const projectsData = await clientDataService.getAllProjects();
+        
         // Fetch categories
-        const categoriesResponse = await fetch('/api/categories');
-        if (!categoriesResponse.ok) {
-          throw new Error(`Error fetching categories: ${categoriesResponse.statusText}`);
-        }
-        const categoriesData = await categoriesResponse.json();
-
+        const categoriesData = await clientDataService.getAllCategories();
+        
         // Fetch field types
-        const fieldTypesResponse = await fetch('/api/fieldTypes');
-        if (!fieldTypesResponse.ok) {
-          throw new Error(`Error fetching field types: ${fieldTypesResponse.statusText}`);
-        }
-        const fieldTypesData = await fieldTypesResponse.json();
-
+        const fieldTypesData = await clientDataService.getAllFieldTypes();
+  
         setProjects(projectsData);
         setCategories(categoriesData);
-        setFieldTypes(fieldTypesData);
+        setFieldTypes(fieldTypesData.filter((fieldType): fieldType is FieldType => 
+          fieldType.id !== undefined
+        ));
       } catch (err) {
         console.error('Error fetching data:', err);
         setError('Failed to load data');
       } finally {
         setLoading(false);
       }
-    };
-
+    };  
     fetchData();
   }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem('adminToken');
+    if (!token || !validateToken(token)) {
+      router.push('/admin/login');
+    }
+  }, [router]);
 
   // Project management functions
   const handleAddProject = () => {
@@ -86,29 +84,17 @@ const AdminPage: React.FC = () => {
     router.push(`/admin/projects/edit/${projectId}`);
   };
 
-  const handleDeleteProject = async (projectId: string) => {
-    if (deleteConfirmation !== projectId) {
-      // First click - show confirmation
-      setDeleteConfirmation(projectId);
-      return;
-    }
-
-    // Second click - proceed with deletion
-    try {
-      const response = await fetch(`/api/projects/${projectId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error deleting project: ${response.statusText}`);
+  const handleDeleteProject = async (id: string) => {
+    if (confirm('Are you sure you want to delete this project?')) {
+      try {
+        await clientDataService.deleteProject(id);
+        
+        // Remove the deleted project from the state
+        setProjects(projects.filter(project => project.id !== id));
+      } catch (error) {
+        console.error('Error deleting project:', error);
+        setError('Failed to delete project');
       }
-
-      // Remove the project from the state
-      setProjects(projects.filter(project => project.id !== projectId));
-      setDeleteConfirmation(null);
-    } catch (err) {
-      console.error('Error deleting project:', err);
-      alert('Failed to delete project');
     }
   };
 

@@ -87,26 +87,26 @@ const KategorienDocsPage: React.FC = () => {
 
                     <ol className="list-decimal pl-6 my-4">
                         <li>Navigieren Sie zum Admin-Dashboard</li>
-                        <li>Wechseln Sie zur Registerkarte "Kategorien"</li>
-                        <li>Klicken Sie auf "Neue Kategorie"</li>
-                        <li>Geben Sie einen Namen ein, wählen Sie eine Farbe und ein Symbol</li>
-                        <li>Klicken Sie auf "Kategorie erstellen"</li>
+                        <li>Wechseln Sie zur Registerkarte &quot;Kategorien&quot;</li>
+                        <li>Klicken Sie auf &quot;Neue Kategorie&quot;</li>
+                        <li>Füllen Sie das Kategorieformular aus:</li>
+                        <li>Klicken Sie auf &quot;Kategorie erstellen&quot;</li>
                     </ol>
 
                     <h3 className="text-xl font-bold mt-6 mb-3">Kategorie bearbeiten</h3>
 
                     <ol className="list-decimal pl-6 my-4">
                         <li>Suchen Sie die Kategorie in der Tabelle</li>
-                        <li>Klicken Sie auf "Bearbeiten"</li>
+                        <li>Klicken Sie auf &quot;Bearbeiten&quot;</li>
                         <li>Aktualisieren Sie die Informationen</li>
-                        <li>Klicken Sie auf "Kategorie aktualisieren"</li>
+                        <li>Klicken Sie auf &quot;Kategorie aktualisieren&quot;</li>
                     </ol>
 
                     <h3 className="text-xl font-bold mt-6 mb-3">Kategorie löschen</h3>
 
                     <ol className="list-decimal pl-6 my-4">
                         <li>Suchen Sie die Kategorie in der Tabelle</li>
-                        <li>Klicken Sie auf "Löschen"</li>
+                        <li>Klicken Sie auf &quot;Löschen&quot;</li>
                         <li>Bestätigen Sie die Löschung</li>
                     </ol>
 

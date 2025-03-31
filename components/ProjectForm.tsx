@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { clientDataService } from '@/utils/clientDataService';
 
 interface ProjectFormProps {
   projectId?: string; // If provided, we're editing an existing project
@@ -18,6 +19,11 @@ interface FieldType {
   name: string;
   type: string;
   description: string;
+}
+
+interface FieldItem {
+  type: string;
+  value: string;
 }
 
 interface TeamMember {
@@ -86,28 +92,34 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ projectId, onCancel }) => {
 
       try {
         // Fetch categories
-        const categoriesResponse = await fetch('/api/categories');
-        if (!categoriesResponse.ok) {
-          throw new Error(`Error fetching categories: ${categoriesResponse.statusText}`);
-        }
-        const categoriesData = await categoriesResponse.json();
+        const categoriesData = await clientDataService.getAllCategories();
         setCategories(categoriesData);
 
         // Fetch field types
-        const fieldTypesResponse = await fetch('/api/fieldTypes');
-        if (!fieldTypesResponse.ok) {
-          throw new Error(`Error fetching field types: ${fieldTypesResponse.statusText}`);
-        }
-        const fieldTypesData = await fieldTypesResponse.json();
-        setFieldTypes(fieldTypesData);
+        const fieldTypesData = await clientDataService.getAllFieldTypes();
+        setFieldTypes(fieldTypesData.map(ft => ({
+          ...ft,
+          id: ft.id || ''
+        })));
 
         // If projectId is provided, fetch the project data
         if (projectId) {
-          const projectResponse = await fetch(`/api/projects/${projectId}`);
-          if (!projectResponse.ok) {
-            throw new Error(`Error fetching project: ${projectResponse.statusText}`);
+          const projectData = await clientDataService.getProjectById(projectId);
+          if (!projectData) {
+            throw new Error('Project not found');
           }
-          const projectData = await projectResponse.json();
+
+          // Get team members and fields for the project
+          const teamMembers = await clientDataService.getTeamMembersByProjectId(projectId);
+          const fields = await clientDataService.getFieldsByProjectId(projectId);
+
+          // Process fields into the expected structure
+          const processedFields = {
+            process: fields.filter((f: FieldItem) => f.type === 'PROCESS').map((f: FieldItem) => f.value) || [''],
+            technology: fields.filter((f: FieldItem) => f.type === 'TECHNOLOGY').map((f: FieldItem) => f.value) || [''],
+            services: fields.filter((f: FieldItem) => f.type === 'SERVICE').map((f: FieldItem) => f.value) || [''],
+            data: fields.filter((f: FieldItem) => f.type === 'DATA').map((f: FieldItem) => f.value) || [''],
+          };
 
           // Transform the project data to match our form structure
           setFormData({
@@ -115,34 +127,30 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ projectId, onCancel }) => {
             category: projectData.category,
             startQuarter: projectData.startQuarter,
             endQuarter: projectData.endQuarter,
-            description: projectData.description,
-            status: projectData.status,
+            description: projectData.description || '',
+            status: (projectData.status?.toLowerCase() || 'planned') as 'planned' | 'in-progress' | 'completed',
             projektleitung: projectData.projektleitung || '',
             bisher: projectData.bisher || '',
             zukunft: projectData.zukunft || '',
             fortschritt: projectData.fortschritt || 0,
             geplante_umsetzung: projectData.geplante_umsetzung || '',
             budget: projectData.budget || '',
-            teamMembers: projectData.users?.length
-              ? projectData.users.map((user: any) => ({ name: user.name, role: user.role }))
-              : [{ name: '', role: '' }],
+            teamMembers: teamMembers.length ? teamMembers : [{ name: '', role: '' }],
             fields: {
-              process: projectData.felder?.process || [''],
-              technology: projectData.felder?.technology || [''],
-              services: projectData.felder?.services || [''],
-              data: projectData.felder?.data || [''],
-            },
+              process: processedFields.process.length ? processedFields.process : [''],
+              technology: processedFields.technology.length ? processedFields.technology : [''],
+              services: processedFields.services.length ? processedFields.services : [''],
+              data: processedFields.data.length ? processedFields.data : [''],
+            }
           });
         }
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load data');
-      } finally {
+
+        setLoading(false);
+      } catch (error) {
+        setError(`Failed to load data: ${error instanceof Error ? error.message : String(error)}`);
         setLoading(false);
       }
-    };
-
-    fetchData();
+    }; fetchData();
   }, [projectId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -208,41 +216,17 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ projectId, onCancel }) => {
     setError(null);
 
     try {
-      // Filter out empty fields
-      const filteredFormData = {
-        ...formData,
-        teamMembers: formData.teamMembers.filter(member => member.name.trim() !== '' || member.role.trim() !== ''),
-        fields: {
-          process: formData.fields.process.filter(item => item.trim() !== ''),
-          technology: formData.fields.technology.filter(item => item.trim() !== ''),
-          services: formData.fields.services.filter(item => item.trim() !== ''),
-          data: formData.fields.data.filter(item => item.trim() !== ''),
-        },
-      };
-
-      // Determine if we're creating or updating
-      const url = projectId ? `/api/projects/${projectId}` : '/api/projects';
-      const method = projectId ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(filteredFormData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save project');
+      if (projectId) {
+        // Update existing project
+        await clientDataService.updateProject(projectId, formData);
+      } else {
+        // Create new project
+        await clientDataService.createProject(formData);
       }
 
-      // Redirect to admin page on success
       router.push('/admin');
-    } catch (err) {
-      console.error('Error saving project:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred while saving the project');
-    } finally {
+    } catch (error) {
+      setError(`Error: ${error instanceof Error ? error.message : String(error)}`);
       setSubmitting(false);
     }
   };

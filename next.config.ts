@@ -1,18 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  // If your app will be in a subfolder, set the base path accordingly
-  basePath: '/sites/YourSite/SiteAssets/roadmap-app',
-  // Disable image optimization
+  reactStrictMode: true,
+  output: 'export',          // For static export to SharePoint
   images: {
-    unoptimized: true,
+    unoptimized: true,       // Required for static export
   },
-  // Important for SharePoint navigation
-  trailingSlash: true,
-  eslint: {
-    // Warning: This disables ESLint completely during build
-    ignoreDuringBuilds: true,
-  },
+  trailingSlash: true,       // Makes SharePoint paths work better
+  basePath: process.env.NODE_ENV === 'production' 
+    ? '/JSD/QMServices/Roadmap/roadmapapp' // Adjusted to your SharePoint path
+    : '',
 }
 
 module.exports = nextConfig

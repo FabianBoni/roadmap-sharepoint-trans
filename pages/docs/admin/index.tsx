@@ -1,24 +1,23 @@
 import React from 'react';
 import DocsLayout from '../../../components/DocsLayout';
-import Link from 'next/link';
 
 const AdminDocsPage: React.FC = () => {
   return (
     <DocsLayout>
       <div className="max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold mb-8">Admin-Anleitung</h1>
-        
+
         <div className="prose prose-invert max-w-none">
           <p>
             Diese Anleitung bietet einen umfassenden Überblick über die Administrationsfunktionen von Roadmap JSD. Als Administrator haben Sie Zugriff auf erweiterte Funktionen zur Verwaltung von Projekten, Kategorien und Feldtypen.
           </p>
-          
+
           <h2 className="text-2xl font-bold mt-8 mb-4">Zugriff auf das Admin-Dashboard</h2>
-          
+
           <p>
             Um auf das Admin-Dashboard zuzugreifen:
           </p>
-          
+
           <ol className="list-decimal pl-6 my-4">
             <li>Navigieren Sie zu <code>/admin</code> in Ihrem Browser</li>
             <li>Melden Sie sich mit Ihren Admin-Anmeldedaten an:
@@ -28,46 +27,46 @@ const AdminDocsPage: React.FC = () => {
               </ul>
             </li>
           </ol>
-          
+
           <h2 className="text-2xl font-bold mt-8 mb-4">Überblick über das Admin-Dashboard</h2>
-          
+
           <p>
             Das Admin-Dashboard ist in drei Hauptbereiche unterteilt:
           </p>
-          
+
           <ol className="list-decimal pl-6 my-4">
             <li><strong>Projekte</strong>: Verwaltung aller Projekte im System</li>
             <li><strong>Kategorien</strong>: Verwaltung der Projektkategorien</li>
             <li><strong>Feldtypen</strong>: Verwaltung der benutzerdefinierten Feldtypen</li>
           </ol>
-          
+
           <p>
             Sie können zwischen diesen Bereichen über die Registerkarten am oberen Rand des Dashboards wechseln.
           </p>
-          
+
           <h2 className="text-2xl font-bold mt-8 mb-4">Projekte verwalten</h2>
-          
+
           <h3 className="text-xl font-bold mt-6 mb-3">Projekte anzeigen</h3>
-          
+
           <p>
-            Die Registerkarte "Projekte" zeigt eine Tabelle aller Projekte im System, einschließlich:
+            Die Registerkarte &quot;Projekte&quot; zeigt eine Tabelle aller Projekte im System, einschließlich:
           </p>
-          
+
           <ul className="list-disc pl-6 my-4">
             <li>Titel</li>
             <li>Kategorie</li>
             <li>Zeitplan (Start- und Endquartal)</li>
             <li>Status</li>
           </ul>
-          
+
           <h3 className="text-xl font-bold mt-6 mb-3">Ein neues Projekt erstellen</h3>
-          
+
           <p>
             Um ein neues Projekt zu erstellen:
           </p>
-          
+
           <ol className="list-decimal pl-6 my-4">
-            <li>Klicken Sie auf die Schaltfläche "Neues Projekt" in der oberen rechten Ecke</li>
+            <li>Klicken Sie auf die Schaltfläche &quot;Neues Projekt&quot; in der oberen rechten Ecke</li>
             <li>Füllen Sie das Projektformular mit den erforderlichen Informationen aus:
               <ul className="list-disc pl-6 my-2">
                 <li>Titel</li>
@@ -79,49 +78,49 @@ const AdminDocsPage: React.FC = () => {
                 <li>Benutzerdefinierte Felder</li>
               </ul>
             </li>
-            <li>Klicken Sie auf "Projekt erstellen", um zu speichern</li>
+            <li>Klicken Sie auf &quot;Projekt erstellen&quot;, um zu speichern</li>
           </ol>
-          
+
           <h3 className="text-xl font-bold mt-6 mb-3">Ein Projekt bearbeiten</h3>
-          
+
           <p>
             Um ein bestehendes Projekt zu bearbeiten:
           </p>
-          
+
           <ol className="list-decimal pl-6 my-4">
             <li>Suchen Sie das Projekt in der Tabelle</li>
-            <li>Klicken Sie auf die Schaltfläche "Bearbeiten" in der Spalte "Aktionen"</li>
+            <li>Klicken Sie auf die Schaltfläche &quot;Bearbeiten&quot; in der Spalte &quot;Aktionen&quot;</li>
             <li>Aktualisieren Sie die Projektinformationen im Formular</li>
-            <li>Klicken Sie auf "Projekt aktualisieren", um Änderungen zu speichern</li>
+            <li>Klicken Sie auf &quot;Projekt aktualisieren&quot;, um Änderungen zu speichern</li>
           </ol>
-          
+
           <h3 className="text-xl font-bold mt-6 mb-3">Ein Projekt löschen</h3>
-          
+
           <p>
             Um ein Projekt zu löschen:
           </p>
-          
+
           <ol className="list-decimal pl-6 my-4">
             <li>Suchen Sie das Projekt in der Tabelle</li>
-            <li>Klicken Sie auf die Schaltfläche "Löschen" in der Spalte "Aktionen"</li>
-            <li>Bestätigen Sie die Löschung, indem Sie auf "Bestätigen" klicken, wenn Sie dazu aufgefordert werden</li>
+            <li>Klicken Sie auf die Schaltfläche &quot;Löschen&quot; in der Spalte &quot;Aktionen&quot;</li>
+            <li>Bestätigen Sie die Löschung, indem Sie auf &quot;Bestätigen&quot; klicken, wenn Sie dazu aufgefordert werden</li>
           </ol>
-          
+
           <h2 className="text-2xl font-bold mt-8 mb-4">Kategorien verwalten</h2>
-          
+
           <p>
             Kategorien helfen dabei, Projekte in logische Gruppen zu organisieren. Jede Kategorie hat einen Namen, eine Farbe und ein Symbol.
           </p>
-          
+
           <h3 className="text-xl font-bold mt-6 mb-3">Eine neue Kategorie erstellen</h3>
-          
+
           <p>
             Um eine neue Kategorie zu erstellen:
           </p>
-          
+
           <ol className="list-decimal pl-6 my-4">
-            <li>Wechseln Sie zur Registerkarte "Kategorien"</li>
-            <li>Klicken Sie auf die Schaltfläche "Neue Kategorie"</li>
+            <li>Wechseln Sie zur Registerkarte &quot;Kategorien&quot;</li>
+            <li>Klicken Sie auf die Schaltfläche &quot;Neue Kategorie&quot;</li>
             <li>Füllen Sie das Kategorieformular aus:
               <ul className="list-disc pl-6 my-2">
                 <li>Name</li>
@@ -129,24 +128,24 @@ const AdminDocsPage: React.FC = () => {
                 <li>Symbol (wählen Sie aus den verfügbaren Optionen)</li>
               </ul>
             </li>
-            <li>Klicken Sie auf "Kategorie erstellen", um zu speichern</li>
+            <li>Klicken Sie auf &quot;Kategorie erstellen&quot;, um zu speichern</li>
           </ol>
-          
+
           <h2 className="text-2xl font-bold mt-8 mb-4">Feldtypen verwalten</h2>
-          
+
           <p>
             Mit Feldtypen können Sie benutzerdefinierte Felder für Projekte definieren, wie Technologien, Prozesse, Dienste oder Datentypen.
           </p>
-          
+
           <h3 className="text-xl font-bold mt-6 mb-3">Einen neuen Feldtyp erstellen</h3>
-          
+
           <p>
             Um einen neuen Feldtyp zu erstellen:
           </p>
-          
+
           <ol className="list-decimal pl-6 my-4">
-            <li>Wechseln Sie zur Registerkarte "Feldtypen"</li>
-            <li>Klicken Sie auf die Schaltfläche "Neues Feld"</li>
+            <li>Wechseln Sie zur Registerkarte &quot;Feldtypen&quot;</li>
+            <li>Klicken Sie auf die Schaltfläche &quot;Neues Feld&quot;</li>
             <li>Füllen Sie das Feldtyp-Formular aus:
               <ul className="list-disc pl-6 my-2">
                 <li>Name</li>
@@ -154,7 +153,7 @@ const AdminDocsPage: React.FC = () => {
                 <li>Beschreibung</li>
               </ul>
             </li>
-            <li>Klicken Sie auf "Feldtyp erstellen", um zu speichern</li>
+            <li>Klicken Sie auf &quot;Feldtyp erstellen&quot;, um zu speichern</li>
           </ol>
         </div>
       </div>

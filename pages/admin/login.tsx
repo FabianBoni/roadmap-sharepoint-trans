@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { generateToken } from '@/utils/auth';
 
 const AdminLogin: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -25,7 +26,8 @@ const AdminLogin: React.FC = () => {
       // In a real app, this would be an API call to verify credentials
       // For now, we'll use a simple check with our seeded admin user
       if (email === 'admin@jsd.bs.ch' && password === 'admin123') {
-        localStorage.setItem('isAdmin', 'true');
+        const token = generateToken(email, password);
+        localStorage.setItem('adminToken', token);
         router.push('/admin');
       } else {
         setError('Invalid email or password');

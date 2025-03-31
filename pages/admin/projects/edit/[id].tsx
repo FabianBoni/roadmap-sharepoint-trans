@@ -16,8 +16,19 @@ const EditProjectPage: React.FC = () => {
       router.push('/admin/login');
       return;
     }
-    
-    setLoading(false);
+
+    // Add error handling for the project loading
+    const fetchProject = async () => {
+      try {
+        // Your code to fetch project data if needed
+        setLoading(false);
+      } catch (err) {
+        setError('Failed to load project data. Please try again: ' + err);
+        setLoading(false);
+      }
+    };
+
+    fetchProject();
   }, [router]);
 
   const handleCancel = () => {

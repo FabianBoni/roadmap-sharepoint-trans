@@ -58,7 +58,7 @@ const InstallationDocsPage: React.FC = () => {
                         <li>Erstellen Sie eine <code>.env</code>-Datei im Stammverzeichnis</li>
                         <li>Fügen Sie Ihren Datenbankverbindungsstring hinzu:
                             <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto mt-2">
-                                <code>DATABASE_URL="postgresql://benutzername:passwort@localhost:5432/roadmap_jsd"</code>
+                                <code>DATABASE_URL=&quot;postgresql://benutzername:passwort@localhost:5432/roadmap_jsd&quot;</code>
                             </pre>
                         </li>
                         <li>Führen Sie Prisma-Migrationen aus:
@@ -153,12 +153,12 @@ const InstallationDocsPage: React.FC = () => {
                     <h3 className="text-xl font-bold mt-6 mb-3">Häufige Fehler</h3>
 
                     <div className="bg-gray-800 p-4 rounded-md my-4">
-                        <p className="font-bold">Fehler: "Prisma Client konnte nicht mit der Datenbank verbinden"</p>
+                        <p className="font-bold">Fehler: &quot;Prisma Client konnte nicht mit der Datenbank verbinden&quot;</p>
                         <p className="mt-2">Lösung: Überprüfen Sie Ihre Datenbankverbindung und stellen Sie sicher, dass die Datenbank läuft.</p>
                     </div>
 
                     <div className="bg-gray-800 p-4 rounded-md my-4">
-                        <p className="font-bold">Fehler: "Module not found"</p>
+                        <p className="font-bold">Fehler: &quot;Module not found&quot;</p>
                         <p className="mt-2">Lösung: Führen Sie <code>npm install</code> aus, um sicherzustellen, dass alle Abhängigkeiten installiert sind.</p>
                     </div>
 

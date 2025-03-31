@@ -1,6 +1,5 @@
 import React from 'react';
 import DocsLayout from '../../../components/DocsLayout';
-import Link from 'next/link';
 
 const ApiDocsPage: React.FC = () => {
     return (

@@ -99,26 +99,26 @@ const FeldtypenDocsPage: React.FC = () => {
           
           <ol className="list-decimal pl-6 my-4">
             <li>Navigieren Sie zum Admin-Dashboard</li>
-            <li>Wechseln Sie zur Registerkarte "Feldtypen"</li>
-            <li>Klicken Sie auf "Neues Feld"</li>
+            <li>Wechseln Sie zur Registerkarte &quot;Feldtypen&quot;</li>
+            <li>Klicken Sie auf &quot;Neues Feld&quot;</li>
             <li>Geben Sie einen Namen ein, wählen Sie einen Typ und fügen Sie eine Beschreibung hinzu</li>
-            <li>Klicken Sie auf "Feldtyp erstellen"</li>
+            <li>Klicken Sie auf &quot;Feldtyp erstellen&quot;</li>
           </ol>
           
           <h3 className="text-xl font-bold mt-6 mb-3">Feldtyp bearbeiten</h3>
           
           <ol className="list-decimal pl-6 my-4">
             <li>Suchen Sie den Feldtyp in der Tabelle</li>
-            <li>Klicken Sie auf "Bearbeiten"</li>
+            <li>Klicken Sie auf &quot;Bearbeiten&quot;</li>
             <li>Aktualisieren Sie die Informationen</li>
-            <li>Klicken Sie auf "Feldtyp aktualisieren"</li>
+            <li>Klicken Sie auf &quot;Feldtyp aktualisieren&quot;</li>
           </ol>
           
           <h3 className="text-xl font-bold mt-6 mb-3">Feldtyp löschen</h3>
           
           <ol className="list-decimal pl-6 my-4">
             <li>Suchen Sie den Feldtyp in der Tabelle</li>
-            <li>Klicken Sie auf "Löschen"</li>
+            <li>Klicken Sie auf &quot;Löschen&quot;</li>
             <li>Bestätigen Sie die Löschung</li>
           </ol>
           

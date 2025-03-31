@@ -4,23 +4,7 @@ import ProjectTimeline from './ProjectTimeline';
 import TimelineNavigation from './TimelineNavigation';
 import Footer from './Footer';
 import ClientOnly from './ClientOnly';
-
-interface Project {
-  id: string;
-  title: string;
-  category: string;
-  startQuarter: string;
-  endQuarter: string;
-  description: string;
-  status: 'completed' | 'in-progress' | 'planned';
-}
-
-interface Category {
-  id: string;
-  name: string;
-  color: string;
-  icon: string;
-}
+import { clientDataService, Project, Category } from '@/utils/clientDataService';
 
 const RoadmapDashboard: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -29,28 +13,24 @@ const RoadmapDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch categories
-    fetch('/api/categories')
-      .then(response => response.json())
-      .then((data: Category[]) => {
-        setCategories(data);
-        setActiveCategories(data.map(c => c.id));
-      })
-      .catch(error => {
-        console.error('Error fetching categories:', error);
-      });
-
-    // Fetch projects
-    fetch('/api/projects')
-      .then(response => response.json())
-      .then((data: Project[]) => {
-        setProjects(data);
+    const fetchData = async () => {
+      try {
+        // Fetch categories
+        const categoriesData = await clientDataService.getAllCategories();
+        setCategories(categoriesData);
+        setActiveCategories(categoriesData.map(c => c.id));
+        
+        // Fetch projects
+        const projectsData = await clientDataService.getAllProjects();
+        setProjects(projectsData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
         setLoading(false);
-      })
-      .catch(error => {
-        console.error('Error fetching projects:', error);
-        setLoading(false);
-      });
+      }
+    };
+    
+    fetchData();
   }, []);
 
   const toggleCategory = (categoryId: string) => {

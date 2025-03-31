@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
+import { HTMLAttributes } from 'react';
 
-export default function ClientOnly({ children, ...delegated }: { children: React.ReactNode; [key: string]: any }) {
+// Use React's built-in HTMLAttributes type for div elements
+export default function ClientOnly({ 
+  children, 
+  ...delegated 
+}: { 
+  children: React.ReactNode; 
+} & HTMLAttributes<HTMLDivElement>) {
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
