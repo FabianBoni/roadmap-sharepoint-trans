@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import prisma from '../../../lib/prisma'
+import { clientDataService } from '@/utils/clientDataService';
 
 export default async function handler(
   req: NextApiRequest,
@@ -8,7 +8,9 @@ export default async function handler(
   // GET - Fetch all categories
   if (req.method === 'GET') {
     try {
-      const categories = await prisma.category.findMany()
+      // Use clientDataService directly
+      const categories = await clientDataService.getAllCategories();
+      
       res.status(200).json(categories)
     } catch (error) {
       console.error('Error fetching categories:', error)
@@ -24,13 +26,8 @@ export default async function handler(
         return res.status(400).json({ error: 'Name, color, and icon are required' })
       }
       
-      const newCategory = await prisma.category.create({
-        data: {
-          name,
-          color,
-          icon,
-        },
-      })
+      // Use clientDataService directly
+      const newCategory = await clientDataService.createCategory({ name, color, icon });
       
       res.status(201).json(newCategory)
     } catch (error) {

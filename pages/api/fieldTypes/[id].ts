@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import prisma from '../../../lib/prisma'
+import { clientDataService } from '@/utils/clientDataService';
 
 export default async function handler(
   req: NextApiRequest,
@@ -14,9 +14,8 @@ export default async function handler(
   // GET - Fetch a single field type
   if (req.method === 'GET') {
     try {
-      const fieldType = await prisma.fieldType.findUnique({
-        where: { id }
-      })
+      // Use clientDataService directly
+      const fieldType = await clientDataService.getFieldTypeById(id);
       
       if (!fieldType) {
         return res.status(404).json({ error: 'Field type not found' })
@@ -37,33 +36,11 @@ export default async function handler(
         return res.status(400).json({ error: 'Name, type, and description are required' })
       }
       
-      // Check if the type is being changed and if the new type already exists
-      const existingFieldType = await prisma.fieldType.findUnique({
-        where: { id }
-      })
+      // Use clientDataService directly
+      await clientDataService.updateFieldType(id, { name, type, description });
       
-      if (!existingFieldType) {
-        return res.status(404).json({ error: 'Field type not found' })
-      }
-      
-      if (existingFieldType.type !== type) {
-        const typeExists = await prisma.fieldType.findUnique({
-          where: { type }
-        })
-        
-        if (typeExists) {
-          return res.status(400).json({ error: `Field type '${type}' already exists` })
-        }
-      }
-      
-      const updatedFieldType = await prisma.fieldType.update({
-        where: { id },
-        data: {
-          name,
-          type,
-          description
-        }
-      })
+      // Fetch the updated field type to return
+      const updatedFieldType = await clientDataService.getFieldTypeById(id);
       
       res.status(200).json(updatedFieldType)
     } catch (error) {
@@ -74,24 +51,8 @@ export default async function handler(
   // DELETE - Delete a field type
   else if (req.method === 'DELETE') {
     try {
-      // Check if any fields are using this field type
-      const fieldsUsingType = await prisma.field.findFirst({
-        where: {
-          type: {
-            equals: (await prisma.fieldType.findUnique({ where: { id } }))?.type
-          }
-        }
-      })
-      
-      if (fieldsUsingType) {
-        return res.status(400).json({ 
-          error: 'Cannot delete field type: it is being used by one or more projects' 
-        })
-      }
-      
-      await prisma.fieldType.delete({
-        where: { id }
-      })
+      // Use clientDataService directly
+      await clientDataService.deleteFieldType(id);
       
       res.status(200).json({ success: true, message: 'Field type deleted successfully' })
     } catch (error) {

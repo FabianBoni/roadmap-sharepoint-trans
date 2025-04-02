@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { clientDataService } from '@/utils/clientDataService';
-import { validateToken } from '@/utils/auth';
+import { hasAdminAccess } from '@/utils/auth';
+import withAdminAuth from '@/components/withAdminAuth';
 
 interface Project {
   id: string;
@@ -42,20 +43,20 @@ const AdminPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
-  
+
       try {
         // Fetch projects
         const projectsData = await clientDataService.getAllProjects();
-        
+
         // Fetch categories
         const categoriesData = await clientDataService.getAllCategories();
-        
+
         // Fetch field types
         const fieldTypesData = await clientDataService.getAllFieldTypes();
-  
+
         setProjects(projectsData);
         setCategories(categoriesData);
-        setFieldTypes(fieldTypesData.filter((fieldType): fieldType is FieldType => 
+        setFieldTypes(fieldTypesData.filter((fieldType): fieldType is FieldType =>
           fieldType.id !== undefined
         ));
       } catch (err) {
@@ -64,15 +65,35 @@ const AdminPage: React.FC = () => {
       } finally {
         setLoading(false);
       }
-    };  
+    };
     fetchData();
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
-    if (!token || !validateToken(token)) {
-      router.push('/admin/login');
-    }
+    const checkAdminAccess = async () => {
+      try {
+        // First check localStorage for quick access
+        const isAdmin = localStorage.getItem('isAdmin');
+
+        if (!isAdmin) {
+          router.push('/admin/login');
+          return;
+        }
+
+        // Double-check with the server for security
+        const hasAccess = await hasAdminAccess();
+
+        if (!hasAccess) {
+          localStorage.removeItem('isAdmin');
+          router.push('/admin/login');
+        }
+      } catch (error) {
+        console.error('Error checking admin access:', error);
+        router.push('/admin/login');
+      }
+    };
+
+    checkAdminAccess();
   }, [router]);
 
   // Project management functions
@@ -88,7 +109,7 @@ const AdminPage: React.FC = () => {
     if (confirm('Are you sure you want to delete this project?')) {
       try {
         await clientDataService.deleteProject(id);
-        
+
         // Remove the deleted project from the state
         setProjects(projects.filter(project => project.id !== id));
       } catch (error) {
@@ -116,13 +137,8 @@ const AdminPage: React.FC = () => {
 
     // Second click - proceed with deletion
     try {
-      const response = await fetch(`/api/categories/${categoryId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error deleting category: ${response.statusText}`);
-      }
+      // Use clientDataService directly instead of fetch API
+      await clientDataService.deleteCategory(categoryId);
 
       // Remove the category from the state
       setCategories(categories.filter(category => category.id !== categoryId));
@@ -151,13 +167,8 @@ const AdminPage: React.FC = () => {
 
     // Second click - proceed with deletion
     try {
-      const response = await fetch(`/api/fieldTypes/${fieldTypeId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error deleting field type: ${response.statusText}`);
-      }
+      // Use clientDataService directly instead of fetch API
+      await clientDataService.deleteFieldType(fieldTypeId);
 
       // Remove the field type from the state
       setFieldTypes(fieldTypes.filter(fieldType => fieldType.id !== fieldTypeId));
@@ -241,8 +252,8 @@ const AdminPage: React.FC = () => {
         <div className="flex border-b border-gray-700 mb-6">
           <button
             className={`py-2 px-4 font-medium ${activeTab === 'projects'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-gray-300'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
               }`}
             onClick={() => setActiveTab('projects')}
           >
@@ -250,8 +261,8 @@ const AdminPage: React.FC = () => {
           </button>
           <button
             className={`py-2 px-4 font-medium ${activeTab === 'categories'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-gray-300'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
               }`}
             onClick={() => setActiveTab('categories')}
           >
@@ -259,8 +270,8 @@ const AdminPage: React.FC = () => {
           </button>
           <button
             className={`py-2 px-4 font-medium ${activeTab === 'fieldTypes'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-gray-400 hover:text-gray-300'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
               }`}
             onClick={() => setActiveTab('fieldTypes')}
           >
@@ -454,4 +465,4 @@ const AdminPage: React.FC = () => {
   );
 };
 
-export default AdminPage;
+export default withAdminAuth(AdminPage);

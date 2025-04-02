@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import prisma from '../../../lib/prisma'
+import { clientDataService } from '@/utils/clientDataService';
 
 export default async function handler(
   req: NextApiRequest,
@@ -8,7 +8,9 @@ export default async function handler(
   // GET - Fetch all field types
   if (req.method === 'GET') {
     try {
-      const fieldTypes = await prisma.fieldType.findMany()
+      // Use clientDataService directly
+      const fieldTypes = await clientDataService.getAllFieldTypes();
+      
       res.status(200).json(fieldTypes)
     } catch (error) {
       console.error('Error fetching field types:', error)
@@ -20,26 +22,16 @@ export default async function handler(
     try {
       const { name, type, description } = req.body
       
-      if (!name || !type || !description) {
-        return res.status(400).json({ error: 'Name, type, and description are required' })
+      if (!name || !type) {
+        return res.status(400).json({ error: 'Name and type are required' })
       }
       
-      // Check if type already exists (must be unique)
-      const existingType = await prisma.fieldType.findUnique({
-        where: { type }
-      })
-      
-      if (existingType) {
-        return res.status(400).json({ error: `Field type '${type}' already exists` })
-      }
-      
-      const newFieldType = await prisma.fieldType.create({
-        data: {
-          name,
-          type,
-          description
-        }
-      })
+      // Use clientDataService directly
+      const newFieldType = await clientDataService.createFieldType({ 
+        name, 
+        type, 
+        description: description || '' 
+      });
       
       res.status(201).json(newFieldType)
     } catch (error) {

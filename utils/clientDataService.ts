@@ -55,6 +55,11 @@ const SP_LISTS = {
 
 // Client-side data service using fetch API instead of PnP JS
 class ClientDataService {
+    // Cache for list metadata types
+    private metadataCache: Record<string, string> = {};
+    // Cache for request digest
+    private requestDigestCache: { value: string; expiration: number } | null = null;
+
     private getWebUrl(): string {
         // For development/testing with a hardcoded URL that matches your environment
         if (process.env.NODE_ENV === 'development') {
@@ -86,24 +91,132 @@ class ClientDataService {
         return 'https://spi-u.intranet.bs.ch/JSD/QMServices/Roadmap';
     }
 
+    private async getRequestDigest(): Promise<string> {
+        // Check if we have a cached digest that's still valid
+        const now = Date.now();
+        if (this.requestDigestCache && this.requestDigestCache.expiration > now) {
+            return this.requestDigestCache.value;
+        }
+
+        try {
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/contextinfo`;
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata'
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Request Digest Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
+                throw new Error(`Failed to get request digest: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            const digestValue = data.FormDigestValue;
+            const expiresIn = data.FormDigestTimeoutSeconds * 1000;
+
+            // Cache the digest
+            this.requestDigestCache = {
+                value: digestValue,
+                expiration: now + expiresIn - 60000 // Subtract 1 minute for safety
+            };
+
+            return digestValue;
+        } catch (error) {
+            console.error('Error getting request digest:', error);
+            throw error;
+        }
+    }
+
     private async fetchFromSharePoint(listName: string, select: string = '*'): Promise<any[]> {
         const webUrl = this.getWebUrl();
         const endpoint = `${webUrl}/_api/web/lists/getByTitle('${listName}')/items?$select=${select}`;
 
-        const response = await fetch(endpoint, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json;odata=nometadata'
-            },
-            credentials: 'same-origin'
-        });
+        try {
+            const response = await fetch(endpoint, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata'
+                },
+                credentials: 'same-origin'
+            });
 
-        if (!response.ok) {
-            throw new Error(`SharePoint request failed: ${response.statusText}`);
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('SharePoint API Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
+                throw new Error(`SharePoint request failed: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            return data.value || [];
+        } catch (error) {
+            console.error(`Error fetching from SharePoint list ${listName}:`, error);
+            throw error;
+        }
+    }
+
+    // Helper method to get the correct metadata type for a list
+    private async getListMetadata(listName: string): Promise<string> {
+        // Check if we have the metadata type cached
+        if (this.metadataCache[listName]) {
+            return this.metadataCache[listName];
         }
 
-        const data = await response.json();
-        return data.value || [];
+        try {
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${listName}')?$select=ListItemEntityTypeFullName`;
+
+            const response = await fetch(endpoint, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata'
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('List Metadata Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
+                throw new Error(`Failed to get list metadata: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            const metadataType = data.ListItemEntityTypeFullName;
+
+            // Cache the result
+            this.metadataCache[listName] = metadataType;
+
+            return metadataType;
+        } catch (error) {
+            console.error(`Error getting metadata for list ${listName}:`, error);
+            // Fallback to the standard format
+            const fallbackType = `SP.Data.${listName}ListItem`;
+            this.metadataCache[listName] = fallbackType;
+            return fallbackType;
+        }
     }
 
     // PROJECT OPERATIONS
@@ -150,6 +263,14 @@ class ClientDataService {
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Project Fetch Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
                 throw new Error(`Failed to fetch project: ${response.statusText}`);
             }
 
@@ -181,18 +302,30 @@ class ClientDataService {
             const webUrl = this.getWebUrl();
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.PROJECTS}')/items(${id})`;
 
+            // Get request digest for write operations
+            const requestDigest = await this.getRequestDigest();
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json;odata=nometadata',
                     'Content-Type': 'application/json;odata=verbose',
                     'X-HTTP-Method': 'DELETE',
-                    'IF-MATCH': '*'
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
                 },
                 credentials: 'same-origin'
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Project Delete Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
                 throw new Error(`Failed to delete project: ${response.statusText}`);
             }
 
@@ -239,6 +372,14 @@ class ClientDataService {
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Category Fetch Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
                 throw new Error(`Failed to fetch category: ${response.statusText}`);
             }
 
@@ -290,6 +431,14 @@ class ClientDataService {
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Field Type Fetch Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
                 throw new Error(`Failed to fetch field type: ${response.statusText}`);
             }
 
@@ -322,6 +471,14 @@ class ClientDataService {
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Team Members Fetch Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
                 throw new Error(`Failed to fetch team members: ${response.statusText}`);
             }
 
@@ -345,15 +502,19 @@ class ClientDataService {
             const webUrl = this.getWebUrl();
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.TEAM_MEMBERS}')/items`;
 
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.TEAM_MEMBERS);
+            const requestDigest = await this.getRequestDigest();
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json;odata=nometadata',
                     'Content-Type': 'application/json;odata=verbose',
-                    'X-HTTP-Method': 'POST'
+                    'X-RequestDigest': requestDigest
                 },
                 body: JSON.stringify({
-                    __metadata: { type: `SP.Data.${SP_LISTS.TEAM_MEMBERS}ListItem` },
+                    __metadata: { type: listMetadata },
                     Title: teamMember.name,
                     Role: teamMember.role,
                     ProjectId: teamMember.projectId
@@ -362,6 +523,14 @@ class ClientDataService {
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Team Member Create Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
                 throw new Error(`Failed to create team member: ${response.statusText}`);
             }
 
@@ -385,18 +554,30 @@ class ClientDataService {
                 const webUrl = this.getWebUrl();
                 const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.TEAM_MEMBERS}')/items(${member.id})`;
 
+                // Get request digest for write operations
+                const requestDigest = await this.getRequestDigest();
+
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json;odata=nometadata',
                         'Content-Type': 'application/json;odata=verbose',
                         'X-HTTP-Method': 'DELETE',
-                        'IF-MATCH': '*'
+                        'IF-MATCH': '*',
+                        'X-RequestDigest': requestDigest
                     },
                     credentials: 'same-origin'
                 });
 
                 if (!response.ok) {
+                    // Try to get the response text for better error messages
+                    const errorText = await response.text();
+                    console.error('Team Member Delete Error Response:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        url: response.url,
+                        body: errorText
+                    });
                     throw new Error(`Failed to delete team member: ${response.statusText}`);
                 }
             }
@@ -421,6 +602,14 @@ class ClientDataService {
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Fields Fetch Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
                 throw new Error(`Failed to fetch fields: ${response.statusText}`);
             }
 
@@ -444,15 +633,19 @@ class ClientDataService {
             const webUrl = this.getWebUrl();
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.FIELDS}')/items`;
 
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.FIELDS);
+            const requestDigest = await this.getRequestDigest();
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json;odata=nometadata',
                     'Content-Type': 'application/json;odata=verbose',
-                    'X-HTTP-Method': 'POST'
+                    'X-RequestDigest': requestDigest
                 },
                 body: JSON.stringify({
-                    __metadata: { type: `SP.Data.${SP_LISTS.FIELDS}ListItem` },
+                    __metadata: { type: listMetadata },
                     Type: field.type,
                     Value: field.value,
                     ProjectId: field.projectId
@@ -461,6 +654,19 @@ class ClientDataService {
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Field Create Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify({
+                        Type: field.type,
+                        Value: field.value,
+                        ProjectId: field.projectId
+                    })
+                });
                 throw new Error(`Failed to create field: ${response.statusText}`);
             }
 
@@ -484,18 +690,30 @@ class ClientDataService {
                 const webUrl = this.getWebUrl();
                 const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.FIELDS}')/items(${field.id})`;
 
+                // Get request digest for write operations
+                const requestDigest = await this.getRequestDigest();
+
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json;odata=nometadata',
                         'Content-Type': 'application/json;odata=verbose',
                         'X-HTTP-Method': 'DELETE',
-                        'IF-MATCH': '*'
+                        'IF-MATCH': '*',
+                        'X-RequestDigest': requestDigest
                     },
                     credentials: 'same-origin'
                 });
 
                 if (!response.ok) {
+                    // Try to get the response text for better error messages
+                    const errorText = await response.text();
+                    console.error('Field Delete Error Response:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        url: response.url,
+                        body: errorText
+                    });
                     throw new Error(`Failed to delete field: ${response.statusText}`);
                 }
             }
@@ -505,7 +723,6 @@ class ClientDataService {
         }
     }
 
-    // Enhanced createProject method that also handles team members and fields
     async createProject(project: Omit<Project, 'id'> & {
         teamMembers?: { name: string; role: string }[];
         fields?: {
@@ -520,47 +737,126 @@ class ClientDataService {
             const webUrl = this.getWebUrl();
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.PROJECTS}')/items`;
 
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.PROJECTS);
+            const requestDigest = await this.getRequestDigest();
+
+            // Convert Fortschritt to a proper double format
+            const fortschrittValue = parseFloat(project.fortschritt.toString());
+
+            console.log("Creating project with data:", {
+                Title: project.title,
+                Category: project.category,
+                StartQuarter: project.startQuarter,
+                EndQuarter: project.endQuarter,
+                Description: project.description || '',
+                Status: project.status.toUpperCase(),
+                Projektleitung: project.projektleitung || '',
+                Bisher: project.bisher || '',
+                Zukunft: project.zukunft || '',
+                Fortschritt: fortschrittValue,
+                GeplantUmsetzung: project.geplante_umsetzung || '',
+                Budget: project.budget || ''
+            });
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
-                    'Accept': 'application/json;odata=nometadata',
+                    'Accept': 'application/json;odata=verbose',
                     'Content-Type': 'application/json;odata=verbose',
-                    'X-HTTP-Method': 'POST'
+                    'X-RequestDigest': requestDigest
                 },
                 body: JSON.stringify({
-                    __metadata: { type: `SP.Data.${SP_LISTS.PROJECTS}ListItem` },
+                    __metadata: { type: listMetadata },
                     Title: project.title,
                     Category: project.category,
                     StartQuarter: project.startQuarter,
                     EndQuarter: project.endQuarter,
-                    Description: project.description,
-                    Status: project.status.toUpperCase(), // Convert to uppercase for SharePoint
-                    Projektleitung: project.projektleitung,
-                    Bisher: project.bisher,
-                    Zukunft: project.zukunft,
-                    Fortschritt: project.fortschritt,
-                    GeplantUmsetzung: project.geplante_umsetzung,
-                    Budget: project.budget
+                    Description: project.description || '',
+                    Status: project.status.toUpperCase(),
+                    Projektleitung: project.projektleitung || '',
+                    Bisher: project.bisher || '',
+                    Zukunft: project.zukunft || '',
+                    Fortschritt: fortschrittValue, // Explicitly formatted as a double
+                    GeplantUmsetzung: project.geplante_umsetzung || '',
+                    Budget: project.budget || ''
                 }),
-                credentials: 'same-origin'
+                credentials: 'include'
             });
 
             if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Project Create Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify({
+                        Title: project.title,
+                        Category: project.category,
+                        StartQuarter: project.startQuarter,
+                        EndQuarter: project.endQuarter,
+                        Description: project.description || '',
+                        Status: project.status.toUpperCase(),
+                        Projektleitung: project.projektleitung || '',
+                        Bisher: project.bisher || '',
+                        Zukunft: project.zukunft || '',
+                        Fortschritt: fortschrittValue,
+                        GeplantUmsetzung: project.geplante_umsetzung || '',
+                        Budget: project.budget || ''
+                    })
+                });
                 throw new Error(`Failed to create project: ${response.statusText}`);
             }
 
+            // Log the full response for debugging
             const result = await response.json();
-            const newProjectId = result.Id.toString();
+            console.log("Project creation result:", JSON.stringify(result, null, 2));
+
+            // Handle different response formats
+            let newProjectId;
+            if (result.d && result.d.Id) {
+                newProjectId = result.d.Id.toString();
+            } else if (result.Id) {
+                newProjectId = result.Id.toString();
+            } else if (result.id) {
+                newProjectId = result.id.toString();
+            } else {
+                console.error("Unexpected response format:", result);
+                // Try to find an ID property at any level
+                const findId = (obj: any): string | null => {
+                    if (!obj || typeof obj !== 'object') return null;
+                    if (obj.Id) return obj.Id.toString();
+                    if (obj.id) return obj.id.toString();
+                    for (const key in obj) {
+                        const found = findId(obj[key]);
+                        if (found) return found;
+                    }
+                    return null;
+                };
+
+                newProjectId = findId(result);
+                if (!newProjectId) {
+                    throw new Error("Could not find project ID in response");
+                }
+            }
+
+            console.log("Using project ID:", newProjectId);
 
             // Then create team members if provided
             if (project.teamMembers && project.teamMembers.length > 0) {
                 for (const member of project.teamMembers) {
                     if (member.name && member.role) { // Only create if name and role are provided
-                        await this.createTeamMember({
-                            name: member.name,
-                            role: member.role,
-                            projectId: newProjectId
-                        });
+                        try {
+                            await this.createTeamMember({
+                                name: member.name,
+                                role: member.role,
+                                projectId: newProjectId
+                            });
+                        } catch (error) {
+                            console.error(`Error creating team member ${member.name}:`, error);
+                            // Continue with other team members even if one fails
+                        }
                     }
                 }
             }
@@ -571,11 +867,16 @@ class ClientDataService {
                 if (project.fields.process) {
                     for (const value of project.fields.process) {
                         if (value) { // Only create if value is not empty
-                            await this.createField({
-                                type: 'PROCESS',
-                                value,
-                                projectId: newProjectId
-                            });
+                            try {
+                                await this.createField({
+                                    type: 'PROCESS',
+                                    value,
+                                    projectId: newProjectId
+                                });
+                            } catch (error) {
+                                console.error(`Error creating process field ${value}:`, error);
+                                // Continue with other fields even if one fails
+                            }
                         }
                     }
                 }
@@ -584,11 +885,15 @@ class ClientDataService {
                 if (project.fields.technology) {
                     for (const value of project.fields.technology) {
                         if (value) {
-                            await this.createField({
-                                type: 'TECHNOLOGY',
-                                value,
-                                projectId: newProjectId
-                            });
+                            try {
+                                await this.createField({
+                                    type: 'TECHNOLOGY',
+                                    value,
+                                    projectId: newProjectId
+                                });
+                            } catch (error) {
+                                console.error(`Error creating technology field ${value}:`, error);
+                            }
                         }
                     }
                 }
@@ -597,11 +902,15 @@ class ClientDataService {
                 if (project.fields.services) {
                     for (const value of project.fields.services) {
                         if (value) {
-                            await this.createField({
-                                type: 'SERVICE',
-                                value,
-                                projectId: newProjectId
-                            });
+                            try {
+                                await this.createField({
+                                    type: 'SERVICE',
+                                    value,
+                                    projectId: newProjectId
+                                });
+                            } catch (error) {
+                                console.error(`Error creating service field ${value}:`, error);
+                            }
                         }
                     }
                 }
@@ -610,11 +919,15 @@ class ClientDataService {
                 if (project.fields.data) {
                     for (const value of project.fields.data) {
                         if (value) {
-                            await this.createField({
-                                type: 'DATA',
-                                value,
-                                projectId: newProjectId
-                            });
+                            try {
+                                await this.createField({
+                                    type: 'DATA',
+                                    value,
+                                    projectId: newProjectId
+                                });
+                            } catch (error) {
+                                console.error(`Error creating data field ${value}:`, error);
+                            }
                         }
                     }
                 }
@@ -626,20 +939,95 @@ class ClientDataService {
                 category: project.category,
                 startQuarter: project.startQuarter,
                 endQuarter: project.endQuarter,
-                description: project.description,
+                description: project.description || '',
                 status: project.status,
-                projektleitung: project.projektleitung,
-                bisher: project.bisher,
-                zukunft: project.zukunft,
+                projektleitung: project.projektleitung || '',
+                bisher: project.bisher || '',
+                zukunft: project.zukunft || '',
                 fortschritt: project.fortschritt,
-                geplante_umsetzung: project.geplante_umsetzung,
-                budget: project.budget
+                geplante_umsetzung: project.geplante_umsetzung || '',
+                budget: project.budget || ''
             };
         } catch (error) {
             console.error('Error creating project:', error);
             throw error;
         }
     }
+
+    async getCurrentUser(): Promise<any> {
+        try {
+          const webUrl = this.getWebUrl();
+          const endpoint = `${webUrl}/_api/web/currentuser?$select=Id,Title,Email,IsSiteAdmin,LoginName,UserPrincipalName`;
+      
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json;odata=verbose'
+            },
+            credentials: 'include'
+          });
+      
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Current User Fetch Error:', {
+              status: response.status,
+              statusText: response.statusText,
+              url: response.url,
+              body: errorText
+            });
+            throw new Error(`Failed to fetch current user: ${response.statusText}`);
+          }
+      
+          const data = await response.json();
+          return data.d;
+        } catch (error) {
+          console.error('Error fetching current user:', error);
+          throw error;
+        }
+      }
+      
+      // Method to check if current user is an admin
+      async isCurrentUserAdmin(): Promise<boolean> {
+        try {
+          // First check if user is a site admin
+          const currentUser = await this.getCurrentUser();
+          
+          if (currentUser.IsSiteAdmin) {
+            return true;
+          }
+          
+          // If not a site admin, check if they're in our admin list
+          const adminUsers = await this.getAdminUsers();
+          return adminUsers.some(admin => 
+            admin.email.toLowerCase() === currentUser.Email.toLowerCase() ||
+            admin.loginName === currentUser.LoginName
+          );
+        } catch (error) {
+          console.error('Error checking admin status:', error);
+          return false;
+        }
+      }
+      
+      // Get list of admin users from our custom list
+      async getAdminUsers(): Promise<{id: string, email: string, loginName: string}[]> {
+        try {
+          const items = await this.fetchFromSharePoint(
+            SP_LISTS.USERS,
+            'Id,Email,LoginName,Role'
+          );
+          
+          return items
+            .filter(item => item.Role === 'admin')
+            .map(item => ({
+              id: item.Id.toString(),
+              email: item.Email,
+              loginName: item.LoginName || ''
+            }));
+        } catch (error) {
+          console.error('Error fetching admin users:', error);
+          return [];
+        }
+      }      
 
     // Enhanced updateProject method that also handles team members and fields
     async updateProject(id: string, project: Partial<Project> & {
@@ -656,8 +1044,12 @@ class ClientDataService {
             const webUrl = this.getWebUrl();
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.PROJECTS}')/items(${id})`;
 
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.PROJECTS);
+            const requestDigest = await this.getRequestDigest();
+
             const updateData: any = {
-                __metadata: { type: `SP.Data.${SP_LISTS.PROJECTS}ListItem` }
+                __metadata: { type: listMetadata }
             };
 
             if (project.title) updateData.Title = project.title;
@@ -679,13 +1071,23 @@ class ClientDataService {
                     'Accept': 'application/json;odata=nometadata',
                     'Content-Type': 'application/json;odata=verbose',
                     'X-HTTP-Method': 'MERGE',
-                    'IF-MATCH': '*'
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
                 },
                 body: JSON.stringify(updateData),
                 credentials: 'same-origin'
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Project Update Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify(updateData)
+                });
                 throw new Error(`Failed to update project: ${response.statusText}`);
             }
 
@@ -776,15 +1178,19 @@ class ClientDataService {
             const webUrl = this.getWebUrl();
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.CATEGORIES}')/items`;
 
+            const listMetadata = await this.getListMetadata(SP_LISTS.CATEGORIES);
+            const requestDigest = await this.getRequestDigest();
+
+            // Don't explicitly set the Title/Titel field at all
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json;odata=nometadata',
                     'Content-Type': 'application/json;odata=verbose',
-                    'X-HTTP-Method': 'POST'
+                    'X-RequestDigest': requestDigest
                 },
                 body: JSON.stringify({
-                    __metadata: { type: `SP.Data.${SP_LISTS.CATEGORIES}ListItem` },
+                    __metadata: { type: listMetadata },
                     Title: category.name,
                     Color: category.color,
                     Icon: category.icon
@@ -793,17 +1199,30 @@ class ClientDataService {
             });
 
             if (!response.ok) {
-                throw new Error(`Failed to create category: ${response.statusText}`);
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Field Type Create Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify({
+                        Title: category.name,
+                        Color: category.color,
+                        Icon: category.icon || ''
+                    })
+                });
+
+                throw new Error(`Failed to create field type: ${response.statusText}`);
             }
 
             const result = await response.json();
 
             return {
-                id: result.Id.toString(),
-                name: category.name,
-                color: category.color,
-                icon: category.icon
+                ...category,
+                id: result.Id.toString()
             };
+
         } catch (error) {
             console.error('Error creating category:', error);
             throw error;
@@ -815,8 +1234,12 @@ class ClientDataService {
             const webUrl = this.getWebUrl();
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.CATEGORIES}')/items(${id})`;
 
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.CATEGORIES);
+            const requestDigest = await this.getRequestDigest();
+
             const updateData: any = {
-                __metadata: { type: `SP.Data.${SP_LISTS.CATEGORIES}ListItem` }
+                __metadata: { type: listMetadata }
             };
 
             if (category.name) updateData.Title = category.name;
@@ -829,13 +1252,23 @@ class ClientDataService {
                     'Accept': 'application/json;odata=nometadata',
                     'Content-Type': 'application/json;odata=verbose',
                     'X-HTTP-Method': 'MERGE',
-                    'IF-MATCH': '*'
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
                 },
                 body: JSON.stringify(updateData),
                 credentials: 'same-origin'
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Category Update Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify(updateData)
+                });
                 throw new Error(`Failed to update category: ${response.statusText}`);
             }
         } catch (error) {
@@ -849,18 +1282,30 @@ class ClientDataService {
             const webUrl = this.getWebUrl();
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.CATEGORIES}')/items(${id})`;
 
+            // Get request digest for write operations
+            const requestDigest = await this.getRequestDigest();
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json;odata=nometadata',
                     'Content-Type': 'application/json;odata=verbose',
                     'X-HTTP-Method': 'DELETE',
-                    'IF-MATCH': '*'
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
                 },
                 credentials: 'same-origin'
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Category Delete Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
                 throw new Error(`Failed to delete category: ${response.statusText}`);
             }
         } catch (error) {
@@ -875,15 +1320,19 @@ class ClientDataService {
             const webUrl = this.getWebUrl();
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.FIELD_TYPES}')/items`;
 
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.FIELD_TYPES);
+            const requestDigest = await this.getRequestDigest();
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json;odata=nometadata',
                     'Content-Type': 'application/json;odata=verbose',
-                    'X-HTTP-Method': 'POST'
+                    'X-RequestDigest': requestDigest
                 },
                 body: JSON.stringify({
-                    __metadata: { type: `SP.Data.${SP_LISTS.FIELD_TYPES}ListItem` },
+                    __metadata: { type: listMetadata },
                     Title: fieldType.name,
                     Type: fieldType.type,
                     Description: fieldType.description || ''
@@ -892,6 +1341,19 @@ class ClientDataService {
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Field Type Create Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify({
+                        Title: fieldType.name,
+                        Type: fieldType.type,
+                        Description: fieldType.description || ''
+                    })
+                });
                 throw new Error(`Failed to create field type: ${response.statusText}`);
             }
 
@@ -914,8 +1376,12 @@ class ClientDataService {
             const webUrl = this.getWebUrl();
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.FIELD_TYPES}')/items(${id})`;
 
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.FIELD_TYPES);
+            const requestDigest = await this.getRequestDigest();
+
             const updateData: any = {
-                __metadata: { type: `SP.Data.${SP_LISTS.FIELD_TYPES}ListItem` }
+                __metadata: { type: listMetadata }
             };
 
             if (fieldType.name) updateData.Title = fieldType.name;
@@ -928,13 +1394,23 @@ class ClientDataService {
                     'Accept': 'application/json;odata=nometadata',
                     'Content-Type': 'application/json;odata=verbose',
                     'X-HTTP-Method': 'MERGE',
-                    'IF-MATCH': '*'
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
                 },
                 body: JSON.stringify(updateData),
                 credentials: 'same-origin'
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Field Type Update Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify(updateData)
+                });
                 throw new Error(`Failed to update field type: ${response.statusText}`);
             }
         } catch (error) {
@@ -948,18 +1424,30 @@ class ClientDataService {
             const webUrl = this.getWebUrl();
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.FIELD_TYPES}')/items(${id})`;
 
+            // Get request digest for write operations
+            const requestDigest = await this.getRequestDigest();
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json;odata=nometadata',
                     'Content-Type': 'application/json;odata=verbose',
                     'X-HTTP-Method': 'DELETE',
-                    'IF-MATCH': '*'
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
                 },
                 credentials: 'same-origin'
             });
 
             if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Field Type Delete Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
                 throw new Error(`Failed to delete field type: ${response.statusText}`);
             }
         } catch (error) {
@@ -967,7 +1455,220 @@ class ClientDataService {
             throw error;
         }
     }
+
+    // User operations for authentication
+    async getUserByEmail(email: string): Promise<any | null> {
+        try {
+            const webUrl = this.getWebUrl();
+            const encodedEmail = encodeURIComponent(email);
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.USERS}')/items?$filter=Email eq '${encodedEmail}'&$select=Id,Title,Email,Role,Password`;
+
+            const response = await fetch(endpoint, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata'
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('User Fetch Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
+                throw new Error(`Failed to fetch user: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            const users = data.value || [];
+
+            if (users.length === 0) {
+                return null;
+            }
+
+            return {
+                id: users[0].Id.toString(),
+                username: users[0].Email,
+                displayName: users[0].Title,
+                role: users[0].Role || 'user',
+                password: users[0].Password // Note: In a real app, passwords should be hashed
+            };
+        } catch (error) {
+            console.error(`Error fetching user by email ${email}:`, error);
+            return null;
+        }
+    }
+
+    async createUser(user: { username: string; displayName: string; role: string; password: string }): Promise<any> {
+        try {
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.USERS}')/items`;
+
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.USERS);
+            const requestDigest = await this.getRequestDigest();
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata',
+                    'Content-Type': 'application/json;odata=verbose',
+                    'X-RequestDigest': requestDigest
+                },
+                body: JSON.stringify({
+                    __metadata: { type: listMetadata },
+                    Title: user.displayName,
+                    Email: user.username,
+                    Role: user.role,
+                    Password: user.password // Note: In a real app, passwords should be hashed
+                }),
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('User Create Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify({
+                        Title: user.displayName,
+                        Email: user.username,
+                        Role: user.role,
+                        Password: '********' // Masked for security
+                    })
+                });
+                throw new Error(`Failed to create user: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            return {
+                id: result.Id.toString(),
+                username: user.username,
+                displayName: user.displayName,
+                role: user.role
+            };
+        } catch (error) {
+            console.error('Error creating user:', error);
+            throw error;
+        }
+    }
+
+    async getAllUsers(): Promise<any[]> {
+        try {
+            const items = await this.fetchFromSharePoint(
+                SP_LISTS.USERS,
+                'Id,Title,Email,Role'
+            );
+
+            return items.map(item => ({
+                id: item.Id.toString(),
+                username: item.Email,
+                displayName: item.Title,
+                role: item.Role || 'user'
+            }));
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            return [];
+        }
+    }
+
+    async updateUser(id: string, user: Partial<{ username: string; displayName: string; role: string; password: string }>): Promise<void> {
+        try {
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.USERS}')/items(${id})`;
+
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.USERS);
+            const requestDigest = await this.getRequestDigest();
+
+            const updateData: any = {
+                __metadata: { type: listMetadata }
+            };
+
+            if (user.displayName) updateData.Title = user.displayName;
+            if (user.username) updateData.Email = user.username;
+            if (user.role) updateData.Role = user.role;
+            if (user.password) updateData.Password = user.password; // Note: In a real app, passwords should be hashed
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata',
+                    'Content-Type': 'application/json;odata=verbose',
+                    'X-HTTP-Method': 'MERGE',
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
+                },
+                body: JSON.stringify(updateData),
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('User Update Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify({
+                        ...updateData,
+                        Password: updateData.Password ? '********' : undefined // Masked for security
+                    })
+                });
+                throw new Error(`Failed to update user: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error(`Error updating user ${id}:`, error);
+            throw error;
+        }
+    }
+
+    async deleteUser(id: string): Promise<void> {
+        try {
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.USERS}')/items(${id})`;
+
+            // Get request digest for write operations
+            const requestDigest = await this.getRequestDigest();
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata',
+                    'Content-Type': 'application/json;odata=verbose',
+                    'X-HTTP-Method': 'DELETE',
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('User Delete Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
+                throw new Error(`Failed to delete user: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error(`Error deleting user ${id}:`, error);
+            throw error;
+        }
+    }
 }
 
 // Create and export a singleton instance
-export const clientDataService = new ClientDataService();    
+export const clientDataService = new ClientDataService();

@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import prisma from '../../../lib/prisma'
+import { clientDataService } from '@/utils/clientDataService';
 
 export default async function handler(
   req: NextApiRequest,
@@ -14,20 +14,13 @@ export default async function handler(
   // GET - Fetch a single category
   if (req.method === 'GET') {
     try {
-      const category = await prisma.category.findUnique({
-        where: { id },
-      })
-
+      // Use clientDataService directly
+      const category = await clientDataService.getCategoryById(id);
+      
       if (!category) {
-        // For debugging, let's log what IDs we do have
-        const allCategories = await prisma.category.findMany({
-          select: { id: true, name: true }
-        });
-        console.log('Available category IDs:', allCategories);
-
         return res.status(404).json({ error: 'Category not found' })
       }
-
+      
       res.status(200).json(category)
     } catch (error) {
       console.error('Error fetching category:', error)
@@ -43,15 +36,12 @@ export default async function handler(
         return res.status(400).json({ error: 'Name, color, and icon are required' })
       }
 
-      const updatedCategory = await prisma.category.update({
-        where: { id },
-        data: {
-          name,
-          color,
-          icon,
-        },
-      })
-
+      // Use clientDataService directly
+      await clientDataService.updateCategory(id, { name, color, icon });
+      
+      // Fetch the updated category to return
+      const updatedCategory = await clientDataService.getCategoryById(id);
+      
       res.status(200).json(updatedCategory)
     } catch (error) {
       console.error('Error updating category:', error)
@@ -61,10 +51,9 @@ export default async function handler(
   // DELETE - Delete a category
   else if (req.method === 'DELETE') {
     try {
-      await prisma.category.delete({
-        where: { id },
-      })
-
+      // Use clientDataService directly
+      await clientDataService.deleteCategory(id);
+      
       res.status(204).end()
     } catch (error) {
       console.error('Error deleting category:', error)
