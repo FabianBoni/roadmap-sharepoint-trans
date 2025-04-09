@@ -90,3 +90,79 @@ export const iconCategories: Record<string, string[]> = {
 
 // Flatten all categories to get all available icons
 export const allIcons = Object.values(iconCategories).flat();
+
+// NEW: Get all available icons from all libraries
+export const getAllAvailableIcons = (): Record<string, string[]> => {
+  const result: Record<string, string[]> = {};
+  
+  // For each library, get all its exported icons
+  Object.entries(iconLibraries).forEach(([prefix, library]) => {
+    result[prefix] = Object.keys(library).filter(key => 
+      typeof library[key as keyof typeof library] === 'function' &&
+      // Filter out non-icon exports
+      !key.startsWith('_') && 
+      key !== 'default'
+    );
+  });
+  
+  return result;
+};
+
+// NEW: Search for icons across all libraries
+export const searchIcons = (searchTerm: string, limit = 100): string[] => {
+  if (!searchTerm) return allIcons.slice(0, limit);
+  
+  const results: string[] = [];
+  const lowerSearchTerm = searchTerm.toLowerCase();
+  
+  // First search in our predefined categories
+  allIcons.forEach(iconName => {
+    if (iconName.toLowerCase().includes(lowerSearchTerm)) {
+      results.push(iconName);
+    }
+  });
+  
+  // If we don't have enough results, search through all libraries
+  if (results.length < limit) {
+    Object.entries(iconLibraries).forEach(([prefix, library]) => {
+      Object.keys(library).forEach(key => {
+        // Skip if we already have this icon or if it's not a function
+        if (results.includes(key) || typeof library[key as keyof typeof library] !== 'function') {
+          return;
+        }
+        
+        // Skip non-icon exports
+        if (key.startsWith('_') || key === 'default') {
+          return;
+        }
+        
+        if (key.toLowerCase().includes(lowerSearchTerm) && results.length < limit) {
+          results.push(key.startsWith(prefix.toUpperCase()) ? key : `${prefix.toUpperCase()}${key}`);
+        }
+      });
+    });
+  }
+  
+  return results;
+};
+
+// NEW: Get a sample of icons from each library
+export const getIconSamples = (count = 5): Record<string, string[]> => {
+  const samples: Record<string, string[]> = {};
+  
+  Object.entries(iconLibraries).forEach(([prefix, library]) => {
+    const icons = Object.keys(library)
+      .filter(key => 
+        typeof library[key as keyof typeof library] === 'function' &&
+        !key.startsWith('_') && 
+        key !== 'default'
+      )
+      .slice(0, count);
+    
+    if (icons.length > 0) {
+      samples[prefix] = icons;
+    }
+  });
+  
+  return samples;
+};
