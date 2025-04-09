@@ -7,7 +7,7 @@ interface FooterProps {
 
 const Footer: React.FC<FooterProps> = ({ version = 'Alpha' }) => {
   return (
-    <footer className="py-6 px-10 border-t border-gray-700 bg-gradient-to-r from-gray-900 to-gray-800">
+    <footer className="py-6 px-10 border-t border-gray-700">
       <div className="container mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-center">
           <div className="mb-4 md:mb-0">
