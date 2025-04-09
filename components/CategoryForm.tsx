@@ -1,157 +1,118 @@
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import { toast } from 'react-hot-toast';
-import { Category, clientDataService } from '../utils/clientDataService';
+import React, { useState } from 'react';
+import { Category } from '../types';
+import { clientDataService } from '../utils/clientDataService';
+import IconPicker from './IconPicker';
+import ColorPicker from './ColorPicker';
 
 interface CategoryFormProps {
-  initialData?: Category;
+  category?: Category;
+  onSave: () => void;
   onCancel: () => void;
 }
 
-const CategoryForm: React.FC<CategoryFormProps> = ({ initialData, onCancel }) => {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [allCategories, setAllCategories] = useState<Category[]>([]);
-  const [formData, setFormData] = useState({
-    name: initialData?.name || '',
-    color: initialData?.color || '#3B82F6', // Default blue color
-    icon: initialData?.icon || '',
-    parentId: initialData?.parentId || '',
-    isSubcategory: initialData?.parentId ? true : false
-  });
-
-  // Fetch all categories to populate parent category dropdown
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const categories = await clientDataService.getAllCategories();
-        // Filter out the current category (to prevent self-reference) and subcategories
-        const availableParents = initialData?.id
-          ? categories.filter(cat => cat.id !== initialData.id && !cat.isSubcategory)
-          : categories.filter(cat => !cat.isSubcategory);
-        setAllCategories(availableParents);
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-        toast.error('Failed to load categories');
-      }
-    };
-
-    fetchCategories();
-  }, [initialData]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ 
-      ...prev, 
-      [name]: value,
-      isSubcategory: name === 'parentId' ? value !== '' : prev.isSubcategory
-    }));
-  };
+const CategoryForm: React.FC<CategoryFormProps> = ({
+  category,
+  onSave,
+  onCancel
+}) => {
+  const [name, setName] = useState(category?.name || '');
+  const [color, setColor] = useState(category?.color || '#4299e1');
+  const [icon, setIcon] = useState(category?.icon || '');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+
+    if (!name.trim()) {
+      setError('Category name is required');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
 
     try {
-      if (initialData) {
+      if (category?.id) {
         // Update existing category
-        await clientDataService.updateCategory(initialData.id, formData);
-        toast.success('Category updated successfully');
+        await clientDataService.updateCategory(category.id, {
+          name,
+          color,
+          icon
+        });
       } else {
         // Create new category
-        await clientDataService.createCategory(formData);
-        toast.success('Category created successfully');
+        await clientDataService.createCategory({
+          name,
+          color,
+          icon
+        });
       }
-      router.push('/admin');
-    } catch (error) {
-      console.error('Error saving category:', error);
-      toast.error(initialData ? 'Failed to update category' : 'Failed to create category');
+
+      onSave();
+    } catch (err) {
+      console.error('Error saving category:', err);
+      setError('Failed to save category. Please try again.');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg shadow-lg">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-gray-300 mb-2">Name</label>
-          <input
-            type="text"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            required
-          />
-        </div>
-        
-        <div>
-          <label className="block text-gray-300 mb-2">Color</label>
-          <div className="flex space-x-2">
-            <input
-              type="color"
-              name="color"
-              value={formData.color}
-              onChange={handleChange}
-              className="h-10 w-10 bg-gray-700 border border-gray-600 rounded"
-            />
-            <input
-              type="text"
-              name="color"
-              value={formData.color}
-              onChange={handleChange}
-              className="flex-1 p-2 bg-gray-700 border border-gray-600 rounded text-white"
-              placeholder="#HEX"
-            />
-          </div>
-        </div>
-        
-        <div>
-          <label className="block text-gray-300 mb-2">Icon (Optional)</label>
-          <input
-            type="text"
-            name="icon"
-            value={formData.icon}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            placeholder="Icon name or URL"
-          />
-        </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <h2 className="text-xl font-bold">
+        {category ? 'Edit Category' : 'Add New Category'}
+      </h2>
 
-        <div>
-          <label className="block text-gray-300 mb-2">Parent Category (Optional)</label>
-          <select
-            name="parentId"
-            value={formData.parentId}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-          >
-            <option value="">None (Top-level Category)</option>
-            {allCategories.map(category => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
+      {error && (
+        <div className="bg-red-900 text-white p-2 rounded">
+          {error}
         </div>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium mb-1">
+          Category Name
+        </label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+          placeholder="Enter category name"
+          required
+        />
       </div>
 
-      <div className="mt-6 flex justify-end space-x-4">
+      <div>
+        <label className="block text-sm font-medium mb-1">
+          Color
+        </label>
+        <ColorPicker value={color} onChange={setColor} />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">
+          Icon
+        </label>
+        <IconPicker value={icon} onChange={setIcon} />
+      </div>
+
+      <div className="flex justify-end space-x-2 pt-4">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition-colors"
-          disabled={loading}
+          className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600"
+          disabled={isSubmitting}
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500 transition-colors"
-          disabled={loading}
+          className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500"
+          disabled={isSubmitting}
         >
-          {loading ? 'Saving...' : initialData ? 'Update Category' : 'Create Category'}
+          {isSubmitting ? 'Saving...' : 'Save Category'}
         </button>
       </div>
     </form>

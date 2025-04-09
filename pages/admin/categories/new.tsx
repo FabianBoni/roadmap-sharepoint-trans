@@ -22,7 +22,10 @@ const NewCategoryPage: React.FC = () => {
             </button>
           </Link>
         </div>
-        <CategoryForm onCancel={handleCancel} />
+        <CategoryForm 
+          onSave={() => router.push('/admin')} 
+          onCancel={handleCancel} 
+        />
       </div>
     </div>
   );
