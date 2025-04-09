@@ -19,6 +19,7 @@ const CategorySidebar: React.FC<CategorySidebarProps> = ({
 }) => {
   // Function to render the correct Fluent UI icon based on the icon name
   const renderIcon = (iconName: string) => {
+    console.log('Rendering icon:', iconName);
     // Only proceed if we have a valid icon name
     if (!iconName) return <span>📁</span>;
     
@@ -36,7 +37,7 @@ const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
   return (
     <div className="w-64 pr-6">
-      <h2 className="text-xl font-bold mb-4">Projekt Kategorien</h2>
+      <h2 className="text-xl font-bold mb-4">Bereiche</h2>
       <div className="space-y-2">
         {categories.map(category => (
           <div
