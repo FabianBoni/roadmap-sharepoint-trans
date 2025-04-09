@@ -20,6 +20,8 @@ export interface Category {
     name: string;
     color: string;
     icon: string;
+    parentId?: string;      // Added for subcategories support
+    isSubcategory?: boolean; // Added for easier filtering
 }
 
 export interface FieldType {
@@ -219,6 +221,13 @@ class ClientDataService {
         }
     }
 
+    // Added method to convert list names to their expected type format
+    private getListItemType(listName: string): string {
+        // Sanitize the list name for use in the type name
+        const sanitizedName = listName.replace(/\s/g, '_x0020_');
+        return `SP.Data.${sanitizedName}ListItem`;
+    }
+
     // PROJECT OPERATIONS
     async getAllProjects(): Promise<Project[]> {
         try {
@@ -343,14 +352,16 @@ class ClientDataService {
         try {
             const items = await this.fetchFromSharePoint(
                 SP_LISTS.CATEGORIES,
-                'Id,Title,Color,Icon'
+                'Id,Title,Color,Icon,ParentCategoryId,IsSubcategory'
             );
 
             return items.map(item => ({
                 id: item.Id.toString(),
                 name: item.Title,
                 color: item.Color,
-                icon: item.Icon,
+                icon: item.Icon || '',
+                parentId: item.ParentCategoryId ? item.ParentCategoryId.toString() : undefined,
+                isSubcategory: item.IsSubcategory === true
             }));
         } catch (error) {
             console.error('Error fetching categories:', error);
@@ -361,7 +372,7 @@ class ClientDataService {
     async getCategoryById(id: string): Promise<Category | null> {
         try {
             const webUrl = this.getWebUrl();
-            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.CATEGORIES}')/items(${id})?$select=Id,Title,Color,Icon`;
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.CATEGORIES}')/items(${id})?$select=Id,Title,Color,Icon,ParentCategoryId,IsSubcategory`;
 
             const response = await fetch(endpoint, {
                 method: 'GET',
@@ -389,7 +400,9 @@ class ClientDataService {
                 id: item.Id.toString(),
                 name: item.Title,
                 color: item.Color,
-                icon: item.Icon,
+                icon: item.Icon || '',
+                parentId: item.ParentCategoryId ? item.ParentCategoryId.toString() : undefined,
+                isSubcategory: item.IsSubcategory === true
             };
         } catch (error) {
             console.error(`Error fetching category ${id}:`, error);
@@ -723,6 +736,284 @@ class ClientDataService {
         }
     }
 
+    // Category operations
+    async createCategory(categoryData: Omit<Category, 'id'>): Promise<Category> {
+        const webUrl = this.getWebUrl();
+        const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.CATEGORIES}')/items`;
+
+        // Get the correct metadata type and request digest
+        const listMetadata = await this.getListMetadata(SP_LISTS.CATEGORIES);
+        const requestDigest = await this.getRequestDigest();
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json;odata=verbose',
+                'Content-Type': 'application/json;odata=verbose',
+                'X-RequestDigest': requestDigest,
+                'X-HTTP-Method': 'POST'
+            },
+            body: JSON.stringify({
+                __metadata: { type: listMetadata },
+                Title: categoryData.name,
+                Color: categoryData.color,
+                Icon: categoryData.icon || '',
+                ParentCategoryId: categoryData.parentId || null,
+                IsSubcategory: categoryData.parentId ? true : false
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to create category: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return this.mapCategoryFromSharePoint(data.d);
+    }
+
+    // Update the mapCategoryFromSharePoint method to include parent category info
+    private mapCategoryFromSharePoint(item: any): Category {
+        return {
+            id: item.ID?.toString() || item.Id?.toString(),
+            name: item.Title,
+            color: item.Color || '#000000',
+            icon: item.Icon || '',
+            parentId: item.ParentCategoryId ? item.ParentCategoryId.toString() : undefined,
+            isSubcategory: item.IsSubcategory === true
+        };
+    }
+
+    async updateCategory(id: string, category: Partial<Category>): Promise<void> {
+        try {
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.CATEGORIES}')/items(${id})`;
+
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.CATEGORIES);
+            const requestDigest = await this.getRequestDigest();
+
+            const updateData: any = {
+                __metadata: { type: listMetadata }
+            };
+
+            if (category.name) updateData.Title = category.name;
+            if (category.color) updateData.Color = category.color;
+            if (category.icon !== undefined) updateData.Icon = category.icon;
+            if (category.parentId !== undefined) {
+                updateData.ParentCategoryId = category.parentId || null;
+                updateData.IsSubcategory = !!category.parentId;
+            }
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata',
+                    'Content-Type': 'application/json;odata=verbose',
+                    'X-HTTP-Method': 'MERGE',
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
+                },
+                body: JSON.stringify(updateData),
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Category Update Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify(updateData)
+                });
+                throw new Error(`Failed to update category: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error(`Error updating category ${id}:`, error);
+            throw error;
+        }
+    }
+
+    async deleteCategory(id: string): Promise<void> {
+        try {
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.CATEGORIES}')/items(${id})`;
+
+            // Get request digest for write operations
+            const requestDigest = await this.getRequestDigest();
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata',
+                    'Content-Type': 'application/json;odata=verbose',
+                    'X-HTTP-Method': 'DELETE',
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Category Delete Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
+                throw new Error(`Failed to delete category: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error(`Error deleting category ${id}:`, error);
+            throw error;
+        }
+    }
+
+    // Field type operations
+    async createFieldType(fieldType: Omit<FieldType, 'id'>): Promise<FieldType> {
+        try {
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.FIELD_TYPES}')/items`;
+
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.FIELD_TYPES);
+            const requestDigest = await this.getRequestDigest();
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata',
+                    'Content-Type': 'application/json;odata=verbose',
+                    'X-RequestDigest': requestDigest
+                },
+                body: JSON.stringify({
+                    __metadata: { type: listMetadata },
+                    Title: fieldType.name,
+                    Type: fieldType.type,
+                    Description: fieldType.description || ''
+                }),
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Field Type Create Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify({
+                        Title: fieldType.name,
+                        Type: fieldType.type,
+                        Description: fieldType.description || ''
+                    })
+                });
+                throw new Error(`Failed to create field type: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            return {
+                id: result.Id.toString(),
+                name: fieldType.name,
+                type: fieldType.type,
+                description: fieldType.description || ''
+            };
+        } catch (error) {
+            console.error('Error creating field type:', error);
+            throw error;
+        }
+    }
+
+    async updateFieldType(id: string, fieldType: Partial<FieldType>): Promise<void> {
+        try {
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.FIELD_TYPES}')/items(${id})`;
+
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.FIELD_TYPES);
+            const requestDigest = await this.getRequestDigest();
+
+            const updateData: any = {
+                __metadata: { type: listMetadata }
+            };
+
+            if (fieldType.name) updateData.Title = fieldType.name;
+            if (fieldType.type) updateData.Type = fieldType.type;
+            if (fieldType.description !== undefined) updateData.Description = fieldType.description;
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata',
+                    'Content-Type': 'application/json;odata=verbose',
+                    'X-HTTP-Method': 'MERGE',
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
+                },
+                body: JSON.stringify(updateData),
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Field Type Update Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify(updateData)
+                });
+                throw new Error(`Failed to update field type: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error(`Error updating field type ${id}:`, error);
+            throw error;
+        }
+    }
+
+    async deleteFieldType(id: string): Promise<void> {
+        try {
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.FIELD_TYPES}')/items(${id})`;
+
+            // Get request digest for write operations
+            const requestDigest = await this.getRequestDigest();
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata',
+                    'Content-Type': 'application/json;odata=verbose',
+                    'X-HTTP-Method': 'DELETE',
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Field Type Delete Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
+                throw new Error(`Failed to delete field type: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error(`Error deleting field type ${id}:`, error);
+            throw error;
+        }
+    }
+
     async createProject(project: Omit<Project, 'id'> & {
         teamMembers?: { name: string; role: string }[];
         fields?: {
@@ -956,78 +1247,78 @@ class ClientDataService {
 
     async getCurrentUser(): Promise<any> {
         try {
-          const webUrl = this.getWebUrl();
-          const endpoint = `${webUrl}/_api/web/currentuser?$select=Id,Title,Email,IsSiteAdmin,LoginName,UserPrincipalName`;
-      
-          const response = await fetch(endpoint, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json;odata=verbose'
-            },
-            credentials: 'include'
-          });
-      
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Current User Fetch Error:', {
-              status: response.status,
-              statusText: response.statusText,
-              url: response.url,
-              body: errorText
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/currentuser?$select=Id,Title,Email,IsSiteAdmin,LoginName,UserPrincipalName`;
+
+            const response = await fetch(endpoint, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json;odata=verbose'
+                },
+                credentials: 'include'
             });
-            throw new Error(`Failed to fetch current user: ${response.statusText}`);
-          }
-      
-          const data = await response.json();
-          return data.d;
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Current User Fetch Error:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
+                throw new Error(`Failed to fetch current user: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            return data.d;
         } catch (error) {
-          console.error('Error fetching current user:', error);
-          throw error;
+            console.error('Error fetching current user:', error);
+            throw error;
         }
-      }
-      
-      // Method to check if current user is an admin
-      async isCurrentUserAdmin(): Promise<boolean> {
+    }
+
+    // Method to check if current user is an admin
+    async isCurrentUserAdmin(): Promise<boolean> {
         try {
-          // First check if user is a site admin
-          const currentUser = await this.getCurrentUser();
-          
-          if (currentUser.IsSiteAdmin) {
-            return true;
-          }
-          
-          // If not a site admin, check if they're in our admin list
-          const adminUsers = await this.getAdminUsers();
-          return adminUsers.some(admin => 
-            admin.email.toLowerCase() === currentUser.Email.toLowerCase() ||
-            admin.loginName === currentUser.LoginName
-          );
+            // First check if user is a site admin
+            const currentUser = await this.getCurrentUser();
+
+            if (currentUser.IsSiteAdmin) {
+                return true;
+            }
+
+            // If not a site admin, check if they're in our admin list
+            const adminUsers = await this.getAdminUsers();
+            return adminUsers.some(admin =>
+                admin.email.toLowerCase() === currentUser.Email.toLowerCase() ||
+                admin.loginName === currentUser.LoginName
+            );
         } catch (error) {
-          console.error('Error checking admin status:', error);
-          return false;
+            console.error('Error checking admin status:', error);
+            return false;
         }
-      }
-      
-      // Get list of admin users from our custom list
-      async getAdminUsers(): Promise<{id: string, email: string, loginName: string}[]> {
+    }
+
+    // Get list of admin users from our custom list
+    async getAdminUsers(): Promise<{ id: string, email: string, loginName: string }[]> {
         try {
-          const items = await this.fetchFromSharePoint(
-            SP_LISTS.USERS,
-            'Id,Email,LoginName,Role'
-          );
-          
-          return items
-            .filter(item => item.Role === 'admin')
-            .map(item => ({
-              id: item.Id.toString(),
-              email: item.Email,
-              loginName: item.LoginName || ''
-            }));
+            const items = await this.fetchFromSharePoint(
+                SP_LISTS.USERS,
+                'Id,Email,LoginName,Role'
+            );
+
+            return items
+                .filter(item => item.Role === 'admin')
+                .map(item => ({
+                    id: item.Id.toString(),
+                    email: item.Email,
+                    loginName: item.LoginName || ''
+                }));
         } catch (error) {
-          console.error('Error fetching admin users:', error);
-          return [];
+            console.error('Error fetching admin users:', error);
+            return [];
         }
-      }      
+    }
 
     // Enhanced updateProject method that also handles team members and fields
     async updateProject(id: string, project: Partial<Project> & {
@@ -1168,290 +1459,6 @@ class ClientDataService {
             }
         } catch (error) {
             console.error(`Error updating project ${id}:`, error);
-            throw error;
-        }
-    }
-
-    // Category operations
-    async createCategory(category: Omit<Category, 'id'>): Promise<Category> {
-        try {
-            const webUrl = this.getWebUrl();
-            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.CATEGORIES}')/items`;
-
-            const listMetadata = await this.getListMetadata(SP_LISTS.CATEGORIES);
-            const requestDigest = await this.getRequestDigest();
-
-            // Don't explicitly set the Title/Titel field at all
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json;odata=nometadata',
-                    'Content-Type': 'application/json;odata=verbose',
-                    'X-RequestDigest': requestDigest
-                },
-                body: JSON.stringify({
-                    __metadata: { type: listMetadata },
-                    Title: category.name,
-                    Color: category.color,
-                    Icon: category.icon
-                }),
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                // Try to get the response text for better error messages
-                const errorText = await response.text();
-                console.error('Field Type Create Error Response:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    url: response.url,
-                    body: errorText,
-                    requestBody: JSON.stringify({
-                        Title: category.name,
-                        Color: category.color,
-                        Icon: category.icon || ''
-                    })
-                });
-
-                throw new Error(`Failed to create field type: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-
-            return {
-                ...category,
-                id: result.Id.toString()
-            };
-
-        } catch (error) {
-            console.error('Error creating category:', error);
-            throw error;
-        }
-    }
-
-    async updateCategory(id: string, category: Partial<Category>): Promise<void> {
-        try {
-            const webUrl = this.getWebUrl();
-            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.CATEGORIES}')/items(${id})`;
-
-            // Get the correct metadata type and request digest
-            const listMetadata = await this.getListMetadata(SP_LISTS.CATEGORIES);
-            const requestDigest = await this.getRequestDigest();
-
-            const updateData: any = {
-                __metadata: { type: listMetadata }
-            };
-
-            if (category.name) updateData.Title = category.name;
-            if (category.color) updateData.Color = category.color;
-            if (category.icon) updateData.Icon = category.icon;
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json;odata=nometadata',
-                    'Content-Type': 'application/json;odata=verbose',
-                    'X-HTTP-Method': 'MERGE',
-                    'IF-MATCH': '*',
-                    'X-RequestDigest': requestDigest
-                },
-                body: JSON.stringify(updateData),
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                // Try to get the response text for better error messages
-                const errorText = await response.text();
-                console.error('Category Update Error Response:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    url: response.url,
-                    body: errorText,
-                    requestBody: JSON.stringify(updateData)
-                });
-                throw new Error(`Failed to update category: ${response.statusText}`);
-            }
-        } catch (error) {
-            console.error(`Error updating category ${id}:`, error);
-            throw error;
-        }
-    }
-
-    async deleteCategory(id: string): Promise<void> {
-        try {
-            const webUrl = this.getWebUrl();
-            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.CATEGORIES}')/items(${id})`;
-
-            // Get request digest for write operations
-            const requestDigest = await this.getRequestDigest();
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json;odata=nometadata',
-                    'Content-Type': 'application/json;odata=verbose',
-                    'X-HTTP-Method': 'DELETE',
-                    'IF-MATCH': '*',
-                    'X-RequestDigest': requestDigest
-                },
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                // Try to get the response text for better error messages
-                const errorText = await response.text();
-                console.error('Category Delete Error Response:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    url: response.url,
-                    body: errorText
-                });
-                throw new Error(`Failed to delete category: ${response.statusText}`);
-            }
-        } catch (error) {
-            console.error(`Error deleting category ${id}:`, error);
-            throw error;
-        }
-    }
-
-    // Field type operations
-    async createFieldType(fieldType: Omit<FieldType, 'id'>): Promise<FieldType> {
-        try {
-            const webUrl = this.getWebUrl();
-            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.FIELD_TYPES}')/items`;
-
-            // Get the correct metadata type and request digest
-            const listMetadata = await this.getListMetadata(SP_LISTS.FIELD_TYPES);
-            const requestDigest = await this.getRequestDigest();
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json;odata=nometadata',
-                    'Content-Type': 'application/json;odata=verbose',
-                    'X-RequestDigest': requestDigest
-                },
-                body: JSON.stringify({
-                    __metadata: { type: listMetadata },
-                    Title: fieldType.name,
-                    Type: fieldType.type,
-                    Description: fieldType.description || ''
-                }),
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                // Try to get the response text for better error messages
-                const errorText = await response.text();
-                console.error('Field Type Create Error Response:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    url: response.url,
-                    body: errorText,
-                    requestBody: JSON.stringify({
-                        Title: fieldType.name,
-                        Type: fieldType.type,
-                        Description: fieldType.description || ''
-                    })
-                });
-                throw new Error(`Failed to create field type: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-
-            return {
-                id: result.Id.toString(),
-                name: fieldType.name,
-                type: fieldType.type,
-                description: fieldType.description || ''
-            };
-        } catch (error) {
-            console.error('Error creating field type:', error);
-            throw error;
-        }
-    }
-
-    async updateFieldType(id: string, fieldType: Partial<FieldType>): Promise<void> {
-        try {
-            const webUrl = this.getWebUrl();
-            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.FIELD_TYPES}')/items(${id})`;
-
-            // Get the correct metadata type and request digest
-            const listMetadata = await this.getListMetadata(SP_LISTS.FIELD_TYPES);
-            const requestDigest = await this.getRequestDigest();
-
-            const updateData: any = {
-                __metadata: { type: listMetadata }
-            };
-
-            if (fieldType.name) updateData.Title = fieldType.name;
-            if (fieldType.type) updateData.Type = fieldType.type;
-            if (fieldType.description !== undefined) updateData.Description = fieldType.description;
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json;odata=nometadata',
-                    'Content-Type': 'application/json;odata=verbose',
-                    'X-HTTP-Method': 'MERGE',
-                    'IF-MATCH': '*',
-                    'X-RequestDigest': requestDigest
-                },
-                body: JSON.stringify(updateData),
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                // Try to get the response text for better error messages
-                const errorText = await response.text();
-                console.error('Field Type Update Error Response:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    url: response.url,
-                    body: errorText,
-                    requestBody: JSON.stringify(updateData)
-                });
-                throw new Error(`Failed to update field type: ${response.statusText}`);
-            }
-        } catch (error) {
-            console.error(`Error updating field type ${id}:`, error);
-            throw error;
-        }
-    }
-
-    async deleteFieldType(id: string): Promise<void> {
-        try {
-            const webUrl = this.getWebUrl();
-            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.FIELD_TYPES}')/items(${id})`;
-
-            // Get request digest for write operations
-            const requestDigest = await this.getRequestDigest();
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json;odata=nometadata',
-                    'Content-Type': 'application/json;odata=verbose',
-                    'X-HTTP-Method': 'DELETE',
-                    'IF-MATCH': '*',
-                    'X-RequestDigest': requestDigest
-                },
-                credentials: 'same-origin'
-            });
-
-            if (!response.ok) {
-                // Try to get the response text for better error messages
-                const errorText = await response.text();
-                console.error('Field Type Delete Error Response:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    url: response.url,
-                    body: errorText
-                });
-                throw new Error(`Failed to delete field type: ${response.statusText}`);
-            }
-        } catch (error) {
-            console.error(`Error deleting field type ${id}:`, error);
             throw error;
         }
     }

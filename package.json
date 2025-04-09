@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@fluentui/react": "^8.122.11",
+    "@heroicons/react": "^2.2.0",
     "@pnp/core": "^3.0.0",
     "@pnp/graph": "^3.0.0",
     "@pnp/logging": "^3.0.0",
@@ -33,6 +34,7 @@
     "react": "^19.0.0",
     "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^19.0.0",
+    "react-hot-toast": "^2.5.2",
     "react-toastify": "^11.0.5",
     "styled-components": "^6.1.15"
   },

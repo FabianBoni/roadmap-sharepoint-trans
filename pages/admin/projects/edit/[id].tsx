@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import ProjectForm from '../../../../components/ProjectForm';
+import withAdminAuth from '@/components/withAdminAuth';
 
 const EditProjectPage: React.FC = () => {
   const router = useRouter();
@@ -78,4 +79,4 @@ const EditProjectPage: React.FC = () => {
   );
 };
 
-export default EditProjectPage;
+export default withAdminAuth(EditProjectPage);

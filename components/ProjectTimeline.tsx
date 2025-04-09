@@ -21,6 +21,7 @@ interface Category {
 interface ProjectTimelineProps {
   projects: Project[];
   categories: Category[];
+  currentYear: number;
 }
 
 const getQuarterPosition = (quarter: string): number => {
