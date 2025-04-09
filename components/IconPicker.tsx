@@ -1,51 +1,33 @@
 import React, { useState } from 'react';
-import * as FluentIcons from '@fluentui/react-icons';
-import { validIconNames, iconCategories } from '../utils/fluentIcons';
+import { iconCategories, getIconByName } from '../utils/reactIcons';
 
 interface IconPickerProps {
   value: string;
   onChange: (iconName: string) => void;
 }
 
-// Define proper types for Fluent UI icons
-type FluentIconsType = typeof FluentIcons;
-type FluentIconComponent = React.FC<{ className?: string; fontSize?: number }>;
-
 const IconPicker: React.FC<IconPickerProps> = ({ value, onChange }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showPicker, setShowPicker] = useState(false);
   
+  // Get all available icon names
+  const allIconNames = Object.values(iconCategories).flat();
+  
   // Filter icons based on search term
   const filteredIcons = searchTerm 
-    ? validIconNames.filter(name => 
+    ? allIconNames.filter(name => 
         name.toLowerCase().includes(searchTerm.toLowerCase())
       )
-    : validIconNames;
+    : allIconNames;
   
   // Render the selected icon or a placeholder
   const renderSelectedIcon = () => {
-    if (!value || !validIconNames.includes(value)) {
+    if (!value) {
       return <span className="text-gray-400">Select an icon</span>;
     }
     
-    const IconComponent = FluentIcons[value as keyof FluentIconsType] as FluentIconComponent | undefined;
-    
-    if (IconComponent && typeof IconComponent === 'function') {
-      return <IconComponent className="text-white" fontSize={20} />;
-    }
-    
-    return <span className="text-gray-400">Select an icon</span>;
-  };
-  
-  // Helper function to render an icon by name
-  const renderIcon = (iconName: string) => {
-    const IconComponent = FluentIcons[iconName as keyof FluentIconsType] as FluentIconComponent | undefined;
-    
-    if (IconComponent && typeof IconComponent === 'function') {
-      return <IconComponent className="text-white" fontSize={20} />;
-    }
-    
-    return <span>?</span>;
+    const IconComponent = getIconByName(value);
+    return IconComponent ? <IconComponent className="text-white" size={20} /> : <span>📁</span>;
   };
   
   return (
@@ -74,21 +56,24 @@ const IconPicker: React.FC<IconPickerProps> = ({ value, onChange }) => {
           
           {searchTerm ? (
             <div className="grid grid-cols-6 gap-2 max-h-60 overflow-y-auto">
-              {filteredIcons.map(iconName => (
-                <div
-                  key={iconName}
-                  className={`p-2 rounded cursor-pointer hover:bg-gray-700 flex items-center justify-center ${
-                    value === iconName ? 'bg-blue-600' : ''
-                  }`}
-                  onClick={() => {
-                    onChange(iconName);
-                    setShowPicker(false);
-                  }}
-                  title={iconName}
-                >
-                  {renderIcon(iconName)}
-                </div>
-              ))}
+              {filteredIcons.map(iconName => {
+                const IconComponent = getIconByName(iconName);
+                return (
+                  <div
+                    key={iconName}
+                    className={`p-2 rounded cursor-pointer hover:bg-gray-700 flex items-center justify-center ${
+                      value === iconName ? 'bg-blue-600' : ''
+                    }`}
+                    onClick={() => {
+                      onChange(iconName);
+                      setShowPicker(false);
+                    }}
+                    title={iconName}
+                  >
+                    {IconComponent ? <IconComponent className="text-white" size={20} /> : <span>?</span>}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="max-h-60 overflow-y-auto">
@@ -96,21 +81,24 @@ const IconPicker: React.FC<IconPickerProps> = ({ value, onChange }) => {
                 <div key={category} className="mb-4">
                   <h3 className="text-white font-medium mb-2 capitalize">{category}</h3>
                   <div className="grid grid-cols-6 gap-2">
-                    {icons.map(iconName => (
-                      <div
-                        key={iconName}
-                        className={`p-2 rounded cursor-pointer hover:bg-gray-700 flex items-center justify-center ${
-                          value === iconName ? 'bg-blue-600' : ''
-                        }`}
-                        onClick={() => {
-                          onChange(iconName);
-                          setShowPicker(false);
-                        }}
-                        title={iconName}
-                      >
-                        {renderIcon(iconName)}
-                      </div>
-                    ))}
+                    {icons.map(iconName => {
+                      const IconComponent = getIconByName(iconName);
+                      return (
+                        <div
+                          key={iconName}
+                          className={`p-2 rounded cursor-pointer hover:bg-gray-700 flex items-center justify-center ${
+                            value === iconName ? 'bg-blue-600' : ''
+                          }`}
+                          onClick={() => {
+                            onChange(iconName);
+                            setShowPicker(false);
+                          }}
+                          title={iconName}
+                        >
+                          {IconComponent ? <IconComponent className="text-white" size={20} /> : <span>?</span>}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}

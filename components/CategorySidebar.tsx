@@ -1,6 +1,10 @@
 import React from 'react';
 import { Category } from '../types';
-import * as FluentIcons from '@fluentui/react-icons';
+// Import all icons from a specific icon set (you can choose which one you prefer)
+import * as Fa from 'react-icons/fa'; // Font Awesome
+import * as Md from 'react-icons/md'; // Material Design
+import * as Fi from 'react-icons/fi'; // Feather Icons
+import * as Ai from 'react-icons/ai'; // Ant Design Icons
 
 interface CategorySidebarProps {
   categories: Category[];
@@ -8,25 +12,44 @@ interface CategorySidebarProps {
   onToggleCategory: (categoryId: string) => void;
 }
 
-// Define a type for accessing FluentIcons by string key
-type IconComponentType = React.FC<{ className?: string; fontSize?: number }>;
-type FluentIconsType = Record<string, IconComponentType>;
-
 const CategorySidebar: React.FC<CategorySidebarProps> = ({
   categories,
   activeCategories,
   onToggleCategory
 }) => {
-  // Function to render the correct Fluent UI icon based on the icon name
+  // Function to render the correct React Icon based on the icon name
   const renderIcon = (iconName: string) => {
-    // Cast FluentIcons to the specific type we defined, avoiding 'any'
-    const IconComponent = (FluentIcons as unknown as FluentIconsType)[iconName];
-    
-    if (IconComponent) {
-      return <IconComponent className="text-white" fontSize={16} />;
+    if (!iconName) {
+      return <span>📁</span>;
     }
     
-    return <span>📁</span>;
+    // Check different icon libraries
+    // Format: library prefix + icon name (e.g., "FaFolder", "MdHome")
+    const iconLibrary = iconName.substring(0, 2).toLowerCase();
+    
+    // Choose the appropriate icon library based on prefix
+    switch (iconLibrary) {
+      case 'fa':
+        const FaIcon = Fa[iconName as keyof typeof Fa];
+        return FaIcon ? <FaIcon className="text-white" size={16} /> : <span>📁</span>;
+      
+      case 'md':
+        const MdIcon = Md[iconName as keyof typeof Md];
+        return MdIcon ? <MdIcon className="text-white" size={16} /> : <span>📁</span>;
+      
+      case 'fi':
+        const FiIcon = Fi[iconName as keyof typeof Fi];
+        return FiIcon ? <FiIcon className="text-white" size={16} /> : <span>📁</span>;
+      
+      case 'ai':
+        const AiIcon = Ai[iconName as keyof typeof Ai];
+        return AiIcon ? <AiIcon className="text-white" size={16} /> : <span>📁</span>;
+      
+      default:
+        // Try Font Awesome as default
+        const DefaultIcon = Fa[iconName as keyof typeof Fa];
+        return DefaultIcon ? <DefaultIcon className="text-white" size={16} /> : <span>📁</span>;
+    }
   };
 
   return (
