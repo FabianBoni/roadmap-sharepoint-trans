@@ -90,13 +90,13 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   return (
     <>
       <div className="min-h-screen pt-20 px-20 font-sans bg-gray-900 text-white overflow-hidden p-0 m-0">
-        <header className="py-8 px-10 bg-gradient-to-r from-gray-900 to-gray-800">
+        <header className="py-8 px-10">
           <h1 className="text-5xl font-bold m-0 uppercase tracking-wider bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent shadow-xl">
             IT + Digital Roadmap {currentYear}
           </h1>
         </header>
 
-        <div className="flex justify-end p-2.5 px-10 border-b border-gray-700">
+        <div className="flex justify-end p-2.5 px-10">
           <RoadmapYearNavigation
             initialYear={currentYear}
             onYearChange={setCurrentYear}
