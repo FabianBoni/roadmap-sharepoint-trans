@@ -3,6 +3,7 @@ import RoadmapYearNavigation from './RoadmapYearNavigation';
 import { Category, Project } from '../types';
 import { clientDataService } from '../utils/clientDataService';
 import Footer from './Footer';
+import CategorySidebar from './CategorySidebar';
 
 interface RoadmapProps {
   initialProjects: Project[];
@@ -85,7 +86,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
         <div className="max-w-7xl mx-auto">
           <header className="mb-8 text-center">
             <h1 className="text-5xl font-bold mb-4 uppercase tracking-wider bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent">
-              IT + Digital Portfolio Roadmap {currentYear}
+              IT + Digital Roadmap {currentYear}
             </h1>
             <RoadmapYearNavigation
               initialYear={currentYear}
@@ -94,48 +95,38 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
           </header>
 
           <div className="flex">
-            {/* Left sidebar with categories */}
-            <div className="w-64 pr-6">
-              <h2 className="text-xl font-bold mb-4">Projekt Kategorien</h2>
-              <div className="space-y-2">
-                {categories.map(category => (
-                  <div
-                    key={category.id}
-                    className={`flex items-center p-2 rounded cursor-pointer transition-all ${activeCategories.includes(category.id)
-                        ? 'bg-gray-700 border-l-4'
-                        : 'bg-gray-800 opacity-70'
-                      }`}
-                    style={{
-                      borderLeftColor: activeCategories.includes(category.id) ? category.color : 'transparent'
-                    }}
-                    onClick={() => toggleCategory(category.id)}
-                  >
-                    <div
-                      className="w-8 h-8 rounded flex items-center justify-center mr-3"
-                      style={{ backgroundColor: category.color }}
-                    >
-                      <span>{category.icon}</span>
-                    </div>
-                    <span>{category.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <CategorySidebar
+              categories={categories}
+              activeCategories={activeCategories}
+              onToggleCategory={toggleCategory}
+            />
 
             {/* Main timeline area */}
             <div className="flex-1">
               {/* Quarter headers with gradient colors */}
               <div className="grid grid-cols-4 gap-4 mb-6">
-                <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-3 rounded-lg text-center font-semibold">
+                <div
+                  className="p-3 rounded-lg text-center font-semibold"
+                  style={{ background: 'linear-gradient(to right, #eab308, #d97706)' }}
+                >
                   Q1 {currentYear}
                 </div>
-                <div className="bg-gradient-to-r from-yellow-600 to-amber-600 p-3 rounded-lg text-center font-semibold">
+                <div
+                  className="p-3 rounded-lg text-center font-semibold"
+                  style={{ background: 'linear-gradient(to right, #d97706, #ea580c)' }}
+                >
                   Q2 {currentYear}
                 </div>
-                <div className="bg-gradient-to-r from-amber-600 to-orange-600 p-3 rounded-lg text-center font-semibold">
+                <div
+                  className="p-3 rounded-lg text-center font-semibold"
+                  style={{ background: 'linear-gradient(to right, #ea580c, #c2410c)' }}
+                >
                   Q3 {currentYear}
                 </div>
-                <div className="bg-gradient-to-r from-orange-600 to-red-700 p-3 rounded-lg text-center font-semibold">
+                <div
+                  className="p-3 rounded-lg text-center font-semibold"
+                  style={{ background: 'linear-gradient(to right, #c2410c, #b91c1c)' }}
+                >
                   Q4 {currentYear}
                 </div>
               </div>

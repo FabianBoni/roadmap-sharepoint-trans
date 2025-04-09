@@ -1,12 +1,6 @@
 import React from 'react';
-import { Icon, Checkbox } from '@fluentui/react';
-
-interface Category {
-  id: string;
-  name: string;
-  color: string;
-  icon: string;
-}
+import { Category } from '../types';
+import * as FluentIcons from '@fluentui/react-icons';
 
 interface CategorySidebarProps {
   categories: Category[];
@@ -14,34 +8,57 @@ interface CategorySidebarProps {
   onToggleCategory: (categoryId: string) => void;
 }
 
+// Define a type for the FluentIcons object
+type IconComponentType = React.ComponentType<{
+  className?: string;
+  fontSize?: number;
+}>;
+
 const CategorySidebar: React.FC<CategorySidebarProps> = ({
   categories,
   activeCategories,
   onToggleCategory
 }) => {
-  return (
-    <div className="w-64 p-5 border-r border-gray-700 bg-gray-800">
-      <h2 className="text-lg font-bold mb-5 text-white">Projekt Kategorien</h2>
+  // Function to render the correct Fluent UI icon based on the icon name
+  const renderIcon = (iconName: string) => {
+    // Use a properly typed approach instead of 'any'
+    const IconComponent = (FluentIcons as unknown as Record<string, IconComponentType | undefined>)[iconName];
+    
+    if (IconComponent) {
+      return <IconComponent className="text-white" fontSize={16} />;
+    }
+    
+    // Fallback if icon not found
+    return <span>📁</span>;
+  };
 
-      {categories.map(category => (
-        <div
-          key={category.id}
-          className={`flex items-center mb-4 p-3 rounded-lg cursor-pointer transition-all duration-250 hover:bg-gray-700 hover:translate-x-1 ${activeCategories.includes(category.id) ? 'bg-gray-700 border-l-4 border-yellow-400 pl-2' : ''}`}
-          onClick={() => onToggleCategory(category.id)}
-        >
-          <Icon
-            iconName={category.icon}
-            className="mr-3 text-xl"
-            style={{ color: category.color }}
-          />
-          <span className="flex-1 text-white">{category.name}</span>
-          <Checkbox
-            checked={activeCategories.includes(category.id)}
-            onChange={() => onToggleCategory(category.id)}
-            className="m-0"
-          />
-        </div>
-      ))}
+  return (
+    <div className="w-64 pr-6">
+      <h2 className="text-xl font-bold mb-4">Projekt Kategorien</h2>
+      <div className="space-y-2">
+        {categories.map(category => (
+          <div
+            key={category.id}
+            className={`flex items-center p-2 rounded cursor-pointer transition-all ${
+              activeCategories.includes(category.id) 
+                ? 'bg-gray-700 border-l-4' 
+                : 'bg-gray-800 opacity-70'
+            }`}
+            style={{
+              borderLeftColor: activeCategories.includes(category.id) ? category.color : 'transparent'
+            }}
+            onClick={() => onToggleCategory(category.id)}
+          >
+            <div
+              className="w-8 h-8 rounded flex items-center justify-center mr-3"
+              style={{ backgroundColor: category.color }}
+            >
+              {renderIcon(category.icon || '')}
+            </div>
+            <span>{category.name}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
