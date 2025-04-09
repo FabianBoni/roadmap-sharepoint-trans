@@ -1,16 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import RoadmapYearNavigation from './RoadmapYearNavigation';
-import { Category } from '../types';
+import { Category, Project } from '../types';
 import { clientDataService } from '../utils/clientDataService';
-
-interface Project {
-  id: string;
-  title: string;
-  category: string;
-  startQuarter: string;
-  endQuarter: string;
-  // other project properties
-}
+import Footer from './Footer';
 
 interface RoadmapProps {
   initialProjects: Project[];
@@ -19,160 +11,193 @@ interface RoadmapProps {
 const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
   const [displayedProjects, setDisplayedProjects] = useState<Project[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]); 
-  
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [activeCategories, setActiveCategories] = useState<string[]>([]);
+  const [hoveredProject, setHoveredProject] = useState<Project | null>(null);
+
   // Fetch categories and filter projects based on the selected year
   useEffect(() => {
     // Filter projects based on year
     const filteredProjects = initialProjects.filter(project => {
       const startYear = parseInt(project.startQuarter.split(' ')[1], 10);
       const endYear = parseInt(project.endQuarter.split(' ')[1], 10);
-      
+
       return startYear <= currentYear && endYear >= currentYear;
     });
-    
+
     setDisplayedProjects(filteredProjects);
-    
+
     // Fetch categories
     const fetchCategories = async () => {
       try {
         const categoriesData = await clientDataService.getAllCategories();
         setCategories(categoriesData);
+        // Initially set all categories as active
+        setActiveCategories(categoriesData.map(c => c.id));
       } catch (error) {
         console.error('Error fetching categories:', error);
       }
     };
-    
+
     fetchCategories();
   }, [currentYear, initialProjects]);
 
-  // Helper function to get category name and color by ID
-  const getCategoryInfo = (categoryId: string) => {
+  const toggleCategory = (categoryId: string) => {
+    if (activeCategories.includes(categoryId)) {
+      setActiveCategories(activeCategories.filter(id => id !== categoryId));
+    } else {
+      setActiveCategories([...activeCategories, categoryId]);
+    }
+  };
+
+  // Filter projects by active categories
+  const filteredProjects = displayedProjects.filter(project =>
+    activeCategories.includes(project.category)
+  );
+
+  // Get category name by ID
+  const getCategoryName = (categoryId: string) => {
     const category = categories.find(cat => cat.id === categoryId);
+    return category?.name || 'Uncategorized';
+  };
+
+  // Get category color by ID
+  const getCategoryColor = (categoryId: string) => {
+    const category = categories.find(cat => cat.id === categoryId);
+    return category?.color || '#777777';
+  };
+
+  // Calculate quarter span for timeline visualization
+  const getQuarterSpan = (startQ: string, endQ: string) => {
+    const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
+    const startIdx = quarters.indexOf(startQ.split(' ')[0]);
+    const endIdx = quarters.indexOf(endQ.split(' ')[0]);
+
     return {
-      name: category?.name || 'Uncategorized',
-      color: category?.color || '#999999'
+      start: startIdx,
+      span: endIdx - startIdx + 1
     };
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4">
-      <div className="max-w-7xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-4xl font-bold mb-4">Roadmap JSD</h1>
-          <RoadmapYearNavigation 
-            initialYear={currentYear}
-            onYearChange={setCurrentYear}
-          />
-        </header>
-        
-        <div className="grid grid-cols-4 gap-4">
-          {/* Q1 column */}
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <h3 className="text-xl font-semibold mb-4">Q1 {currentYear}</h3>
-            <div className="space-y-3">
-              {displayedProjects
-                .filter(p => p.startQuarter === `Q1 ${currentYear}` || p.endQuarter === `Q1 ${currentYear}`)
-                .map(project => {
-                  const categoryInfo = getCategoryInfo(project.category);
-                  return (
-                    <div key={project.id} className="bg-gray-700 p-3 rounded">
-                      <p className="font-medium">{project.title}</p>
-                      <div 
-                        className="text-xs mt-1 px-2 py-1 rounded-full inline-block"
-                        style={{ 
-                          backgroundColor: categoryInfo.color,
-                          color: '#fff'
-                        }}
-                      >
-                        {categoryInfo.name}
-                      </div>
+    <>
+      <div className="min-h-screen bg-gray-900 text-white p-4">
+        <div className="max-w-7xl mx-auto">
+          <header className="mb-8 text-center">
+            <h1 className="text-5xl font-bold mb-4 uppercase tracking-wider bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent">
+              IT + Digital Portfolio Roadmap {currentYear}
+            </h1>
+            <RoadmapYearNavigation
+              initialYear={currentYear}
+              onYearChange={setCurrentYear}
+            />
+          </header>
+
+          <div className="flex">
+            {/* Left sidebar with categories */}
+            <div className="w-64 pr-6">
+              <h2 className="text-xl font-bold mb-4">Projekt Kategorien</h2>
+              <div className="space-y-2">
+                {categories.map(category => (
+                  <div
+                    key={category.id}
+                    className={`flex items-center p-2 rounded cursor-pointer transition-all ${activeCategories.includes(category.id)
+                        ? 'bg-gray-700 border-l-4'
+                        : 'bg-gray-800 opacity-70'
+                      }`}
+                    style={{
+                      borderLeftColor: activeCategories.includes(category.id) ? category.color : 'transparent'
+                    }}
+                    onClick={() => toggleCategory(category.id)}
+                  >
+                    <div
+                      className="w-8 h-8 rounded flex items-center justify-center mr-3"
+                      style={{ backgroundColor: category.color }}
+                    >
+                      <span>{category.icon}</span>
                     </div>
-                  );
-                })}
+                    <span>{category.name}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-          
-          {/* Q2 column */}
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <h3 className="text-xl font-semibold mb-4">Q2 {currentYear}</h3>
-            <div className="space-y-3">
-              {displayedProjects
-                .filter(p => p.startQuarter === `Q2 ${currentYear}` || p.endQuarter === `Q2 ${currentYear}`)
-                .map(project => {
-                  const categoryInfo = getCategoryInfo(project.category);
+
+            {/* Main timeline area */}
+            <div className="flex-1">
+              {/* Quarter headers with gradient colors */}
+              <div className="grid grid-cols-4 gap-4 mb-6">
+                <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-3 rounded-lg text-center font-semibold">
+                  Q1 {currentYear}
+                </div>
+                <div className="bg-gradient-to-r from-yellow-600 to-amber-600 p-3 rounded-lg text-center font-semibold">
+                  Q2 {currentYear}
+                </div>
+                <div className="bg-gradient-to-r from-amber-600 to-orange-600 p-3 rounded-lg text-center font-semibold">
+                  Q3 {currentYear}
+                </div>
+                <div className="bg-gradient-to-r from-orange-600 to-red-700 p-3 rounded-lg text-center font-semibold">
+                  Q4 {currentYear}
+                </div>
+              </div>
+
+              {/* Project timeline bars */}
+              <div className="space-y-4 relative">
+                {filteredProjects.map(project => {
+                  const { start, span } = getQuarterSpan(project.startQuarter, project.endQuarter);
                   return (
-                    <div key={project.id} className="bg-gray-700 p-3 rounded">
-                      <p className="font-medium">{project.title}</p>
-                      <div 
-                        className="text-xs mt-1 px-2 py-1 rounded-full inline-block"
-                        style={{ 
-                          backgroundColor: categoryInfo.color,
-                          color: '#fff'
+                    <div
+                      key={project.id}
+                      className="relative h-12"
+                      onMouseEnter={() => setHoveredProject(project)}
+                      onMouseLeave={() => setHoveredProject(null)}
+                    >
+                      <div className="absolute top-0 left-0 right-0 grid grid-cols-4 gap-4 h-full pointer-events-none">
+                        <div className="bg-gray-800 rounded-lg opacity-30"></div>
+                        <div className="bg-gray-800 rounded-lg opacity-30"></div>
+                        <div className="bg-gray-800 rounded-lg opacity-30"></div>
+                        <div className="bg-gray-800 rounded-lg opacity-30"></div>
+                      </div>
+
+                      <div
+                        className="absolute top-0 h-full rounded-lg flex items-center px-4 cursor-pointer transition-all hover:brightness-110"
+                        style={{
+                          left: `${(start * 25) + 0.5}%`,
+                          width: `${span * 25 - 1}%`,
+                          backgroundColor: getCategoryColor(project.category),
+                          opacity: 0.8
                         }}
                       >
-                        {categoryInfo.name}
+                        <span className="font-medium truncate">{project.title}</span>
                       </div>
+
+                      {/* Tooltip */}
+                      {hoveredProject?.id === project.id && (
+                        <div className="absolute top-full mt-2 left-0 bg-gray-800 p-3 rounded-lg shadow-lg z-10 w-64">
+                          <h3 className="font-bold text-lg">{project.title}</h3>
+                          <p className="text-sm text-gray-300 mb-1">
+                            <span className="font-medium">Kategorie:</span> {getCategoryName(project.category)}
+                          </p>
+                          <p className="text-sm text-gray-300 mb-1">
+                            <span className="font-medium">Zeitraum:</span> {project.startQuarter} to {project.endQuarter}
+                          </p>
+                          <p className="text-sm text-gray-300 mb-1">
+                            <span className="font-medium">Status:</span> {project.status}
+                          </p>
+                          <p className="text-sm text-gray-300">
+                            {project.description}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
-            </div>
-          </div>
-          
-          {/* Q3 column */}
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <h3 className="text-xl font-semibold mb-4">Q3 {currentYear}</h3>
-            <div className="space-y-3">
-              {displayedProjects
-                .filter(p => p.startQuarter === `Q3 ${currentYear}` || p.endQuarter === `Q3 ${currentYear}`)
-                .map(project => {
-                  const categoryInfo = getCategoryInfo(project.category);
-                  return (
-                    <div key={project.id} className="bg-gray-700 p-3 rounded">
-                      <p className="font-medium">{project.title}</p>
-                      <div 
-                        className="text-xs mt-1 px-2 py-1 rounded-full inline-block"
-                        style={{ 
-                          backgroundColor: categoryInfo.color,
-                          color: '#fff'
-                        }}
-                      >
-                        {categoryInfo.name}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-          
-          {/* Q4 column */}
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <h3 className="text-xl font-semibold mb-4">Q4 {currentYear}</h3>
-            <div className="space-y-3">
-              {displayedProjects
-                .filter(p => p.startQuarter === `Q4 ${currentYear}` || p.endQuarter === `Q4 ${currentYear}`)
-                .map(project => {
-                  const categoryInfo = getCategoryInfo(project.category);
-                  return (
-                    <div key={project.id} className="bg-gray-700 p-3 rounded">
-                      <p className="font-medium">{project.title}</p>
-                      <div 
-                        className="text-xs mt-1 px-2 py-1 rounded-full inline-block"
-                        style={{ 
-                          backgroundColor: categoryInfo.color,
-                          color: '#fff'
-                        }}
-                      >
-                        {categoryInfo.name}
-                      </div>
-                    </div>
-                  );
-                })}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+      <Footer />
+    </>
   );
 };
 

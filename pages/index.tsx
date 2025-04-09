@@ -12,8 +12,7 @@ const HomePage: React.FC = () => {
     const fetchProjects = async () => {
       try {
         const data = await clientDataService.getAllProjects();
-        // Now TypeScript knows what type to expect
-        setProjects(data as Project[]);
+        setProjects(data);
       } catch (error) {
         console.error('Error fetching projects:', error);
       } finally {
