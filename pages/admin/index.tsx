@@ -22,18 +22,10 @@ interface Category {
   icon: string;
 }
 
-interface FieldType {
-  id: string;
-  name: string;
-  type: 'PROCESS' | 'TECHNOLOGY' | 'SERVICE' | 'DATA';
-  description: string;
-}
-
 const AdminPage: React.FC = () => {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [fieldTypes, setFieldTypes] = useState<FieldType[]>([]);
   const [settings, setSettings] = useState<AppSettings[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,17 +47,11 @@ const AdminPage: React.FC = () => {
         // Fetch categories
         const categoriesData = await clientDataService.getAllCategories();
 
-        // Fetch field types
-        const fieldTypesData = await clientDataService.getAllFieldTypes();
-
         const settingsData = await clientDataService.getAllSettings();
         setSettings(settingsData);
 
         setProjects(projectsData);
         setCategories(categoriesData);
-        setFieldTypes(fieldTypesData.filter((fieldType): fieldType is FieldType =>
-          fieldType.id !== undefined
-        ));
       } catch (err) {
         console.error('Error fetching data:', err);
         setError('Failed to load data');
@@ -156,36 +142,6 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  // Field type management functions
-  const handleAddFieldType = () => {
-    router.push('/admin/fieldTypes/new');
-  };
-
-  const handleEditFieldType = (fieldTypeId: string) => {
-    router.push(`/admin/fieldTypes/edit/${fieldTypeId}`);
-  };
-
-  const handleDeleteFieldType = async (fieldTypeId: string) => {
-    if (deleteConfirmation !== fieldTypeId) {
-      // First click - show confirmation
-      setDeleteConfirmation(fieldTypeId);
-      return;
-    }
-
-    // Second click - proceed with deletion
-    try {
-      // Use clientDataService directly instead of fetch API
-      await clientDataService.deleteFieldType(fieldTypeId);
-
-      // Remove the field type from the state
-      setFieldTypes(fieldTypes.filter(fieldType => fieldType.id !== fieldTypeId));
-      setDeleteConfirmation(null);
-    } catch (err) {
-      console.error('Error deleting field type:', err);
-      alert('Failed to delete field type');
-    }
-  };
-
   const getCategoryName = (categoryId: string) => {
     const category = categories.find(cat => cat.id === categoryId);
     return category ? category.name : 'Unknown';
@@ -206,16 +162,6 @@ const AdminPage: React.FC = () => {
       case 'in-progress': return 'In Bearbeitung';
       case 'planned': return 'Geplant';
       default: return 'Unbekannt';
-    }
-  };
-
-  const getFieldTypeColor = (type: string) => {
-    switch (type) {
-      case 'PROCESS': return 'bg-blue-500';
-      case 'TECHNOLOGY': return 'bg-green-500';
-      case 'SERVICE': return 'bg-purple-500';
-      case 'DATA': return 'bg-yellow-500';
-      default: return 'bg-gray-500';
     }
   };
 
