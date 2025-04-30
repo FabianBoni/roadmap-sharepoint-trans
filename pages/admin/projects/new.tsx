@@ -15,10 +15,10 @@ const NewProjectPage: React.FC = () => {
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="bg-gray-800 py-4 px-6 border-b border-gray-700">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Add New Project</h1>
+          <h1 className="text-2xl font-bold">Neues Projekt hinzufügen</h1>
           <Link href="/admin">
             <button className="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded transition-colors">
-              Back to Dashboard
+              Zurück zum Dashboard
             </button>
           </Link>
         </div>

@@ -1,31 +1,54 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { Project, Category, clientDataService } from '@/utils/clientDataService';
-import { toast } from 'react-toastify';
+import { clientDataService } from '../utils/clientDataService';
 
 interface ProjectFormProps {
   projectId?: string;
   onCancel: () => void;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
+}
+
+interface ProjectData {
+  title: string;
+  category: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+  status: 'planned' | 'in-progress' | 'completed';
+  projektleitung: string;
+  bisher: string;
+  zukunft: string;
+  fortschritt: number;
+  geplante_umsetzung: string;
+  budget: string;
+  teamMembers: { name: string; role: string }[];
+  attributes: {
+    process: boolean;
+    technology: boolean;
+    services: boolean;
+    data: boolean;
+  };
+}
+
 const ProjectForm: React.FC<ProjectFormProps> = ({ projectId, onCancel }) => {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [fetchingData, setFetchingData] = useState(projectId ? true : false);
-  const [formData, setFormData] = useState<Partial<Project> & {
-    teamMembers: { name: string; role: string }[];
-    fields: {
-      process: string[];
-      technology: string[];
-      services: string[];
-      data: string[];
-    }
-  }>({
+
+  // Project data state
+  const [projectData, setProjectData] = useState<ProjectData>({
     title: '',
     category: '',
-    startQuarter: 'Q1 2023',
-    endQuarter: 'Q4 2023',
+    startDate: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
+    endDate: new Date().toISOString().split('T')[0],
     description: '',
     status: 'planned',
     projektleitung: '',
@@ -35,240 +58,277 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ projectId, onCancel }) => {
     geplante_umsetzung: '',
     budget: '',
     teamMembers: [{ name: '', role: '' }],
-    fields: {
-      process: [''],
-      technology: [''],
-      services: [''],
-      data: ['']
+    attributes: {
+      process: false,
+      technology: false,
+      services: false,
+      data: false
     }
   });
 
-  const fetchProject = useCallback(async (id: string) => {
-    try {
-      setFetchingData(true);
-
-      // Use clientDataService directly to fetch project
-      const project = await clientDataService.getProjectById(id);
-
-      if (!project) {
-        toast.error('Project not found');
-        router.push('/admin');
-        return;
-      }
-
-      // Use clientDataService directly to fetch team members
-      const teamMembers = await clientDataService.getTeamMembersByProjectId(id);
-
-      // Use clientDataService directly to fetch fields
-      const fields = await clientDataService.getFieldsByProjectId(id);
-
-      // Process fields by type
-      const processFields = fields.filter(f => f.type === 'PROCESS').map(f => f.value);
-      const technologyFields = fields.filter(f => f.type === 'TECHNOLOGY').map(f => f.value);
-      const serviceFields = fields.filter(f => f.type === 'SERVICE').map(f => f.value);
-      const dataFields = fields.filter(f => f.type === 'DATA').map(f => f.value);
-
-      // Ensure at least one empty field for each type
-      if (processFields.length === 0) processFields.push('');
-      if (technologyFields.length === 0) technologyFields.push('');
-      if (serviceFields.length === 0) serviceFields.push('');
-      if (dataFields.length === 0) dataFields.push('');
-
-      // Format team members
-      const formattedTeamMembers = teamMembers.map(tm => ({
-        name: tm.name,
-        role: tm.role
-      }));
-
-      // Ensure at least one empty team member
-      if (formattedTeamMembers.length === 0) {
-        formattedTeamMembers.push({ name: '', role: '' });
-      }
-
-      setFormData({
-        ...project,
-        teamMembers: formattedTeamMembers,
-        fields: {
-          process: processFields,
-          technology: technologyFields,
-          services: serviceFields,
-          data: dataFields
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching project data:', error);
-      toast.error('Failed to load project data');
-    } finally {
-      setFetchingData(false);
-    }
-  }, [router]);
-
-  const fetchCategories = useCallback(async () => {
-    try {
-      // Use clientDataService directly
-      const data = await clientDataService.getAllCategories();
-      setCategories(data);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-      toast.error('Failed to load categories');
-    }
-  }, []);
-
+  // Fetch categories and project data if editing
   useEffect(() => {
-    // Initial fetch of categories
-    fetchCategories();
+    const fetchData = async () => {
+      try {
+        // Fetch categories
+        const categoriesData = await clientDataService.getAllCategories();
+        setCategories(categoriesData);
 
-    // If we have a projectId, fetch the project data
-    if (projectId) {
-      fetchProject(projectId);
+        // If projectId is provided, fetch project data
+        if (projectId) {
+          const project = await clientDataService.getProjectById(projectId);
+          if (project) {
+            // Convert quarter format to date
+            const startQuarterParts = project.startQuarter.split(' ');
+            const endQuarterParts = project.endQuarter.split(' ');
+
+            const startDate = getDateFromQuarter(startQuarterParts[0], parseInt(startQuarterParts[1]));
+            const endDate = getDateFromQuarter(endQuarterParts[0], parseInt(endQuarterParts[1]), true);
+
+            // Fetch team members
+            const teamMembers = await clientDataService.getTeamMembersByProjectId(projectId);
+
+            // Fetch fields
+            const fields = await clientDataService.getFieldsByProjectId(projectId);
+
+            // Check which attributes are used
+            const attributes = {
+              process: fields.some(f => f.type === 'PROCESS'),
+              technology: fields.some(f => f.type === 'TECHNOLOGY'),
+              services: fields.some(f => f.type === 'SERVICE'),
+              data: fields.some(f => f.type === 'DATA')
+            };
+
+            // Update project data state
+            setProjectData({
+              title: project.title,
+              category: project.category,
+              startDate: startDate,
+              endDate: endDate,
+              description: project.description || '',
+              status: project.status,
+              projektleitung: project.projektleitung || '',
+              bisher: project.bisher || '',
+              zukunft: project.zukunft || '',
+              fortschritt: project.fortschritt || 0,
+              geplante_umsetzung: project.geplante_umsetzung || '',
+              budget: project.budget || '',
+              teamMembers: teamMembers.length > 0
+                ? teamMembers.map(m => ({ name: m.name, role: m.role }))
+                : [{ name: '', role: '' }],
+              attributes
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Fehler beim Laden der Daten. Bitte versuchen Sie es erneut.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [projectId]);
+
+  // Helper function to get date from quarter
+  const getDateFromQuarter = (quarter: string, year: number, endOfQuarter: boolean = false): string => {
+    let month: number;
+
+    switch (quarter) {
+      case 'Q1':
+        month = endOfQuarter ? 3 : 1;
+        break;
+      case 'Q2':
+        month = endOfQuarter ? 6 : 4;
+        break;
+      case 'Q3':
+        month = endOfQuarter ? 9 : 7;
+        break;
+      case 'Q4':
+        month = endOfQuarter ? 12 : 10;
+        break;
+      default:
+        month = 1;
     }
-  }, [projectId, fetchCategories, fetchProject]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const day = endOfQuarter ? (month === 2 ? 28 : (month === 4 || month === 6 || month === 9 || month === 11) ? 30 : 31) : 1;
+
+    return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
   };
 
+  // Helper function to get quarter from date
+  const getQuarterFromDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+
+    let quarter: string;
+    if (month <= 3) quarter = 'Q1';
+    else if (month <= 6) quarter = 'Q2';
+    else if (month <= 9) quarter = 'Q3';
+    else quarter = 'Q4';
+
+    return `${quarter} ${year}`;
+  };
+
+  // Handle input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setProjectData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Handle status change
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value as 'planned' | 'in-progress' | 'completed';
+    setProjectData(prev => ({ ...prev, status: value }));
+  };
+
+  // Handle progress change
+  const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value);
+    setProjectData(prev => ({ ...prev, fortschritt: isNaN(value) ? 0 : value }));
+  };
+
+  // Handle team member changes
   const handleTeamMemberChange = (index: number, field: 'name' | 'role', value: string) => {
-    setFormData(prev => {
-      const newTeamMembers = [...prev.teamMembers];
-      newTeamMembers[index] = { ...newTeamMembers[index], [field]: value };
-      return { ...prev, teamMembers: newTeamMembers };
+    setProjectData(prev => {
+      const updatedMembers = [...prev.teamMembers];
+      updatedMembers[index] = { ...updatedMembers[index], [field]: value };
+      return { ...prev, teamMembers: updatedMembers };
     });
   };
 
+  // Add team member
   const addTeamMember = () => {
-    setFormData(prev => ({
+    setProjectData(prev => ({
       ...prev,
       teamMembers: [...prev.teamMembers, { name: '', role: '' }]
     }));
   };
 
+  // Remove team member
   const removeTeamMember = (index: number) => {
-    setFormData(prev => {
-      const newTeamMembers = [...prev.teamMembers];
-      newTeamMembers.splice(index, 1);
-      return { ...prev, teamMembers: newTeamMembers.length ? newTeamMembers : [{ name: '', role: '' }] };
+    setProjectData(prev => {
+      const updatedMembers = [...prev.teamMembers];
+      updatedMembers.splice(index, 1);
+      return { ...prev, teamMembers: updatedMembers.length ? updatedMembers : [{ name: '', role: '' }] };
     });
   };
 
-  const handleFieldChange = (type: 'process' | 'technology' | 'services' | 'data', index: number, value: string) => {
-    setFormData(prev => {
-      const newFields = { ...prev.fields };
-      newFields[type][index] = value;
-      return { ...prev, fields: newFields };
-    });
-  };
-
-  const addField = (type: 'process' | 'technology' | 'services' | 'data') => {
-    setFormData(prev => {
-      const newFields = { ...prev.fields };
-      newFields[type] = [...newFields[type], ''];
-      return { ...prev, fields: newFields };
-    });
-  };
-
-  const removeField = (type: 'process' | 'technology' | 'services' | 'data', index: number) => {
-    setFormData(prev => {
-      const newFields = { ...prev.fields };
-      newFields[type].splice(index, 1);
-      if (newFields[type].length === 0) {
-        newFields[type] = [''];
+  // Handle attribute checkbox changes
+  const handleAttributeChange = (attribute: 'process' | 'technology' | 'services' | 'data') => {
+    setProjectData(prev => ({
+      ...prev,
+      attributes: {
+        ...prev.attributes,
+        [attribute]: !prev.attributes[attribute]
       }
-      return { ...prev, fields: newFields };
-    });
+    }));
   };
 
+  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
+    setError(null);
 
     try {
-      // Filter out empty team members and fields
-      const filteredTeamMembers = formData.teamMembers.filter(tm => tm.name && tm.role);
-      const filteredFields = {
-        process: formData.fields.process.filter(f => f),
-        technology: formData.fields.technology.filter(f => f),
-        services: formData.fields.services.filter(f => f),
-        data: formData.fields.data.filter(f => f)
+      // Convert dates to quarters
+      const startQuarter = getQuarterFromDate(projectData.startDate);
+      const endQuarter = getQuarterFromDate(projectData.endDate);
+
+      // Filter out empty team members
+      const teamMembers = projectData.teamMembers.filter(m => m.name.trim() && m.role.trim());
+
+      // Create fields based on selected attributes
+      const fields = {
+        process: projectData.attributes.process ? ['Enabled'] : [],
+        technology: projectData.attributes.technology ? ['Enabled'] : [],
+        services: projectData.attributes.services ? ['Enabled'] : [],
+        data: projectData.attributes.data ? ['Enabled'] : []
       };
 
-      const projectData = {
-        title: formData.title || '',
-        category: formData.category || '',
-        startQuarter: formData.startQuarter || '',
-        endQuarter: formData.endQuarter || '',
-        description: formData.description || '',
-        status: (formData.status as 'planned' | 'in-progress' | 'completed') || 'planned',
-        projektleitung: formData.projektleitung || '',
-        bisher: formData.bisher || '',
-        zukunft: formData.zukunft || '',
-        fortschritt: formData.fortschritt || 0,
-        geplante_umsetzung: formData.geplante_umsetzung || '',
-        budget: formData.budget || '',
-        teamMembers: filteredTeamMembers,
-        fields: filteredFields
+      // Prepare project data
+      const projectToSave = {
+        title: projectData.title,
+        category: projectData.category,
+        startQuarter,
+        endQuarter,
+        description: projectData.description,
+        status: projectData.status,
+        projektleitung: projectData.projektleitung,
+        bisher: projectData.bisher,
+        zukunft: projectData.zukunft,
+        fortschritt: projectData.fortschritt,
+        geplante_umsetzung: projectData.geplante_umsetzung,
+        budget: projectData.budget,
+        teamMembers,
+        fields
       };
+
+      console.log("Saving project with data:", projectToSave);
 
       if (projectId) {
-        // Update existing project using clientDataService
-        await clientDataService.updateProject(projectId, projectData);
-        toast.success('Project updated successfully');
+        // Update existing project
+        await clientDataService.updateProject(projectId, projectToSave);
       } else {
-        // Create new project using clientDataService
-        await clientDataService.createProject(projectData as Omit<Project, 'id'> & {
-          teamMembers?: { name: string; role: string }[];
-          fields?: {
-            process: string[];
-            technology: string[];
-            services: string[];
-            data: string[];
-          }
-        });
-        toast.success('Project created successfully');
+        // Create new project
+        await clientDataService.createProject(projectToSave);
       }
+
+      // Redirect to admin dashboard
       router.push('/admin');
-    } catch (error) {
-      console.error('Error saving project:', error);
-      toast.error(projectId ? 'Failed to update project' : 'Failed to create project');
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('Error saving project:', err);
+      setError('Fehler beim Speichern des Projekts. Bitte versuchen Sie es erneut.');
+      setSubmitting(false);
     }
   };
 
-  if (fetchingData) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <p className="text-lg">Loading project data...</p>
-      </div>
-    );
+  if (loading) {
+    return <div className="flex justify-center items-center h-64">Laden...</div>;
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="bg-red-500 text-white p-3 rounded-md">
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Project Title */}
         <div>
-          <label className="block text-gray-300 mb-2">Project Title</label>
+          <label htmlFor="title" className="block text-sm font-medium mb-1">
+            Projekttitel
+          </label>
           <input
             type="text"
+            id="title"
             name="title"
-            value={formData.title}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
             required
+            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+            value={projectData.title}
+            onChange={handleInputChange}
           />
         </div>
 
+        {/* Category */}
         <div>
-          <label className="block text-gray-300 mb-2">Category</label>
+          <label htmlFor="category" className="block text-sm font-medium mb-1">
+            Kategorie
+          </label>
           <select
+            id="category"
             name="category"
-            value={formData.category}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
             required
+            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+            value={projectData.category}
+            onChange={handleInputChange}
           >
-            <option value="">Select a category</option>
+            <option value="">Kategorie auswählen</option>
             {categories.map(category => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -276,311 +336,299 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ projectId, onCancel }) => {
             ))}
           </select>
         </div>
+      </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Start Date */}
         <div>
-          <label className="block text-gray-300 mb-2">Start Quarter</label>
+          <label htmlFor="startDate" className="block text-sm font-medium mb-1">
+            Startdatum
+          </label>
           <input
-            type="text"
-            name="startQuarter"
-            value={formData.startQuarter}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            placeholder="e.g., Q1 2023"
+            type="date"
+            id="startDate"
+            name="startDate"
             required
+            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+            value={projectData.startDate}
+            onChange={handleInputChange}
           />
         </div>
 
+        {/* End Date */}
         <div>
-          <label className="block text-gray-300 mb-2">End Quarter</label>
+          <label htmlFor="endDate" className="block text-sm font-medium mb-1">
+            Enddatum
+          </label>
           <input
-            type="text"
-            name="endQuarter"
-            value={formData.endQuarter}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            placeholder="e.g., Q4 2023"
+            type="date"
+            id="endDate"
+            name="endDate"
             required
-          />
-        </div>
-
-        <div>
-          <label className="block text-gray-300 mb-2">Status</label>
-          <select
-            name="status"
-            value={formData.status}
-            onChange={handleChange}
             className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            required
-          >
-            <option value="planned">Planned</option>
-            <option value="in-progress">In Progress</option>
-            <option value="completed">Completed</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-gray-300 mb-2">Project Lead</label>
-          <input
-            type="text"
-            name="projektleitung"
-            value={formData.projektleitung}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="block text-gray-300 mb-2">Description</label>
-          <textarea
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            rows={3}
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="block text-gray-300 mb-2">Previous Work</label>
-          <textarea
-            name="bisher"
-            value={formData.bisher}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            rows={3}
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="block text-gray-300 mb-2">Future Plans</label>
-          <textarea
-            name="zukunft"
-            value={formData.zukunft}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            rows={3}
-          />
-        </div>
-
-        <div>
-          <label className="block text-gray-300 mb-2">Progress (%)</label>
-          <input
-            type="number"
-            name="fortschritt"
-            value={formData.fortschritt}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            min="0"
-            max="100"
-          />
-        </div>
-
-        <div>
-          <label className="block text-gray-300 mb-2">Planned Implementation</label>
-          <input
-            type="text"
-            name="geplante_umsetzung"
-            value={formData.geplante_umsetzung}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-          />
-        </div>
-
-        <div>
-          <label className="block text-gray-300 mb-2">Budget</label>
-          <input
-            type="text"
-            name="budget"
-            value={formData.budget}
-            onChange={handleChange}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+            value={projectData.endDate}
+            onChange={handleInputChange}
           />
         </div>
       </div>
 
-      {/* Team Members Section */}
-      <div className="bg-gray-800 p-4 rounded-lg">
-        <h3 className="text-xl font-semibold mb-4">Team Members</h3>
-        {formData.teamMembers.map((member, index) => (
-          <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 p-3 bg-gray-700 rounded">
-            <div>
-              <label className="block text-gray-300 mb-2">Name</label>
-              <input
-                type="text"
-                value={member.name}
-                onChange={(e) => handleTeamMemberChange(index, 'name', e.target.value)}
-                className="w-full p-2 bg-gray-600 border border-gray-500 rounded text-white"
-              />
-            </div>
-            <div className="flex items-end">
-              <div className="flex-grow">
-                <label className="block text-gray-300 mb-2">Role</label>
-                <input
-                  type="text"
-                  value={member.role}
-                  onChange={(e) => handleTeamMemberChange(index, 'role', e.target.value)}
-                  className="w-full p-2 bg-gray-600 border border-gray-500 rounded text-white"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => removeTeamMember(index)}
-                className="ml-2 mb-1 p-2 bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                Remove
-              </button>
-            </div>
+      {/* Status */}
+      <div>
+        <label htmlFor="status" className="block text-sm font-medium mb-1">
+          Status
+        </label>
+        <select
+          id="status"
+          name="status"
+          required
+          className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+          value={projectData.status}
+          onChange={handleStatusChange}
+        >
+          <option value="planned">Geplant</option>
+          <option value="in-progress">In Bearbeitung</option>
+          <option value="completed">Abgeschlossen</option>
+        </select>
+      </div>
+
+      {/* Description */}
+      <div>
+        <label htmlFor="description" className="block text-sm font-medium mb-1">
+          Beschreibung
+        </label>
+        <textarea
+          id="description"
+          name="description"
+          rows={3}
+          required
+          className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+          value={projectData.description}
+          onChange={handleInputChange}
+        />
+      </div>
+
+      {/* Project Lead */}
+      <div>
+        <label htmlFor="projektleitung" className="block text-sm font-medium mb-1">
+          Projektleitung
+        </label>
+        <input
+          type="text"
+          id="projektleitung"
+          name="projektleitung"
+          required
+          className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+          value={projectData.projektleitung}
+          onChange={handleInputChange}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Previous Work */}
+        <div>
+          <label htmlFor="bisher" className="block text-sm font-medium mb-1">
+            Bisherige Arbeit
+          </label>
+          <textarea
+            id="bisher"
+            name="bisher"
+            rows={3}
+            required
+            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+            value={projectData.bisher}
+            onChange={handleInputChange}
+          />
+        </div>
+
+        {/* Future Work */}
+        <div>
+          <label htmlFor="zukunft" className="block text-sm font-medium mb-1">
+            Zukünftige Arbeit
+          </label>
+          <textarea
+            id="zukunft"
+            name="zukunft"
+            rows={3}
+            required
+            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+            value={projectData.zukunft}
+            onChange={handleInputChange}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Progress */}
+        <div>
+          <label htmlFor="fortschritt" className="block text-sm font-medium mb-1">
+            Fortschritt (%)
+          </label>
+          <input
+            type="number"
+            id="fortschritt"
+            name="fortschritt"
+            min="0"
+            max="100"
+            required
+            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+            value={projectData.fortschritt}
+            onChange={handleProgressChange}
+          />
+        </div>
+
+        {/* Budget */}
+        <div>
+          <label htmlFor="budget" className="block text-sm font-medium mb-1">
+            Budget
+          </label>
+          <input
+            type="text"
+            id="budget"
+            name="budget"
+            required
+            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+            value={projectData.budget}
+            onChange={handleInputChange}
+          />
+        </div>
+      </div>
+
+      {/* Planned Implementation */}
+      <div>
+        <label htmlFor="geplante_umsetzung" className="block text-sm font-medium mb-1">
+          Geplante Umsetzung
+        </label>
+        <textarea
+          id="geplante_umsetzung"
+          name="geplante_umsetzung"
+          rows={3}
+          required
+          className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
+          value={projectData.geplante_umsetzung}
+          onChange={handleInputChange}
+        />
+      </div>
+
+      {/* Team Members */}
+      <div>
+        <h3 className="text-lg font-medium mb-3">Teammitglieder</h3>
+        {projectData.teamMembers.map((member, index) => (
+          <div key={index} className="flex items-center space-x-2 mb-2">
+            <input
+              type="text"
+              placeholder="Name"
+              className="flex-1 p-2 bg-gray-700 border border-gray-600 rounded text-white"
+              value={member.name}
+              required
+              onChange={(e) => handleTeamMemberChange(index, 'name', e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="Rolle"
+              className="flex-1 p-2 bg-gray-700 border border-gray-600 rounded text-white"
+              value={member.role}
+              onChange={(e) => handleTeamMemberChange(index, 'role', e.target.value)}
+            />
+            <button
+              type="button"
+              className="p-2 bg-red-600 text-white rounded hover:bg-red-700"
+              onClick={() => removeTeamMember(index)}
+            >
+              -
+            </button>
           </div>
         ))}
         <button
           type="button"
+          className="mt-2 p-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           onClick={addTeamMember}
-          className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
-          Add Team Member
+          + Teammitglied hinzufügen
         </button>
       </div>
 
-      {/* Custom Fields Section */}
-      <div className="bg-gray-800 p-4 rounded-lg">
-        <h3 className="text-xl font-semibold mb-4">Custom Fields</h3>
+      {/* Project Attributes - Changed to checkboxes */}
+      <div className="space-y-6">
+        <h3 className="text-lg font-medium">Projektattribute</h3>
+        <p className="text-sm text-gray-400 mb-4">
+          Wählen Sie aus, welche Attribute in der Projektbeschreibung angezeigt werden sollen.
+        </p>
 
-        {/* Process Fields */}
-        <div className="mb-6">
-          <h4 className="text-lg font-medium mb-3">Process</h4>
-          {formData.fields.process.map((field, index) => (
-            <div key={index} className="flex mb-2">
-              <input
-                type="text"
-                value={field}
-                onChange={(e) => handleFieldChange('process', index, e.target.value)}
-                className="flex-grow p-2 bg-gray-700 border border-gray-600 rounded text-white"
-                placeholder="Process name"
-              />
-              <button
-                type="button"
-                onClick={() => removeField('process', index)}
-                className="ml-2 p-2 bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => addField('process')}
-            className="mt-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-          >
-            Add Process
-          </button>
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Process Attribute */}
+          <div className="flex items-center space-x-3">
+            <input
+              type="checkbox"
+              id="process-attribute"
+              checked={projectData.attributes.process}
+              onChange={() => handleAttributeChange('process')}
+              className="w-5 h-5 bg-gray-700 border-gray-600 rounded"
+            />
+            <label htmlFor="process-attribute" className="text-sm font-medium">
+              Prozesse
+            </label>
+          </div>
 
-        {/* Technology Fields */}
-        <div className="mb-6">
-          <h4 className="text-lg font-medium mb-3">Technology</h4>
-          {formData.fields.technology.map((field, index) => (
-            <div key={index} className="flex mb-2">
-              <input
-                type="text"
-                value={field}
-                onChange={(e) => handleFieldChange('technology', index, e.target.value)}
-                className="flex-grow p-2 bg-gray-700 border border-gray-600 rounded text-white"
-                placeholder="Technology name"
-              />
-              <button
-                type="button"
-                onClick={() => removeField('technology', index)}
-                className="ml-2 p-2 bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => addField('technology')}
-            className="mt-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-          >
-            Add Technology
-          </button>
-        </div>
+          {/* Technology Attribute */}
+          <div className="flex items-center space-x-3">
+            <input
+              type="checkbox"
+              id="technology-attribute"
+              checked={projectData.attributes.technology}
+              onChange={() => handleAttributeChange('technology')}
+              className="w-5 h-5 bg-gray-700 border-gray-600 rounded"
+            />
+            <label htmlFor="technology-attribute" className="text-sm font-medium">
+              Technologie
+            </label>
+          </div>
 
-        {/* Services Fields */}
-        <div className="mb-6">
-          <h4 className="text-lg font-medium mb-3">Services</h4>
-          {formData.fields.services.map((field, index) => (
-            <div key={index} className="flex mb-2">
-              <input
-                type="text"
-                value={field}
-                onChange={(e) => handleFieldChange('services', index, e.target.value)}
-                className="flex-grow p-2 bg-gray-700 border border-gray-600 rounded text-white"
-                placeholder="Service name"
-              />
-              <button
-                type="button"
-                onClick={() => removeField('services', index)}
-                className="ml-2 p-2 bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => addField('services')}
-            className="mt-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-          >
-            Add Service
-          </button>
-        </div>
+          {/* Services Attribute */}
+          <div className="flex items-center space-x-3">
+            <input
+              type="checkbox"
+              id="services-attribute"
+              checked={projectData.attributes.services}
+              onChange={() => handleAttributeChange('services')}
+              className="w-5 h-5 bg-gray-700 border-gray-600 rounded"
+            />
+            <label htmlFor="services-attribute" className="text-sm font-medium">
+              Services
+            </label>
+          </div>
 
-        {/* Data Fields */}
-        <div>
-          <h4 className="text-lg font-medium mb-3">Data</h4>
-          {formData.fields.data.map((field, index) => (
-            <div key={index} className="flex mb-2">
-              <input
-                type="text"
-                value={field}
-                onChange={(e) => handleFieldChange('data', index, e.target.value)}
-                className="flex-grow p-2 bg-gray-700 border border-gray-600 rounded text-white"
-                placeholder="Data name"
-              />
-              <button
-                type="button"
-                onClick={() => removeField('data', index)}
-                className="ml-2 p-2 bg-red-600 text-white rounded hover:bg-red-700"
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => addField('data')}
-            className="mt-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-          >
-            Add Data
-          </button>
+          {/* Data Attribute */}
+          <div className="flex items-center space-x-3">
+            <input
+              type="checkbox"
+              id="data-attribute"
+              checked={projectData.attributes.data}
+              onChange={() => handleAttributeChange('data')}
+              className="w-5 h-5 bg-gray-700 border-gray-600 rounded"
+            />
+            <label htmlFor="data-attribute" className="text-sm font-medium">
+              Daten
+            </label>
+          </div>
         </div>
       </div>
 
-      <div className="flex space-x-3">
-        <button
-          type="submit"
-          disabled={loading}
-          className={`px-6 py-2 rounded text-white ${loading ? 'bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
-            }`}
-        >
-          {loading ? 'Saving...' : projectId ? 'Update Project' : 'Create Project'}
-        </button>
+      {/* Form Actions */}
+      <div className="flex justify-end space-x-3 pt-6">
         <button
           type="button"
           onClick={onCancel}
-          className="px-6 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+          className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+          disabled={submitting}
         >
-          Cancel
+          Abbrechen
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          disabled={submitting}
+        >
+          {submitting ? 'Speichern...' : (projectId ? 'Aktualisieren' : 'Erstellen')}
         </button>
       </div>
     </form>

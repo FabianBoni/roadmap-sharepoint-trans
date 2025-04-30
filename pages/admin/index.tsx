@@ -306,15 +306,6 @@ const AdminPage: React.FC = () => {
             Kategorien
           </button>
           <button
-            className={`py-2 px-4 font-medium ${activeTab === 'fieldTypes'
-              ? 'text-blue-400 border-b-2 border-blue-400'
-              : 'text-gray-400 hover:text-gray-300'
-              }`}
-            onClick={() => setActiveTab('fieldTypes')}
-          >
-            Felder
-          </button>
-          <button
             className={`py-2 px-4 font-medium ${activeTab === 'settings'
               ? 'text-blue-400 border-b-2 border-blue-400'
               : 'text-gray-400 hover:text-gray-300'
@@ -439,64 +430,6 @@ const AdminPage: React.FC = () => {
                           className={`${deleteConfirmation === category.id ? 'text-red-500' : 'text-red-400'} hover:text-red-300`}
                         >
                           {deleteConfirmation === category.id ? 'Bestätigen' : 'Löschen'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        {/* Field Types Tab */}
-        {activeTab === 'fieldTypes' && (
-          <>
-            <div className="flex justify-end mb-4">
-              <button
-                onClick={handleAddFieldType}
-                className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded"
-              >
-                Neues Feld
-              </button>
-            </div>
-
-            <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-700">
-                <thead className="bg-gray-700">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Typ</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Beschreibung</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Aktionen</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-gray-800 divide-y divide-gray-700">
-                  {fieldTypes.map(fieldType => (
-                    <tr key={fieldType.id} className="hover:bg-gray-750">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-white">{fieldType.name}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getFieldTypeColor(fieldType.type)} text-white`}>
-                          {fieldType.type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-300">{fieldType.description}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => handleEditFieldType(fieldType.id)}
-                          className="text-blue-400 hover:text-blue-300 mr-4"
-                        >
-                          Bearbeiten
-                        </button>
-                        <button
-                          onClick={() => handleDeleteFieldType(fieldType.id)}
-                          className={`${deleteConfirmation === fieldType.id ? 'text-red-500' : 'text-red-400'} hover:text-red-300`}
-                        >
-                          {deleteConfirmation === fieldType.id ? 'Bestätigen' : 'Löschen'}
                         </button>
                       </td>
                     </tr>

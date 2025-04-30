@@ -5,6 +5,7 @@ import { Category, Project } from '../types';
 import { clientDataService } from '../utils/clientDataService';
 import CategorySidebar from './CategorySidebar';
 import Footer from './Footer';
+import ToggleSwitch from './ToggleSwitch';
 
 interface RoadmapProps {
   initialProjects: Project[];
@@ -18,6 +19,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   const [activeCategories, setActiveCategories] = useState<string[]>([]);
   const [hoveredProject, setHoveredProject] = useState<Project | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [showCalendarWeeks, setShowCalendarWeeks] = useState<boolean>(false);
 
   // Fetch categories and filter projects based on the selected year
   useEffect(() => {
@@ -71,12 +73,13 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
     return category?.color || '#777777';
   };
 
+  // Get status color for the left border indicator
   const getStatusColor = (status: string | undefined) => {
     switch (status) {
       case 'completed': return '#10B981'; // green-500
-      case 'in-progress': return '#ddb0ff'; // blue-500
+      case 'in-progress': return '#3B82F6'; // blue-500
       case 'planned': return '#6B7280'; // gray-500
-      default: return '#6B7280'; // gray-500 (default for undefined or unknown status)
+      default: return '#6B7280'; // gray-500
     }
   };
 
@@ -91,9 +94,123 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
     setHoveredProject(null);
   };
 
-  // Add this function to handle clicks on projects
+  // Handle clicks on projects
   const handleProjectClick = (projectId: string) => {
     router.push(`/project/${projectId}`);
+  };
+
+  // Convert quarter to calendar weeks
+  const quarterToWeeks = (quarter: string): { start: number; end: number } => {
+    const q = quarter.split(' ')[0];
+    switch (q) {
+      case 'Q1': return { start: 1, end: 13 };
+      case 'Q2': return { start: 14, end: 26 };
+      case 'Q3': return { start: 27, end: 39 };
+      case 'Q4': return { start: 40, end: 52 };
+      default: return { start: 1, end: 52 };
+    }
+  };
+
+  // Generate calendar week headers
+  const generateWeekHeaders = () => {
+    const weeks = [];
+    for (let i = 1; i <= 52; i += 4) {
+      weeks.push(
+        <div
+          key={`week-${i}`}
+          className="p-2 text-center font-semibold text-xs"
+          style={{
+            background: `linear-gradient(to right, 
+              ${getGradientColor(i)}, 
+              ${getGradientColor(Math.min(i + 3, 52))})`
+          }}
+        >
+          KW {i}-{Math.min(i + 3, 52)}
+        </div>
+      );
+    }
+    return weeks;
+  };
+
+  // Get gradient color based on week number
+  const getGradientColor = (week: number) => {
+    const colors = [
+      '#eab308', // yellow-500
+      '#d97706', // amber-600
+      '#ea580c', // orange-600
+      '#c2410c', // orange-700
+      '#b91c1c'  // red-700
+    ];
+
+    const index = Math.floor((week - 1) / 13);
+
+    return colors[index];
+  };
+
+  // Calculate project position for calendar weeks view
+  const calculateWeekPosition = (project: Project) => {
+    const [startQ, startYear] = project.startQuarter.split(' ');
+    const [endQ, endYear] = project.endQuarter.split(' ');
+
+    const startYearNum = parseInt(startYear, 10);
+    const endYearNum = parseInt(endYear, 10);
+
+    const startWeeks = quarterToWeeks(startQ);
+    const endWeeks = quarterToWeeks(endQ);
+
+    let startPosition = 0;
+    let width = 0;
+
+    if (startYearNum < currentYear) {
+      // Project started before current year
+      startPosition = 0;
+    } else if (startYearNum === currentYear) {
+      // Project starts in current year
+      startPosition = ((startWeeks.start - 1) / 52) * 100;
+    }
+
+    if (endYearNum > currentYear) {
+      // Project ends after current year
+      width = 100 - startPosition;
+    } else if (endYearNum === currentYear) {
+      // Project ends in current year
+      width = ((endWeeks.end) / 52) * 100 - startPosition;
+    }
+
+    return { startPosition, width };
+  };
+
+  // Calculate project position for quarters view
+  const calculateQuarterPosition = (project: Project) => {
+    const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
+    const [startQ, startYear] = project.startQuarter.split(' ');
+    const [endQ, endYear] = project.endQuarter.split(' ');
+
+    const startQIndex = quarters.indexOf(startQ);
+    const endQIndex = quarters.indexOf(endQ);
+    const startYearNum = parseInt(startYear, 10);
+    const endYearNum = parseInt(endYear, 10);
+
+    let startPosition = 0;
+    let width = 0;
+
+    if (startYearNum < currentYear) {
+      // Project started before current year
+      startPosition = 0;
+    } else if (startYearNum === currentYear) {
+      // Project starts in current year
+      startPosition = startQIndex * 25;
+    }
+
+    if (endYearNum > currentYear) {
+      // Project ends after current year
+      width = 100 - startPosition;
+    } else if (endYearNum === currentYear) {
+      // Project ends in current year
+      width = (endQIndex + 1) * 25 - startPosition;
+    }
+
+    return { startPosition, width };
   };
 
   return (
@@ -105,7 +222,12 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
           </h1>
         </header>
 
-        <div className="flex justify-end p-2.5 px-10">
+        <div className="flex justify-between items-center p-2.5 px-10">
+          <ToggleSwitch
+            label={showCalendarWeeks ? "Kalenderwochen" : "Quartale"}
+            isOn={showCalendarWeeks}
+            onToggle={() => setShowCalendarWeeks(!showCalendarWeeks)}
+          />
           <RoadmapYearNavigation
             initialYear={currentYear}
             onYearChange={setCurrentYear}
@@ -122,65 +244,50 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
 
           {/* Main content area */}
           <div className="flex-1 p-6 overflow-x-auto overflow-y-auto h-[calc(100vh-180px)]">
-            {/* Quarter headers with gradient colors */}
-            <div className="grid grid-cols-4 gap-4 mb-6">
-              <div
-                className="p-3 rounded-lg text-center font-semibold"
-                style={{ background: 'linear-gradient(to right, #eab308, #d97706)' }}
-              >
-                Q1 {currentYear}
-              </div>
-              <div
-                className="p-3 rounded-lg text-center font-semibold"
-                style={{ background: 'linear-gradient(to right, #d97706, #ea580c)' }}
-              >
-                Q2 {currentYear}
-              </div>
-              <div
-                className="p-3 rounded-lg text-center font-semibold"
-                style={{ background: 'linear-gradient(to right, #ea580c, #c2410c)' }}
-              >
-                Q3 {currentYear}
-              </div>
-              <div
-                className="p-3 rounded-lg text-center font-semibold"
-                style={{ background: 'linear-gradient(to right, #c2410c, #b91c1c)' }}
-              >
-                Q4 {currentYear}
-              </div>
+            {/* Quarter or Week headers */}
+            <div className={`grid ${showCalendarWeeks ? 'grid-cols-13 gap-1' : 'grid-cols-4 gap-4'} mb-6`}>
+              {showCalendarWeeks ? (
+                generateWeekHeaders()
+              ) : (
+                <>
+                  <div
+                    className="p-3 rounded-lg text-center font-semibold"
+                    style={{ background: 'linear-gradient(to right, #eab308, #d97706)' }}
+                  >
+                    Q1 {currentYear}
+                  </div>
+                  <div
+                    className="p-3 rounded-lg text-center font-semibold"
+                    style={{ background: 'linear-gradient(to right, #d97706, #ea580c)' }}
+                  >
+                    Q2 {currentYear}
+                  </div>
+                  <div
+                    className="p-3 rounded-lg text-center font-semibold"
+                    style={{ background: 'linear-gradient(to right, #ea580c, #c2410c)' }}
+                  >
+                    Q3 {currentYear}
+                  </div>
+                  <div
+                    className="p-3 rounded-lg text-center font-semibold"
+                    style={{ background: 'linear-gradient(to right, #c2410c, #b91c1c)' }}
+                  >
+                    Q4 {currentYear}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Project timeline bars */}
             <div className="space-y-4 relative">
               {filteredProjects.map(project => {
-                // Calculate the position and width of the project bar
-                const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
-                const [startQ, startYear] = project.startQuarter.split(' ');
-                const [endQ, endYear] = project.endQuarter.split(' ');
+                // Use the helper functions instead of inline calculations
+                const { startPosition, width } = showCalendarWeeks
+                  ? calculateWeekPosition(project)
+                  : calculateQuarterPosition(project);
 
-                const startQIndex = quarters.indexOf(startQ);
-                const endQIndex = quarters.indexOf(endQ);
-                const startYearNum = parseInt(startYear, 10);
-                const endYearNum = parseInt(endYear, 10);
-
-                let startPosition = 0;
-                let width = 0;
-
-                if (startYearNum < currentYear) {
-                  // Project started before current year
-                  startPosition = 0;
-                } else if (startYearNum === currentYear) {
-                  // Project starts in current year
-                  startPosition = startQIndex * 25;
-                }
-
-                if (endYearNum > currentYear) {
-                  // Project ends after current year
-                  width = 100 - startPosition;
-                } else if (endYearNum === currentYear) {
-                  // Project ends in current year
-                  width = (endQIndex + 1) * 25 - startPosition;
-                }
+                const startYearNum = parseInt(project.startQuarter.split(' ')[1], 10);
+                const endYearNum = parseInt(project.endQuarter.split(' ')[1], 10);
 
                 // Only show projects that are visible in the current year
                 if (
@@ -190,7 +297,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                   return (
                     <div
                       key={project.id}
-                      className="relative h-12"
+                      className="relative h-12 mb-2"
                     >
                       <div className="absolute top-0 left-0 right-0 grid grid-cols-4 gap-4 h-full pointer-events-none">
                         <div className="bg-gray-800 rounded-lg opacity-30"></div>
@@ -200,27 +307,33 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                       </div>
 
                       <div
-                        className="absolute top-0 h-full rounded-lg flex items-center px-4 cursor-pointer transition-all hover:brightness-110"
+                        className="absolute top-0 h-full rounded-lg flex items-center px-3 cursor-pointer transition-all hover:brightness-110 group border border-white border-opacity-30 hover:border-opacity-70"
                         style={{
                           left: `${startPosition}%`,
                           width: `${width}%`,
                           backgroundColor: getCategoryColor(project.category),
-                          opacity: 0.8,
-                          borderLeft: `6px solid ${getStatusColor(project.status)}` // Add status indicator on left border
+                          opacity: 0.85
                         }}
                         onMouseEnter={(e) => handleMouseOver(e, project)}
                         onMouseLeave={handleMouseLeave}
                         onClick={() => handleProjectClick(project.id)}
                       >
-                        <span className="font-medium truncate">{project.title}</span>
+                        {/* Status indicator */}
+                        <div
+                          className="h-3 w-3 rounded-full mr-2 flex-shrink-0 border border-white border-opacity-70"
+                          style={{ backgroundColor: getStatusColor(project.status) }}
+                        />
+
+                        {/* Project title with improved visibility */}
+                        <span className="font-medium truncate px-2 py-0.5 rounded bg-black bg-opacity-40 text-white group-hover:bg-opacity-60 text-sm">
+                          {project.title}
+                        </span>
                       </div>
                     </div>
                   );
                 }
                 return null;
-              })}
-
-              {/* Tooltip */}
+              })}              {/* Tooltip */}
               {hoveredProject && (
                 <div
                   className="fixed bg-gray-800 p-3 rounded-lg shadow-lg z-10 w-64"
@@ -237,7 +350,11 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                     <span className="font-medium">Zeitraum:</span> {hoveredProject.startQuarter} to {hoveredProject.endQuarter}
                   </p>
                   <p className="text-sm text-gray-300 mb-1">
-                    <span className="font-medium">Status:</span> {hoveredProject.status}
+                    <span className="font-medium">Status:</span> {
+                      hoveredProject.status === 'completed' ? 'Abgeschlossen' :
+                        hoveredProject.status === 'in-progress' ? 'In Bearbeitung' :
+                          'Geplant'
+                    }
                   </p>
                   <p className="text-sm text-gray-300">
                     {hoveredProject.description || ''}
