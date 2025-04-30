@@ -1,3 +1,5 @@
+import { AppSettings } from "@/types";
+
 // Types
 export interface Project {
     id: string;
@@ -53,6 +55,7 @@ const SP_LISTS = {
     FIELDS: "RoadmapFields",
     TEAM_MEMBERS: "RoadmapTeamMembers",
     USERS: "RoadmapUsers",
+    SETTINGS: "RoadmapSettings",
 };
 
 // Client-side data service using fetch API instead of PnP JS
@@ -1672,6 +1675,212 @@ class ClientDataService {
             }
         } catch (error) {
             console.error(`Error deleting user ${id}:`, error);
+            throw error;
+        }
+    }
+
+    async getAllSettings(): Promise<AppSettings[]> {
+        try {
+            const items = await this.fetchFromSharePoint(
+                SP_LISTS.SETTINGS,
+                'Id,Title,Value,Description'
+            );
+
+            return items.map(item => ({
+                id: item.Id.toString(),
+                key: item.Title,
+                value: item.Value || '',
+                description: item.Description || '',
+            }));
+        } catch (error) {
+            console.error('Error fetching settings:', error);
+            return [];
+        }
+    }
+
+    async getSettingByKey(key: string): Promise<AppSettings | null> {
+        try {
+            const webUrl = this.getWebUrl();
+            const encodedKey = encodeURIComponent(key);
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.SETTINGS}')/items?$filter=Title eq '${encodedKey}'&$select=Id,Title,Value,Description`;
+
+            const response = await fetch(endpoint, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata'
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Setting Fetch Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
+                throw new Error(`Failed to fetch setting: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            const items = data.value || [];
+
+            if (items.length === 0) {
+                return null;
+            }
+
+            return {
+                id: items[0].Id.toString(),
+                key: items[0].Title,
+                value: items[0].Value || '',
+                description: items[0].Description || '',
+            };
+        } catch (error) {
+            console.error(`Error fetching setting by key ${key}:`, error);
+            return null;
+        }
+    }
+
+    async createSetting(setting: Omit<AppSettings, 'id'>): Promise<AppSettings> {
+        try {
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.SETTINGS}')/items`;
+
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.SETTINGS);
+            const requestDigest = await this.getRequestDigest();
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata',
+                    'Content-Type': 'application/json;odata=verbose',
+                    'X-RequestDigest': requestDigest
+                },
+                body: JSON.stringify({
+                    __metadata: { type: listMetadata },
+                    Title: setting.key,
+                    Value: setting.value,
+                    Description: setting.description || ''
+                }),
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Setting Create Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify({
+                        Title: setting.key,
+                        Value: setting.value,
+                        Description: setting.description || ''
+                    })
+                });
+                throw new Error(`Failed to create setting: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+
+            return {
+                id: result.Id.toString(),
+                key: setting.key,
+                value: setting.value,
+                description: setting.description || ''
+            };
+        } catch (error) {
+            console.error('Error creating setting:', error);
+            throw error;
+        }
+    }
+
+    async updateSetting(setting: AppSettings): Promise<AppSettings> {
+        try {
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.SETTINGS}')/items(${setting.id})`;
+
+            // Get the correct metadata type and request digest
+            const listMetadata = await this.getListMetadata(SP_LISTS.SETTINGS);
+            const requestDigest = await this.getRequestDigest();
+
+            const updateData: any = {
+                __metadata: { type: listMetadata },
+                Title: setting.key,
+                Value: setting.value,
+                Description: setting.description || ''
+            };
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata',
+                    'Content-Type': 'application/json;odata=verbose',
+                    'X-HTTP-Method': 'MERGE',
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
+                },
+                body: JSON.stringify(updateData),
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Setting Update Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText,
+                    requestBody: JSON.stringify(updateData)
+                });
+                throw new Error(`Failed to update setting: ${response.statusText}`);
+            }
+
+            return setting;
+        } catch (error) {
+            console.error(`Error updating setting ${setting.id}:`, error);
+            throw error;
+        }
+    }
+
+    async deleteSetting(id: string): Promise<void> {
+        try {
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.SETTINGS}')/items(${id})`;
+
+            // Get request digest for write operations
+            const requestDigest = await this.getRequestDigest();
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata',
+                    'Content-Type': 'application/json;odata=verbose',
+                    'X-HTTP-Method': 'DELETE',
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Try to get the response text for better error messages
+                const errorText = await response.text();
+                console.error('Setting Delete Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
+                throw new Error(`Failed to delete setting: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error(`Error deleting setting ${id}:`, error);
             throw error;
         }
     }

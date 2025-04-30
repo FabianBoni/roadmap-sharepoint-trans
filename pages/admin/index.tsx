@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { clientDataService } from '@/utils/clientDataService';
 import { hasAdminAccess } from '@/utils/auth';
 import withAdminAuth from '@/components/withAdminAuth';
+import { AppSettings } from '@/types';
 
 interface Project {
   id: string;
@@ -33,10 +34,13 @@ const AdminPage: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [fieldTypes, setFieldTypes] = useState<FieldType[]>([]);
+  const [settings, setSettings] = useState<AppSettings[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'projects' | 'categories' | 'fieldTypes'>('projects');
+  const [activeTab, setActiveTab] = useState<'projects' | 'categories' | 'fieldTypes' | 'settings'>('projects');
+  const [editingSetting, setEditingSetting] = useState<AppSettings | null>(null);
+  const [newSettingValue, setNewSettingValue] = useState<string>('');
 
   // Fetch projects, categories, and field types
   useEffect(() => {
@@ -53,6 +57,9 @@ const AdminPage: React.FC = () => {
 
         // Fetch field types
         const fieldTypesData = await clientDataService.getAllFieldTypes();
+
+        const settingsData = await clientDataService.getAllSettings();
+        setSettings(settingsData);
 
         setProjects(projectsData);
         setCategories(categoriesData);
@@ -212,6 +219,36 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  const handleEditSetting = (setting: AppSettings) => {
+    setEditingSetting(setting);
+    setNewSettingValue(setting.value);
+  };
+
+  const handleSaveSetting = async () => {
+    if (!editingSetting) return;
+
+    try {
+      const updatedSetting = {
+        ...editingSetting,
+        value: newSettingValue
+      };
+
+      const result = await clientDataService.updateSetting(updatedSetting);
+
+      // Update the settings in state
+      setSettings(settings.map((s: AppSettings) => s.id === result.id ? result : s));
+      setEditingSetting(null);
+      setNewSettingValue('');
+    } catch (error) {
+      console.error('Error updating setting:', error);
+      alert('Failed to update setting');
+    }
+  };
+  const handleCancelEdit = () => {
+    setEditingSetting(null);
+    setNewSettingValue('');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
@@ -276,6 +313,15 @@ const AdminPage: React.FC = () => {
             onClick={() => setActiveTab('fieldTypes')}
           >
             Felder
+          </button>
+          <button
+            className={`py-2 px-4 font-medium ${activeTab === 'settings'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-gray-400 hover:text-gray-300'
+              }`}
+            onClick={() => setActiveTab('settings')}
+          >
+            Einstellungen
           </button>
         </div>
 
@@ -457,6 +503,90 @@ const AdminPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'settings' && (
+          <>
+            <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-700">
+                <thead className="bg-gray-700">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Schlüssel</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Wert</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Beschreibung</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Aktionen</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-gray-800 divide-y divide-gray-700">
+                  {settings.map((setting: AppSettings) => (
+                    <tr key={setting.id} className="hover:bg-gray-750">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-white">{setting.key}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {editingSetting && editingSetting.id === setting.id ? (
+                          <input
+                            type="text"
+                            value={newSettingValue}
+                            onChange={(e) => setNewSettingValue(e.target.value)}
+                            className="bg-gray-700 text-white px-2 py-1 rounded w-full"
+                          />
+                        ) : (
+                          <div className="text-sm text-gray-300">{setting.value}</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-300">{setting.description || '-'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        {editingSetting && editingSetting.id === setting.id ? (
+                          <>
+                            <button
+                              onClick={handleSaveSetting}
+                              className="text-green-400 hover:text-green-300 mr-4"
+                            >
+                              Speichern
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="text-gray-400 hover:text-gray-300"
+                            >
+                              Abbrechen
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleEditSetting(setting)}
+                            className="text-blue-400 hover:text-blue-300"
+                          >
+                            Bearbeiten
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {settings.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-4 text-center text-gray-400">
+                        Keine Einstellungen gefunden. Erstellen Sie die Einstellung &quot;roadmapTitle&quot; für den Roadmap-Titel.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Add a note about the roadmapTitle setting */}
+            <div className="mt-4 p-4 bg-gray-800 rounded-lg">
+              <h3 className="text-lg font-medium text-white mb-2">Hinweise:</h3>
+              <p className="text-gray-300 mb-2">
+                - Erstellen Sie eine Einstellung mit dem Schlüssel &quot;roadmapTitle&quot;, um den Titel der Roadmap anzupassen.
+              </p>
+              <p className="text-gray-300">
+                - Sie können {'{year}'} im Wert verwenden, um das aktuelle Jahr dynamisch einzufügen.
+              </p>
             </div>
           </>
         )}

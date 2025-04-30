@@ -18,8 +18,9 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   const [activeCategories, setActiveCategories] = useState<string[]>([]);
   const [hoveredProject, setHoveredProject] = useState<Project | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [roadmapTitle, setRoadmapTitle] = useState<string>(`IT + Digital Roadmap ${currentYear}`);
 
-  // Fetch categories and filter projects based on the selected year
+  // Fetch categories, filter projects, and get roadmap title
   useEffect(() => {
     // Filter projects based on year
     const filteredProjects = initialProjects.filter(project => {
@@ -43,7 +44,25 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
       }
     };
 
+    // Fetch roadmap title setting
+    const fetchRoadmapTitle = async () => {
+      try {
+        const titleSetting = await clientDataService.getSettingByKey('roadmapTitle');
+        if (titleSetting && titleSetting.value) {
+          // Replace {year} placeholder with the current year if present
+          const title = titleSetting.value.replace('{year}', currentYear.toString());
+          setRoadmapTitle(title);
+        } else {
+          setRoadmapTitle(`IT + Digital Roadmap ${currentYear}`);
+        }
+      } catch (error) {
+        console.error('Error fetching roadmap title:', error);
+        setRoadmapTitle(`IT + Digital Roadmap ${currentYear}`);
+      }
+    };
+
     fetchCategories();
+    fetchRoadmapTitle();
   }, [currentYear, initialProjects]);
 
   const toggleCategory = (categoryId: string) => {
@@ -92,7 +111,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
       <div className="min-h-screen pt-20 px-20 font-sans bg-gray-900 text-white overflow-hidden p-0 m-0">
         <header className="py-8 px-10">
           <h1 className="text-5xl font-bold m-0 uppercase tracking-wider bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent shadow-xl">
-            IT + Digital Roadmap {currentYear}
+            {roadmapTitle}
           </h1>
         </header>
 

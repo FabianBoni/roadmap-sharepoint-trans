@@ -22,4 +22,11 @@ export interface Category {
     icon?: string;
     parentId?: string; // Reference to parent category
     isSubcategory?: boolean; // Flag to easily identify subcategories
-}  
+}
+
+export interface AppSettings {
+    id: string;
+    key: string;
+    value: string;
+    description?: string;
+}
