@@ -1,10 +1,6 @@
 import React from 'react';
 import { Category } from '../types';
-// Import all icons from a specific icon set (you can choose which one you prefer)
-import * as Fa from 'react-icons/fa'; // Font Awesome
-import * as Md from 'react-icons/md'; // Material Design
-import * as Fi from 'react-icons/fi'; // Feather Icons
-import * as Ai from 'react-icons/ai'; // Ant Design Icons
+import { getIconByName } from '../utils/reactIcons';
 
 interface CategorySidebarProps {
   categories: Category[];
@@ -23,33 +19,10 @@ const CategorySidebar: React.FC<CategorySidebarProps> = ({
       return <span>📁</span>;
     }
     
-    // Check different icon libraries
-    // Format: library prefix + icon name (e.g., "FaFolder", "MdHome")
-    const iconLibrary = iconName.substring(0, 2).toLowerCase();
-    
-    // Choose the appropriate icon library based on prefix
-    switch (iconLibrary) {
-      case 'fa':
-        const FaIcon = Fa[iconName as keyof typeof Fa];
-        return FaIcon ? <FaIcon className="text-white" size={16} /> : <span>📁</span>;
-      
-      case 'md':
-        const MdIcon = Md[iconName as keyof typeof Md];
-        return MdIcon ? <MdIcon className="text-white" size={16} /> : <span>📁</span>;
-      
-      case 'fi':
-        const FiIcon = Fi[iconName as keyof typeof Fi];
-        return FiIcon ? <FiIcon className="text-white" size={16} /> : <span>📁</span>;
-      
-      case 'ai':
-        const AiIcon = Ai[iconName as keyof typeof Ai];
-        return AiIcon ? <AiIcon className="text-white" size={16} /> : <span>📁</span>;
-      
-      default:
-        // Try Font Awesome as default
-        const DefaultIcon = Fa[iconName as keyof typeof Fa];
-        return DefaultIcon ? <DefaultIcon className="text-white" size={16} /> : <span>📁</span>;
-    }
+    const IconComponent = getIconByName(iconName);
+    return IconComponent ? 
+      <IconComponent className="text-white" width="16" height="16" /> : 
+      <span>📁</span>;
   };
 
   return (
