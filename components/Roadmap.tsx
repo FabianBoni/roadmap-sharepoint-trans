@@ -103,7 +103,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
 
   // Add this function to handle clicks on projects
   const handleProjectClick = (projectId: string) => {
-    router.push(`/projects/${projectId}`);
+    router.push(`/project/${projectId}`); // This is correct
   };
 
   return (
