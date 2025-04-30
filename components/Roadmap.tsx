@@ -11,16 +11,15 @@ interface RoadmapProps {
 }
 
 const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
-  const router = useRouter(); // Add router for navigation
+  const router = useRouter();
   const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
   const [displayedProjects, setDisplayedProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategories, setActiveCategories] = useState<string[]>([]);
   const [hoveredProject, setHoveredProject] = useState<Project | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
-  const [roadmapTitle, setRoadmapTitle] = useState<string>(`IT + Digital Roadmap ${currentYear}`);
 
-  // Fetch categories, filter projects, and get roadmap title
+  // Fetch categories and filter projects based on the selected year
   useEffect(() => {
     // Filter projects based on year
     const filteredProjects = initialProjects.filter(project => {
@@ -44,25 +43,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
       }
     };
 
-    // Fetch roadmap title setting
-    const fetchRoadmapTitle = async () => {
-      try {
-        const titleSetting = await clientDataService.getSettingByKey('roadmapTitle');
-        if (titleSetting && titleSetting.value) {
-          // Replace {year} placeholder with the current year if present
-          const title = titleSetting.value.replace('{year}', currentYear.toString());
-          setRoadmapTitle(title);
-        } else {
-          setRoadmapTitle(`IT + Digital Roadmap ${currentYear}`);
-        }
-      } catch (error) {
-        console.error('Error fetching roadmap title:', error);
-        setRoadmapTitle(`IT + Digital Roadmap ${currentYear}`);
-      }
-    };
-
     fetchCategories();
-    fetchRoadmapTitle();
   }, [currentYear, initialProjects]);
 
   const toggleCategory = (categoryId: string) => {
@@ -90,6 +71,15 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
     return category?.color || '#777777';
   };
 
+  const getStatusColor = (status: string | undefined) => {
+    switch (status) {
+      case 'completed': return '#10B981'; // green-500
+      case 'in-progress': return '#ddb0ff'; // blue-500
+      case 'planned': return '#6B7280'; // gray-500
+      default: return '#6B7280'; // gray-500 (default for undefined or unknown status)
+    }
+  };
+
   // Handle mouse over for project tooltip
   const handleMouseOver = (e: React.MouseEvent, project: Project) => {
     setHoveredProject(project);
@@ -103,7 +93,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
 
   // Add this function to handle clicks on projects
   const handleProjectClick = (projectId: string) => {
-    router.push(`/project/${projectId}`); // This is correct
+    router.push(`/project/${projectId}`);
   };
 
   return (
@@ -111,7 +101,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
       <div className="min-h-screen pt-20 px-20 font-sans bg-gray-900 text-white overflow-hidden p-0 m-0">
         <header className="py-8 px-10">
           <h1 className="text-5xl font-bold m-0 uppercase tracking-wider bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent shadow-xl">
-            {roadmapTitle}
+            IT + Digital Roadmap {currentYear}
           </h1>
         </header>
 
@@ -215,11 +205,12 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                           left: `${startPosition}%`,
                           width: `${width}%`,
                           backgroundColor: getCategoryColor(project.category),
-                          opacity: 0.8
+                          opacity: 0.8,
+                          borderLeft: `6px solid ${getStatusColor(project.status)}` // Add status indicator on left border
                         }}
                         onMouseEnter={(e) => handleMouseOver(e, project)}
                         onMouseLeave={handleMouseLeave}
-                        onClick={() => handleProjectClick(project.id)} // Add click handler here
+                        onClick={() => handleProjectClick(project.id)}
                       >
                         <span className="font-medium truncate">{project.title}</span>
                       </div>
@@ -253,6 +244,22 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                   </p>
                 </div>
               )}
+            </div>
+
+            {/* Status legend */}
+            <div className="mt-8 flex items-center justify-end space-x-6">
+              <div className="flex items-center">
+                <div className="w-4 h-4 mr-2" style={{ backgroundColor: getStatusColor('planned') }}></div>
+                <span className="text-sm">Geplant</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-4 h-4 mr-2" style={{ backgroundColor: getStatusColor('in-progress') }}></div>
+                <span className="text-sm">In Bearbeitung</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-4 h-4 mr-2" style={{ backgroundColor: getStatusColor('completed') }}></div>
+                <span className="text-sm">Abgeschlossen</span>
+              </div>
             </div>
           </div>
         </div>
