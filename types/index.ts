@@ -5,7 +5,7 @@ export interface Project {
     startQuarter: string;
     endQuarter: string;
     description?: string;
-    status?: string;
+    status: string;
     teamMembers?: string[];
     fields?: {
         process?: string[];

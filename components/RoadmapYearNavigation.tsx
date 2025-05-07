@@ -1,55 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid';
+import React from 'react';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 interface RoadmapYearNavigationProps {
-  initialYear?: number;
-  onYearChange?: (year: number) => void;
+  initialYear: number;
+  onYearChange: (year: number) => void;
 }
 
-const RoadmapYearNavigation: React.FC<RoadmapYearNavigationProps> = ({ 
-  initialYear = new Date().getFullYear(),
-  onYearChange 
+const RoadmapYearNavigation: React.FC<RoadmapYearNavigationProps> = ({
+  initialYear,
+  onYearChange
 }) => {
-  const [currentYear, setCurrentYear] = useState<number>(initialYear);
-  
-  const handleYearChange = (newYear: number) => {
+  const [currentYear, setCurrentYear] = React.useState(initialYear);
+
+  const handlePreviousYear = () => {
+    const newYear = currentYear - 1;
     setCurrentYear(newYear);
-    if (onYearChange) {
-      onYearChange(newYear);
-    }
+    onYearChange(newYear);
   };
 
-  const goToPreviousYear = () => {
-    handleYearChange(currentYear - 1);
+  const handleNextYear = () => {
+    const newYear = currentYear + 1;
+    setCurrentYear(newYear);
+    onYearChange(newYear);
   };
-
-  const goToNextYear = () => {
-    handleYearChange(currentYear + 1);
-  };
-
-  useEffect(() => {
-    // Update document title when year changes
-    document.title = `Roadmap JSD - ${currentYear}`;
-  }, [currentYear]);
 
   return (
-    <div className="flex items-center justify-center space-x-4">
-      <button 
-        onClick={goToPreviousYear}
-        className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 transition-colors"
+    <div className="flex items-center space-x-2 bg-gray-800 rounded-lg p-2">
+      <button
+        onClick={handlePreviousYear}
+        className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
         aria-label="Previous Year"
       >
-        <ChevronLeftIcon className="h-5 w-5 text-white" />
+        <FaChevronLeft className="w-4 h-4" />
       </button>
       
-      <h2 className="text-2xl font-bold text-white">{currentYear}</h2>
+      <span className="text-lg font-bold text-white px-2">{currentYear}</span>
       
-      <button 
-        onClick={goToNextYear}
-        className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 transition-colors"
+      <button
+        onClick={handleNextYear}
+        className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
         aria-label="Next Year"
       >
-        <ChevronRightIcon className="h-5 w-5 text-white" />
+        <FaChevronRight className="w-4 h-4" />
       </button>
     </div>
   );
