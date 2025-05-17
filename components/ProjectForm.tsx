@@ -1,375 +1,237 @@
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import { clientDataService } from '../utils/clientDataService';
+import React, { useState } from 'react';
+import { Project, Category, ProjectLink, TeamMember } from '../types';
+import { v4 as uuidv4 } from 'uuid';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { FaTrash, FaPlus } from 'react-icons/fa';
 
 interface ProjectFormProps {
-  projectId?: string;
+  initialProject?: Project;
+  categories: Category[];
+  onSubmit: (project: Project) => void;
   onCancel: () => void;
 }
 
-interface Category {
-  id: string;
-  name: string;
-  color: string;
-  icon: string;
-}
+const ProjectForm: React.FC<ProjectFormProps> = ({
+  initialProject,
+  categories,
+  onSubmit,
+  onCancel
+}) => {
+  // Grundlegende Projektdaten
+  const [title, setTitle] = useState(initialProject?.title || '');
+  const [description, setDescription] = useState(initialProject?.description || '');
+  const [status, setStatus] = useState(initialProject?.status || 'planned');
+  const [startDate, setStartDate] = useState<Date | null>(
+    initialProject?.startDate ? new Date(initialProject.startDate) : null
+  );
+  const [endDate, setEndDate] = useState<Date | null>(
+    initialProject?.endDate ? new Date(initialProject.endDate) : null
+  );
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    initialProject?.category || ''
+  );
 
-interface ProjectData {
-  title: string;
-  category: string;
-  startDate: string;
-  endDate: string;
-  description: string;
-  status: 'planned' | 'in-progress' | 'completed';
-  projektleitung: string;
-  bisher: string;
-  zukunft: string;
-  fortschritt: number;
-  geplante_umsetzung: string;
-  budget: string;
-  teamMembers: { name: string; role: string }[];
-  attributes: {
-    process: boolean;
-    technology: boolean;
-    services: boolean;
-    data: boolean;
-  };
-}
+  // Zusätzliche Felder aus dem SharePoint-Schema
+  const [projektleitung, setProjektleitung] = useState(initialProject?.projektleitung || '');
+  const [bisher, setBisher] = useState(initialProject?.bisher || '');
+  const [zukunft, setZukunft] = useState(initialProject?.zukunft || '');
+  const [fortschritt, setFortschritt] = useState(initialProject?.fortschritt || 0);
+  const [geplantUmsetzung, setGeplantUmsetzung] = useState(initialProject?.geplante_umsetzung || '');
+  const [budget, setBudget] = useState(initialProject?.budget || '');
 
-const ProjectForm: React.FC<ProjectFormProps> = ({ projectId, onCancel }) => {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
+  // Teammitglieder
+  const [teamMembers, setTeamMembers] = useState<string[]>(() => {
+    if (!initialProject?.teamMembers) return [];
 
-  // Project data state
-  const [projectData, setProjectData] = useState<ProjectData>({
-    title: '',
-    category: '',
-    startDate: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
-    endDate: new Date().toISOString().split('T')[0],
-    description: '',
-    status: 'planned',
-    projektleitung: '',
-    bisher: '',
-    zukunft: '',
-    fortschritt: 0,
-    geplante_umsetzung: '',
-    budget: '',
-    teamMembers: [{ name: '', role: '' }],
-    attributes: {
-      process: false,
-      technology: false,
-      services: false,
-      data: false
+    // If it's already string[], use it directly
+    if (typeof initialProject.teamMembers[0] === 'string') {
+      return initialProject.teamMembers as string[];
     }
+
+    // If it's TeamMember[], extract the names
+    return (initialProject.teamMembers as (string | TeamMember)[]).map(member =>
+      typeof member === 'string' ? member : member.name
+    );
   });
 
-  // Fetch categories and project data if editing
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch categories
-        const categoriesData = await clientDataService.getAllCategories();
-        setCategories(categoriesData);
+  const [newTeamMember, setNewTeamMember] = useState('');
 
-        // If projectId is provided, fetch project data
-        if (projectId) {
-          const project = await clientDataService.getProjectById(projectId);
-          if (project) {
-            // Convert quarter format to date
-            const startQuarterParts = project.startQuarter.split(' ');
-            const endQuarterParts = project.endQuarter.split(' ');
+  // Links-Verwaltung
+  const [links, setLinks] = useState<ProjectLink[]>(initialProject?.links || []);
+  const [newLinkTitle, setNewLinkTitle] = useState('');
+  const [newLinkUrl, setNewLinkUrl] = useState('');
 
-            const startDate = getDateFromQuarter(startQuarterParts[0], parseInt(startQuarterParts[1]));
-            const endDate = getDateFromQuarter(endQuarterParts[0], parseInt(endQuarterParts[1]), true);
+  // Felder-Verwaltung
+  const [selectedFields, setSelectedFields] = useState<string[]>(initialProject?.ProjectFields || []);
 
-            // Fetch team members
-            const teamMembers = await clientDataService.getTeamMembersByProjectId(projectId);
+  // Validierung
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-            // Fetch fields
-            const fields = await clientDataService.getFieldsByProjectId(projectId);
+  // Kategorie auswählen
+  const selectCategory = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+  };
 
-            // Check which attributes are used
-            const attributes = {
-              process: fields.some(f => f.type === 'PROCESS'),
-              technology: fields.some(f => f.type === 'TECHNOLOGY'),
-              services: fields.some(f => f.type === 'SERVICE'),
-              data: fields.some(f => f.type === 'DATA')
-            };
+  // Feld umschalten
+  const toggleField = (fieldValue: string) => {
+    if (selectedFields.includes(fieldValue)) {
+      setSelectedFields(selectedFields.filter(name => name !== fieldValue));
+    } else {
+      setSelectedFields([...selectedFields, fieldValue]);
+    }
+  };
 
-            // Update project data state
-            setProjectData({
-              title: project.title,
-              category: project.category,
-              startDate: startDate,
-              endDate: endDate,
-              description: project.description || '',
-              status: project.status,
-              projektleitung: project.projektleitung || '',
-              bisher: project.bisher || '',
-              zukunft: project.zukunft || '',
-              fortschritt: project.fortschritt || 0,
-              geplante_umsetzung: project.geplante_umsetzung || '',
-              budget: project.budget || '',
-              teamMembers: teamMembers.length > 0
-                ? teamMembers.map(m => ({ name: m.name, role: m.role }))
-                : [{ name: '', role: '' }],
-              attributes
-            });
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Fehler beim Laden der Daten. Bitte versuchen Sie es erneut.');
-      } finally {
-        setLoading(false);
-      }
+  // Teammitglied hinzufügen
+  const addTeamMember = () => {
+    if (newTeamMember.trim()) {
+      setTeamMembers([...teamMembers, newTeamMember.trim()]);
+      setNewTeamMember('');
+    }
+  };
+
+  // Teammitglied entfernen
+  const removeTeamMember = (index: number) => {
+    setTeamMembers(teamMembers.filter((_, i) => i !== index));
+  };
+
+  // Link hinzufügen
+  const addLink = () => {
+    if (newLinkTitle.trim() && newLinkUrl.trim()) {
+      const newLink: ProjectLink = {
+        id: uuidv4(),
+        title: newLinkTitle.trim(),
+        url: newLinkUrl.trim()
+      };
+
+      setLinks([...links, newLink]);
+      setNewLinkTitle('');
+      setNewLinkUrl('');
+    }
+  };
+
+  // Link entfernen
+  const removeLink = (linkId: string) => {
+    setLinks(links.filter(link => link.id !== linkId));
+  };
+
+  // Formular validieren
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!title.trim()) {
+      newErrors.title = 'Titel ist erforderlich';
+    }
+
+    if (!description.trim()) {
+      newErrors.description = 'Beschreibung ist erforderlich';
+    }
+
+    if (!selectedCategory) {
+      newErrors.category = 'Eine Kategorie muss ausgewählt sein';
+    }
+
+    if (startDate && endDate && startDate > endDate) {
+      newErrors.dates = 'Das Enddatum muss nach dem Startdatum liegen';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Formular absenden
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    if (!validateForm()) {
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Berechnen der Quartale aus den Datumsangaben
+    let startQuarter = '';
+    let endQuarter = '';
+
+    if (startDate) {
+      const quarter = Math.floor(startDate.getMonth() / 3) + 1;
+      startQuarter = `Q${quarter} ${startDate.getFullYear()}`;
+    }
+
+    if (endDate) {
+      const quarter = Math.floor(endDate.getMonth() / 3) + 1;
+      endQuarter = `Q${quarter} ${endDate.getFullYear()}`;
+    }
+
+    const projectData: Project = {
+      id: initialProject?.id || '',
+      title,
+      description,
+      status,
+      category: selectedCategory,
+      startQuarter,
+      endQuarter,
+      startDate: startDate ? startDate.toISOString() : '',
+      endDate: endDate ? endDate.toISOString() : '',
+      projektleitung,
+      bisher,
+      zukunft,
+      fortschritt,
+      geplante_umsetzung: geplantUmsetzung,
+      budget,
+      teamMembers,
+      links,
+      ProjectFields: selectedFields
     };
 
-    fetchData();
-  }, [projectId]);
-
-  // Helper function to get date from quarter
-  const getDateFromQuarter = (quarter: string, year: number, endOfQuarter: boolean = false): string => {
-    let month: number;
-
-    switch (quarter) {
-      case 'Q1':
-        month = endOfQuarter ? 3 : 1;
-        break;
-      case 'Q2':
-        month = endOfQuarter ? 6 : 4;
-        break;
-      case 'Q3':
-        month = endOfQuarter ? 9 : 7;
-        break;
-      case 'Q4':
-        month = endOfQuarter ? 12 : 10;
-        break;
-      default:
-        month = 1;
-    }
-
-    const day = endOfQuarter ? (month === 2 ? 28 : (month === 4 || month === 6 || month === 9 || month === 11) ? 30 : 31) : 1;
-
-    return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    onSubmit(projectData);
   };
 
-  // Helper function to get quarter from date
-  const getQuarterFromDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    const month = date.getMonth() + 1;
-    const year = date.getFullYear();
-
-    let quarter: string;
-    if (month <= 3) quarter = 'Q1';
-    else if (month <= 6) quarter = 'Q2';
-    else if (month <= 9) quarter = 'Q3';
-    else quarter = 'Q4';
-
-    return `${quarter} ${year}`;
-  };
-
-  // Handle input changes
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setProjectData(prev => ({ ...prev, [name]: value }));
-  };
-
-  // Handle status change
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value as 'planned' | 'in-progress' | 'completed';
-    setProjectData(prev => ({ ...prev, status: value }));
-  };
-
-  // Handle progress change
-  const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value);
-    setProjectData(prev => ({ ...prev, fortschritt: isNaN(value) ? 0 : value }));
-  };
-
-  // Handle team member changes
-  const handleTeamMemberChange = (index: number, field: 'name' | 'role', value: string) => {
-    setProjectData(prev => {
-      const updatedMembers = [...prev.teamMembers];
-      updatedMembers[index] = { ...updatedMembers[index], [field]: value };
-      return { ...prev, teamMembers: updatedMembers };
-    });
-  };
-
-  // Add team member
-  const addTeamMember = () => {
-    setProjectData(prev => ({
-      ...prev,
-      teamMembers: [...prev.teamMembers, { name: '', role: '' }]
-    }));
-  };
-
-  // Remove team member
-  const removeTeamMember = (index: number) => {
-    setProjectData(prev => {
-      const updatedMembers = [...prev.teamMembers];
-      updatedMembers.splice(index, 1);
-      return { ...prev, teamMembers: updatedMembers.length ? updatedMembers : [{ name: '', role: '' }] };
-    });
-  };
-
-  // Handle attribute checkbox changes
-  const handleAttributeChange = (attribute: 'process' | 'technology' | 'services' | 'data') => {
-    setProjectData(prev => ({
-      ...prev,
-      attributes: {
-        ...prev.attributes,
-        [attribute]: !prev.attributes[attribute]
-      }
-    }));
-  };
-
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-
-    try {
-      // Convert dates to quarters
-      const startQuarter = getQuarterFromDate(projectData.startDate);
-      const endQuarter = getQuarterFromDate(projectData.endDate);
-
-      // Filter out empty team members
-      const teamMembers = projectData.teamMembers.filter(m => m.name.trim() && m.role.trim());
-
-      // Create fields based on selected attributes
-      const fields = {
-        process: projectData.attributes.process ? ['Enabled'] : [],
-        technology: projectData.attributes.technology ? ['Enabled'] : [],
-        services: projectData.attributes.services ? ['Enabled'] : [],
-        data: projectData.attributes.data ? ['Enabled'] : []
-      };
-
-      // Prepare project data
-      const projectToSave = {
-        title: projectData.title,
-        category: projectData.category,
-        startQuarter,
-        endQuarter,
-        description: projectData.description,
-        status: projectData.status,
-        projektleitung: projectData.projektleitung,
-        bisher: projectData.bisher,
-        zukunft: projectData.zukunft,
-        fortschritt: projectData.fortschritt,
-        geplante_umsetzung: projectData.geplante_umsetzung,
-        budget: projectData.budget,
-        teamMembers,
-        fields
-      };
-
-      console.log("Saving project with data:", projectToSave);
-
-      if (projectId) {
-        // Update existing project
-        await clientDataService.updateProject(projectId, projectToSave);
-      } else {
-        // Create new project
-        await clientDataService.createProject(projectToSave);
-      }
-
-      // Redirect to admin dashboard
-      router.push('/admin');
-    } catch (err) {
-      console.error('Error saving project:', err);
-      setError('Fehler beim Speichern des Projekts. Bitte versuchen Sie es erneut.');
-      setSubmitting(false);
-    }
-  };
-
-  if (loading) {
-    return <div className="flex justify-center items-center h-64">Laden...</div>;
-  }
+  // Definieren Sie die verfügbaren Felder
+  const availableFields = [
+    { id: 'process', name: 'Prozess', description: 'Prozessbezogene Aspekte' },
+    { id: 'technology', name: 'Technologie', description: 'Technologische Aspekte' },
+    { id: 'service', name: 'Dienstleistung', description: 'Servicebezogene Aspekte' },
+    { id: 'data', name: 'Daten', description: 'Datenbezogene Aspekte' },
+    { id: 'security', name: 'Sicherheit', description: 'Sicherheitsaspekte' },
+    { id: 'infrastructure', name: 'Infrastruktur', description: 'Infrastrukturaspekte' }
+  ];
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {error && (
-        <div className="bg-red-500 text-white p-3 rounded-md">
-          {error}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Project Title */}
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium mb-1">
-            Projekttitel
-          </label>
-          <input
-            type="text"
-            id="title"
-            name="title"
-            required
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            value={projectData.title}
-            onChange={handleInputChange}
-          />
-        </div>
-
-        {/* Category */}
-        <div>
-          <label htmlFor="category" className="block text-sm font-medium mb-1">
-            Kategorie
-          </label>
-          <select
-            id="category"
-            name="category"
-            required
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            value={projectData.category}
-            onChange={handleInputChange}
-          >
-            <option value="">Kategorie auswählen</option>
-            {categories.map(category => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </div>
+      {/* Titel */}
+      <div>
+        <label htmlFor="title" className="block text-sm font-medium mb-1">
+          Titel <span className="text-red-500">*</span>
+        </label>
+        <input
+          id="title"
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className={`w-full bg-gray-800 border ${errors.title ? 'border-red-500' : 'border-gray-700'
+            } rounded p-2`}
+          required
+        />
+        {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title}</p>}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Start Date */}
-        <div>
-          <label htmlFor="startDate" className="block text-sm font-medium mb-1">
-            Startdatum
-          </label>
-          <input
-            type="date"
-            id="startDate"
-            name="startDate"
-            required
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            value={projectData.startDate}
-            onChange={handleInputChange}
-          />
-        </div>
-
-        {/* End Date */}
-        <div>
-          <label htmlFor="endDate" className="block text-sm font-medium mb-1">
-            Enddatum
-          </label>
-          <input
-            type="date"
-            id="endDate"
-            name="endDate"
-            required
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            value={projectData.endDate}
-            onChange={handleInputChange}
-          />
-        </div>
+      {/* Beschreibung */}
+      <div>
+        <label htmlFor="description" className="block text-sm font-medium mb-1">
+          Beschreibung <span className="text-red-500">*</span>
+        </label>
+        <textarea
+          id="description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={4}
+          className={`w-full bg-gray-800 border ${errors.description ? 'border-red-500' : 'border-gray-700'
+            } rounded p-2`}
+          required
+        />
+        {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description}</p>}
       </div>
 
       {/* Status */}
@@ -379,256 +241,345 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ projectId, onCancel }) => {
         </label>
         <select
           id="status"
-          name="status"
-          required
-          className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-          value={projectData.status}
-          onChange={handleStatusChange}
+          value={status}
+          onChange={(e) => setStatus(e.target.value as "planned" | "in-progress" | "completed" | "paused" | "cancelled")}
+          className="w-full bg-gray-800 border border-gray-700 rounded p-2"
         >
           <option value="planned">Geplant</option>
           <option value="in-progress">In Bearbeitung</option>
           <option value="completed">Abgeschlossen</option>
+          <option value="paused">Pausiert</option>
+          <option value="cancelled">Abgebrochen</option>
         </select>
       </div>
 
-      {/* Description */}
+      {/* Datumsbereich */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="startDate" className="block text-sm font-medium mb-1">
+            Startdatum
+          </label>
+          <DatePicker
+            id="startDate"
+            selected={startDate}
+            onChange={setStartDate}
+            className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+            dateFormat="dd.MM.yyyy"
+            placeholderText="TT.MM.JJJJ"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="endDate" className="block text-sm font-medium mb-1">
+            Enddatum
+          </label>
+          <DatePicker
+            id="endDate"
+            selected={endDate}
+            onChange={setEndDate}
+            className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+            dateFormat="dd.MM.yyyy"
+            placeholderText="TT.MM.JJJJ"
+            minDate={startDate || undefined}
+            required
+          />
+        </div>
+      </div>
+      {errors.dates && <p className="text-red-500 text-sm mt-1">{errors.dates}</p>}
+
+      {/* Kategorien */}
       <div>
-        <label htmlFor="description" className="block text-sm font-medium mb-1">
-          Beschreibung
+        <label className="block text-sm font-medium mb-2">
+          Kategorie <span className="text-red-500">*</span>
         </label>
-        <textarea
-          id="description"
-          name="description"
-          rows={3}
-          required
-          className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-          value={projectData.description}
-          onChange={handleInputChange}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+          {categories.map(category => (
+            <div
+              key={category.id}
+              className={`flex items-center p-2 rounded cursor-pointer transition-all ${selectedCategory === category.id
+                ? 'bg-gray-700 border-l-4'
+                : 'bg-gray-800 opacity-70'
+                }`}
+              style={{
+                borderLeftColor: selectedCategory === category.id
+                  ? category.color
+                  : 'transparent'
+              }}
+              onClick={() => selectCategory(category.id)}
+            >
+              <div
+                className="w-4 h-4 rounded-full mr-2"
+                style={{ backgroundColor: category.color }}
+              />
+              <span>{category.name}</span>
+            </div>
+          ))}
+        </div>
+        {errors.category && (
+          <p className="text-red-500 text-sm mt-1">{errors.category}</p>
+        )}
       </div>
 
-      {/* Project Lead */}
+      {/* Projektleitung */}
       <div>
         <label htmlFor="projektleitung" className="block text-sm font-medium mb-1">
           Projektleitung
         </label>
         <input
-          type="text"
           id="projektleitung"
-          name="projektleitung"
+          type="text"
+          value={projektleitung}
+          onChange={(e) => setProjektleitung(e.target.value)}
+          className="w-full bg-gray-800 border border-gray-700 rounded p-2"
           required
-          className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-          value={projectData.projektleitung}
-          onChange={handleInputChange}
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Previous Work */}
-        <div>
-          <label htmlFor="bisher" className="block text-sm font-medium mb-1">
-            Bisherige Arbeit
-          </label>
-          <textarea
-            id="bisher"
-            name="bisher"
-            rows={3}
-            required
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            value={projectData.bisher}
-            onChange={handleInputChange}
-          />
-        </div>
-
-        {/* Future Work */}
-        <div>
-          <label htmlFor="zukunft" className="block text-sm font-medium mb-1">
-            Zukünftige Arbeit
-          </label>
-          <textarea
-            id="zukunft"
-            name="zukunft"
-            rows={3}
-            required
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            value={projectData.zukunft}
-            onChange={handleInputChange}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Progress */}
-        <div>
-          <label htmlFor="fortschritt" className="block text-sm font-medium mb-1">
-            Fortschritt (%)
-          </label>
+      {/* Fortschritt */}
+      <div>
+        <label htmlFor="fortschritt" className="block text-sm font-medium mb-1">
+          Fortschritt (%)
+        </label>
+        <div className="flex items-center space-x-4">
           <input
-            type="number"
             id="fortschritt"
-            name="fortschritt"
+            type="range"
             min="0"
             max="100"
+            value={fortschritt}
+            onChange={(e) => setFortschritt(parseInt(e.target.value))}
+            className="flex-grow"
             required
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            value={projectData.fortschritt}
-            onChange={handleProgressChange}
           />
+          <span className="w-12 text-center">{fortschritt}%</span>
         </div>
-
-        {/* Budget */}
-        <div>
-          <label htmlFor="budget" className="block text-sm font-medium mb-1">
-            Budget
-          </label>
-          <input
-            type="text"
-            id="budget"
-            name="budget"
-            required
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-            value={projectData.budget}
-            onChange={handleInputChange}
-          />
+        <div className="w-full bg-gray-700 rounded-full h-2.5 mt-2">
+          <div
+            className="bg-blue-600 h-2.5 rounded-full"
+            style={{ width: `${fortschritt}%` }}
+          ></div>
         </div>
       </div>
 
-      {/* Planned Implementation */}
+      {/* Budget */}
       <div>
-        <label htmlFor="geplante_umsetzung" className="block text-sm font-medium mb-1">
+        <label htmlFor="budget" className="block text-sm font-medium mb-1">
+          Budget
+        </label>
+        <input
+          id="budget"
+          type="text"
+          value={budget}
+          onChange={(e) => setBudget(e.target.value)}
+          className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+          placeholder="z.B. CHF 150'000"
+          required
+        />
+      </div>
+
+      {/* Bisher */}
+      <div>
+        <label htmlFor="bisher" className="block text-sm font-medium mb-1">
+          Bisher
+        </label>
+        <textarea
+          id="bisher"
+          value={bisher}
+          onChange={(e) => setBisher(e.target.value)}
+          rows={3}
+          className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+          placeholder="Was wurde bisher erreicht?"
+          required
+        />
+      </div>
+
+      {/* Zukunft */}
+      <div>
+        <label htmlFor="zukunft" className="block text-sm font-medium mb-1">
+          In Zukunft
+        </label>
+        <textarea
+          id="zukunft"
+          value={zukunft}
+          onChange={(e) => setZukunft(e.target.value)}
+          rows={3}
+          className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+          placeholder="Was ist für die Zukunft geplant?"
+          required
+        />
+      </div>
+
+      {/* Geplante Umsetzung */}
+      <div>
+        <label htmlFor="geplantUmsetzung" className="block text-sm font-medium mb-1">
           Geplante Umsetzung
         </label>
         <textarea
-          id="geplante_umsetzung"
-          name="geplante_umsetzung"
+          id="geplantUmsetzung"
+          value={geplantUmsetzung}
+          onChange={(e) => setGeplantUmsetzung(e.target.value)}
           rows={3}
+          className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+          placeholder="Wie soll das Projekt umgesetzt werden?"
           required
-          className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white"
-          value={projectData.geplante_umsetzung}
-          onChange={handleInputChange}
         />
       </div>
 
-      {/* Team Members */}
-      <div>
-        <h3 className="text-lg font-medium mb-3">Teammitglieder</h3>
-        {projectData.teamMembers.map((member, index) => (
-          <div key={index} className="flex items-center space-x-2 mb-2">
-            <input
-              type="text"
-              placeholder="Name"
-              className="flex-1 p-2 bg-gray-700 border border-gray-600 rounded text-white"
-              value={member.name}
-              required
-              onChange={(e) => handleTeamMemberChange(index, 'name', e.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Rolle"
-              className="flex-1 p-2 bg-gray-700 border border-gray-600 rounded text-white"
-              value={member.role}
-              onChange={(e) => handleTeamMemberChange(index, 'role', e.target.value)}
-            />
-            <button
-              type="button"
-              className="p-2 bg-red-600 text-white rounded hover:bg-red-700"
-              onClick={() => removeTeamMember(index)}
-            >
-              -
-            </button>
-          </div>
-        ))}
-        <button
-          type="button"
-          className="mt-2 p-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          onClick={addTeamMember}
-        >
-          + Teammitglied hinzufügen
-        </button>
-      </div>
-
-      {/* Project Attributes - Changed to checkboxes */}
-      <div className="space-y-6">
-        <h3 className="text-lg font-medium">Projektattribute</h3>
-        <p className="text-sm text-gray-400 mb-4">
-          Wählen Sie aus, welche Attribute in der Projektbeschreibung angezeigt werden sollen.
-        </p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Process Attribute */}
-          <div className="flex items-center space-x-3">
-            <input
-              type="checkbox"
-              id="process-attribute"
-              checked={projectData.attributes.process}
-              onChange={() => handleAttributeChange('process')}
-              className="w-5 h-5 bg-gray-700 border-gray-600 rounded"
-            />
-            <label htmlFor="process-attribute" className="text-sm font-medium">
-              Prozesse
-            </label>
-          </div>
-
-          {/* Technology Attribute */}
-          <div className="flex items-center space-x-3">
-            <input
-              type="checkbox"
-              id="technology-attribute"
-              checked={projectData.attributes.technology}
-              onChange={() => handleAttributeChange('technology')}
-              className="w-5 h-5 bg-gray-700 border-gray-600 rounded"
-            />
-            <label htmlFor="technology-attribute" className="text-sm font-medium">
-              Technologie
-            </label>
-          </div>
-
-          {/* Services Attribute */}
-          <div className="flex items-center space-x-3">
-            <input
-              type="checkbox"
-              id="services-attribute"
-              checked={projectData.attributes.services}
-              onChange={() => handleAttributeChange('services')}
-              className="w-5 h-5 bg-gray-700 border-gray-600 rounded"
-            />
-            <label htmlFor="services-attribute" className="text-sm font-medium">
-              Services
-            </label>
-          </div>
-
-          {/* Data Attribute */}
-          <div className="flex items-center space-x-3">
-            <input
-              type="checkbox"
-              id="data-attribute"
-              checked={projectData.attributes.data}
-              onChange={() => handleAttributeChange('data')}
-              className="w-5 h-5 bg-gray-700 border-gray-600 rounded"
-            />
-            <label htmlFor="data-attribute" className="text-sm font-medium">
-              Daten
-            </label>
+      {/* Felder */}
+      <div className="mt-6">
+        <h3 className="text-lg font-medium mb-2">Felder</h3>
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          <p className="text-sm text-gray-400 mb-4">
+            Wählen Sie die Felder aus, die für dieses Projekt relevant sind:
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {availableFields.map(field => (
+              <div key={field.id} className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id={`field-${field.id}`}
+                  checked={selectedFields.includes(field.name)}
+                  onChange={() => toggleField(field.name)}
+                  className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                />
+                <label htmlFor={`field-${field.id}`} className="text-sm">
+                  {field.name}
+                  {field.description && (
+                    <span className="text-xs text-gray-400 block">{field.description}</span>
+                  )}
+                </label>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Form Actions */}
-      <div className="flex justify-end space-x-3 pt-6">
+      {/* Team-Mitglieder */}
+      <div className="mt-6">
+        <h3 className="text-lg font-medium mb-2">Team-Mitglieder</h3>
+
+        {/* Liste der vorhandenen Team-Mitglieder */}
+        <div className="space-y-2 mb-4">
+          {teamMembers.map((member, index) => (
+            <div key={index} className="flex items-center bg-gray-800 p-2 rounded">
+              <div className="flex-grow">
+                <div className="font-medium">{member}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeTeamMember(index)}
+                className="text-red-400 hover:text-red-300 p-1"
+                aria-label="Teammitglied entfernen"
+              >
+                <FaTrash size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Formular zum Hinzufügen neuer Team-Mitglieder */}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-7">
+          <div className="md:col-span-6">
+            <input
+              type="text"
+              placeholder="Name des Teammitglieds"
+              value={newTeamMember}
+              onChange={(e) => setNewTeamMember(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+            />
+          </div>
+          <div className="md:col-span-1">
+            <button
+              type="button"
+              onClick={addTeamMember}
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 px-4 rounded flex items-center justify-center"
+              disabled={!newTeamMember.trim()}
+            >
+              <FaPlus />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Links-Bereich */}
+      <div className="mt-6">
+        <h3 className="text-lg font-medium mb-2">Referenz-Links</h3>
+
+        {/* Liste der vorhandenen Links */}
+        <div className="space-y-2 mb-4">
+          {links.map(link => (
+            <div key={link.id} className="flex items-center bg-gray-800 p-2 rounded">
+              <div className="flex-grow">
+                <div className="font-medium">{link.title}</div>
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 text-sm hover:underline"
+                >
+                  {link.url}
+                </a>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeLink(link.id)}
+                className="text-red-400 hover:text-red-300 p-1"
+                aria-label="Link entfernen"
+              >
+                <FaTrash size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Formular zum Hinzufügen neuer Links */}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-7">
+          <div className="md:col-span-3">
+            <input
+              type="text"
+              placeholder="Link-Titel"
+              value={newLinkTitle}
+              onChange={(e) => setNewLinkTitle(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+            />
+          </div>
+          <div className="md:col-span-3">
+            <input
+              type="url"
+              placeholder="URL (https://...)"
+              value={newLinkUrl}
+              onChange={(e) => setNewLinkUrl(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+            />
+          </div>
+          <div className="md:col-span-1">
+            <button
+              type="button"
+              onClick={addLink}
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 px-4 rounded flex items-center justify-center"
+              disabled={!newLinkTitle.trim() || !newLinkUrl.trim()}
+            >
+              <FaPlus />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Buttons */}
+      <div className="flex justify-end space-x-3 pt-4">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-          disabled={submitting}
+          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded"
         >
           Abbrechen
         </button>
         <button
           type="submit"
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          disabled={submitting}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded"
+          disabled={isSubmitting}
         >
-          {submitting ? 'Speichern...' : (projectId ? 'Aktualisieren' : 'Erstellen')}
+          {initialProject ? 'Aktualisieren' : 'Erstellen'}
         </button>
       </div>
     </form>

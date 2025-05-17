@@ -39,12 +39,27 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
     };
   }, []);
 
+  // Hilfsfunktion zum Extrahieren des Jahres aus einem ISO-Datumsstring
+  const getYearFromISOString = (isoString: string): number => {
+    const date = new Date(isoString);
+    return !isNaN(date.getTime()) ? date.getFullYear() : currentYear;
+  };
+
+  // Hilfsfunktion zum Extrahieren des Quartals aus einem Datum
+  const getQuarterFromDate = (date: Date): number => {
+    return Math.floor(date.getMonth() / 3) + 1;
+  };
+
   // Fetch categories and filter projects based on the selected year
   useEffect(() => {
     // Filter projects based on year
     const filteredProjects = initialProjects.filter(project => {
-      const startYear = parseInt(project.startQuarter.split(' ')[1], 10);
-      const endYear = parseInt(project.endQuarter.split(' ')[1], 10);
+      if (!project.startDate || !project.endDate) {
+        return false; // Ignoriere Projekte ohne Datumsangaben
+      }
+
+      const startYear = getYearFromISOString(project.startDate);
+      const endYear = getYearFromISOString(project.endDate);
 
       return startYear <= currentYear && endYear >= currentYear;
     });
@@ -65,6 +80,13 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
 
     fetchCategories();
   }, [currentYear, initialProjects]);
+
+  // Debugging-Ausgaben
+  useEffect(() => {
+    console.log('Initial projects:', initialProjects);
+    console.log('Displayed projects:', displayedProjects);
+    console.log('Active categories:', activeCategories);
+  }, [initialProjects, displayedProjects, activeCategories]);
 
   const toggleCategory = (categoryId: string) => {
     if (activeCategories.includes(categoryId)) {
@@ -93,10 +115,12 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
 
   // Get status color
   const getStatusColor = (status: string): string => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'completed': return '#10B981'; // green-500
       case 'in-progress': return '#3B82F6'; // blue-500
       case 'planned': return '#6B7280'; // gray-500
+      case 'paused': return '#F59E0B'; // yellow-500
+      case 'cancelled': return '#EF4444'; // red-500
       default: return '#6B7280'; // gray-500
     }
   };
@@ -119,32 +143,39 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
 
   // Calculate position for quarter view
   const calculateQuarterPosition = (project: Project): { startPosition: number, width: number } => {
-    const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
-    const [startQ, startYear] = project.startQuarter.split(' ');
-    const [endQ, endYear] = project.endQuarter.split(' ');
+    if (!project.startDate || !project.endDate) {
+      return { startPosition: 0, width: 0 };
+    }
 
-    const startQIndex = quarters.indexOf(startQ);
-    const endQIndex = quarters.indexOf(endQ);
-    const startYearNum = parseInt(startYear, 10);
-    const endYearNum = parseInt(endYear, 10);
+    const startDate = new Date(project.startDate);
+    const endDate = new Date(project.endDate);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { startPosition: 0, width: 0 };
+    }
+
+    const startYear = startDate.getFullYear();
+    const endYear = endDate.getFullYear();
+    const startQuarter = getQuarterFromDate(startDate);
+    const endQuarter = getQuarterFromDate(endDate);
 
     let startPosition = 0;
     let width = 0;
 
-    if (startYearNum < currentYear) {
+    if (startYear < currentYear) {
       // Project started before current year
       startPosition = 0;
-    } else if (startYearNum === currentYear) {
+    } else if (startYear === currentYear) {
       // Project starts in current year
-      startPosition = startQIndex * 25;
+      startPosition = (startQuarter - 1) * 25;
     }
 
-    if (endYearNum > currentYear) {
+    if (endYear > currentYear) {
       // Project ends after current year
       width = 100 - startPosition;
-    } else if (endYearNum === currentYear) {
+    } else if (endYear === currentYear) {
       // Project ends in current year
-      width = (endQIndex + 1) * 25 - startPosition;
+      width = endQuarter * 25 - startPosition;
     }
 
     return { startPosition, width };
@@ -152,50 +183,37 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
 
   // Calculate position for month view
   const calculateMonthPosition = (project: Project): { startPosition: number, width: number } => {
-    const [startQ, startYear] = project.startQuarter.split(' ');
-    const [endQ, endYear] = project.endQuarter.split(' ');
+    if (!project.startDate || !project.endDate) {
+      return { startPosition: 0, width: 0 };
+    }
 
-    // Convert quarters to months (0-11)
-    const getStartMonth = (quarter: string): number => {
-      switch (quarter) {
-        case 'Q1': return 0; // January
-        case 'Q2': return 3; // April
-        case 'Q3': return 6; // July
-        case 'Q4': return 9; // October
-        default: return 0;
-      }
-    };
+    const startDate = new Date(project.startDate);
+    const endDate = new Date(project.endDate);
 
-    const getEndMonth = (quarter: string): number => {
-      switch (quarter) {
-        case 'Q1': return 2; // March
-        case 'Q2': return 5; // June
-        case 'Q3': return 8; // September
-        case 'Q4': return 11; // December
-        default: return 11;
-      }
-    };
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { startPosition: 0, width: 0 };
+    }
 
-    const startYearNum = parseInt(startYear, 10);
-    const endYearNum = parseInt(endYear, 10);
-    const startMonth = getStartMonth(startQ);
-    const endMonth = getEndMonth(endQ);
+    const startYear = startDate.getFullYear();
+    const endYear = endDate.getFullYear();
+    const startMonth = startDate.getMonth();
+    const endMonth = endDate.getMonth();
 
     let startPosition = 0;
     let width = 0;
 
-    if (startYearNum < currentYear) {
+    if (startYear < currentYear) {
       // Project started before current year
       startPosition = 0;
-    } else if (startYearNum === currentYear) {
+    } else if (startYear === currentYear) {
       // Project starts in current year
       startPosition = (startMonth / 12) * 100;
     }
 
-    if (endYearNum > currentYear) {
+    if (endYear > currentYear) {
       // Project ends after current year
       width = 100 - startPosition;
-    } else if (endYearNum === currentYear) {
+    } else if (endYear === currentYear) {
       // Project ends in current year
       width = ((endMonth + 1) / 12) * 100 - startPosition;
     }
@@ -205,50 +223,44 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
 
   // Calculate position for week view
   const calculateWeekPosition = (project: Project): { startPosition: number, width: number } => {
-    const [startQ, startYear] = project.startQuarter.split(' ');
-    const [endQ, endYear] = project.endQuarter.split(' ');
+    if (!project.startDate || !project.endDate) {
+      return { startPosition: 0, width: 0 };
+    }
 
-    // Map quarters to week numbers (approximate)
-    const getStartWeek = (quarter: string): number => {
-      switch (quarter) {
-        case 'Q1': return 1;  // Week 1
-        case 'Q2': return 14; // Week 14
-        case 'Q3': return 27; // Week 27
-        case 'Q4': return 40; // Week 40
-        default: return 1;
-      }
+    const startDate = new Date(project.startDate);
+    const endDate = new Date(project.endDate);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { startPosition: 0, width: 0 };
+    }
+
+    // Berechne die Wochennummer (ungefähr)
+    const getWeekNumber = (date: Date): number => {
+      const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+      const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
+      return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
     };
 
-    const getEndWeek = (quarter: string): number => {
-      switch (quarter) {
-        case 'Q1': return 13;  // Week 13
-        case 'Q2': return 26;  // Week 26
-        case 'Q3': return 39;  // Week 39
-        case 'Q4': return 52;  // Week 52
-        default: return 52;
-      }
-    };
-
-    const startYearNum = parseInt(startYear, 10);
-    const endYearNum = parseInt(endYear, 10);
-    const startWeek = getStartWeek(startQ);
-    const endWeek = getEndWeek(endQ);
+    const startYear = startDate.getFullYear();
+    const endYear = endDate.getFullYear();
+    const startWeek = getWeekNumber(startDate);
+    const endWeek = getWeekNumber(endDate);
 
     let startPosition = 0;
     let width = 0;
 
-    if (startYearNum < currentYear) {
+    if (startYear < currentYear) {
       // Project started before current year
       startPosition = 0;
-    } else if (startYearNum === currentYear) {
+    } else if (startYear === currentYear) {
       // Project starts in current year
       startPosition = ((startWeek - 1) / 52) * 100;
     }
 
-    if (endYearNum > currentYear) {
+    if (endYear > currentYear) {
       // Project ends after current year
       width = 100 - startPosition;
-    } else if (endYearNum === currentYear) {
+    } else if (endYear === currentYear) {
       // Project ends in current year
       width = (endWeek / 52) * 100 - startPosition;
     }
@@ -414,80 +426,75 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                         ? calculateMonthPosition(project)
                         : calculateWeekPosition(project);
 
-                    const startYearNum = parseInt(project.startQuarter.split(' ')[1], 10);
-                    const endYearNum = parseInt(project.endQuarter.split(' ')[1], 10);
-
-                    // Only show projects that are visible in the current year
-                    if (
-                      (startYearNum <= currentYear && endYearNum >= currentYear) &&
-                      width > 0
-                    ) {
-                      return (
-                        <div
-                          key={project.id}
-                          className="relative h-8 md:h-12 mb-1 md:mb-2"
-                        >
-                          {/* Background grid */}
-                          <div className="absolute top-0 left-0 right-0 h-full pointer-events-none">
-                            {viewType === 'quarters' ? (
-                              <div className="grid grid-cols-4 gap-2 md:gap-4 h-full">
-                                <div className="bg-gray-800 rounded-lg opacity-30"></div>
-                                <div className="bg-gray-800 rounded-lg opacity-30"></div>
-                                <div className="bg-gray-800 rounded-lg opacity-30"></div>
-                                <div className="bg-gray-800 rounded-lg opacity-30"></div>
-                              </div>
-                            ) : viewType === 'months' ? (
-                              <div className="grid grid-cols-12 gap-1 md:gap-2 h-full">
-                                {Array.from({ length: 12 }, (_, i) => (
-                                  <div key={i} className="bg-gray-800 rounded-lg opacity-30"></div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-52 gap-0 h-full">
-                                {Array.from({ length: 52 }, (_, i) => (
-                                  <div key={i} className="bg-gray-800 rounded-lg opacity-30"></div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Project bar */}
-                          <div
-                            className="absolute top-0 h-full rounded-lg flex items-center px-1 md:px-3 cursor-pointer transition-all hover:brightness-110 group border border-white border-opacity-30 hover:border-opacity-70"
-                            style={{
-                              left: `${startPosition}%`,
-                              width: `${width}%`,
-                              backgroundColor: getCategoryColor(project.category),
-                              opacity: 0.85
-                            }}
-                            onMouseEnter={(e) => handleMouseOver(e, project)}
-                            onMouseLeave={handleMouseLeave}
-                            onClick={() => handleProjectClick(project.id)}
-                            onTouchStart={(e) => {
-                              // Show tooltip on touch start
-                              const touch = e.touches[0];
-                              handleMouseOver({ clientX: touch.clientX, clientY: touch.clientY } as React.MouseEvent, project);
-                            }}
-                            onTouchEnd={() => {
-                              // Hide tooltip after a short delay to allow for tap recognition
-                              setTimeout(() => handleMouseLeave(), 500);
-                            }}
-                          >
-                            {/* Status indicator */}
-                            <div
-                              className="h-2 w-2 md:h-3 md:w-3 rounded-full mr-1 md:mr-2 flex-shrink-0 border border-white border-opacity-70"
-                              style={{ backgroundColor: getStatusColor(project.status) }}
-                            />
-
-                            {/* Project title with improved visibility */}
-                            <span className="font-medium truncate px-1 md:px-2 py-0.5 rounded bg-black bg-opacity-40 text-white group-hover:bg-opacity-60 text-xs md:text-sm">
-                              {project.title}
-                            </span>
-                          </div>
-                        </div>
-                      );
+                    // Skip projects with invalid positions
+                    if (width <= 0) {
+                      return null;
                     }
-                    return null;
+
+                    return (
+                      <div
+                        key={project.id}
+                        className="relative h-8 md:h-12 mb-1 md:mb-2"
+                      >
+                        {/* Background grid */}
+                        <div className="absolute top-0 left-0 right-0 h-full pointer-events-none">
+                          {viewType === 'quarters' ? (
+                            <div className="grid grid-cols-4 gap-2 md:gap-4 h-full">
+                              <div className="bg-gray-800 rounded-lg opacity-30"></div>
+                              <div className="bg-gray-800 rounded-lg opacity-30"></div>
+                              <div className="bg-gray-800 rounded-lg opacity-30"></div>
+                              <div className="bg-gray-800 rounded-lg opacity-30"></div>
+                            </div>
+                          ) : viewType === 'months' ? (
+                            <div className="grid grid-cols-12 gap-1 md:gap-2 h-full">
+                              {Array.from({ length: 12 }, (_, i) => (
+                                <div key={i} className="bg-gray-800 rounded-lg opacity-30"></div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-52 gap-0 h-full">
+                              {Array.from({ length: 52 }, (_, i) => (
+                                <div key={i} className="bg-gray-800 rounded-lg opacity-30"></div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Project bar */}
+                        <div
+                          className="absolute top-0 h-full rounded-lg flex items-center px-1 md:px-3 cursor-pointer transition-all hover:brightness-110 group border border-white border-opacity-30 hover:border-opacity-70"
+                          style={{
+                            left: `${startPosition}%`,
+                            width: `${width}%`,
+                            backgroundColor: getCategoryColor(project.category),
+                            opacity: 0.85
+                          }}
+                          onMouseEnter={(e) => handleMouseOver(e, project)}
+                          onMouseLeave={handleMouseLeave}
+                          onClick={() => handleProjectClick(project.id)}
+                          onTouchStart={(e) => {
+                            // Show tooltip on touch start
+                            const touch = e.touches[0];
+                            handleMouseOver({ clientX: touch.clientX, clientY: touch.clientY } as React.MouseEvent, project);
+                          }}
+                          onTouchEnd={() => {
+                            // Hide tooltip after a short delay to allow for tap recognition
+                            setTimeout(() => handleMouseLeave(), 500);
+                          }}
+                        >
+                          {/* Status indicator */}
+                          <div
+                            className="h-2 w-2 md:h-3 md:w-3 rounded-full mr-1 md:mr-2 flex-shrink-0 border border-white border-opacity-70"
+                            style={{ backgroundColor: getStatusColor(project.status) }}
+                          />
+
+                          {/* Project title with improved visibility */}
+                          <span className="font-medium truncate px-1 md:px-2 py-0.5 rounded bg-black bg-opacity-40 text-white group-hover:bg-opacity-60 text-xs md:text-sm">
+                            {project.title}
+                          </span>
+                        </div>
+                      </div>
+                    );
                   })}
                 </div>
               </div>
@@ -510,7 +517,11 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
               <span className="font-medium">Kategorie:</span> {getCategoryName(hoveredProject.category)}
             </p>
             <p className="text-xs md:text-sm text-gray-300 mb-1">
-              <span className="font-medium">Zeitraum:</span> {hoveredProject.startQuarter} to {hoveredProject.endQuarter}
+              <span className="font-medium">Zeitraum:</span> {
+                hoveredProject.startDate && hoveredProject.endDate ?
+                  `${new Date(hoveredProject.startDate).toLocaleDateString()} - ${new Date(hoveredProject.endDate).toLocaleDateString()}` :
+                  'Kein Zeitraum definiert'
+              }
             </p>
             <p className="text-xs md:text-sm text-gray-300 mb-1">
               <span className="font-medium">Status:</span> {hoveredProject.status}

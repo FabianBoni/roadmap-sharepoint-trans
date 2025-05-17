@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import CategoryForm from '../../../../components/CategoryForm';
-import { Category, clientDataService } from '@/utils/clientDataService';
+import { clientDataService } from '@/utils/clientDataService';
 import { toast } from 'react-toastify';
 import withAdminAuth from '@/components/withAdminAuth';
+import { Category } from '@/types';
 
 const EditCategoryPage: React.FC = () => {
   const router = useRouter();

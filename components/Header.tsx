@@ -1,12 +1,30 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FaBars, FaTimes, FaHome, FaInfoCircle, FaUserShield } from 'react-icons/fa';
+import { clientDataService } from '@/utils/clientDataService';
 
 interface HeaderNavigationProps {
     currentPage?: 'roadmap' | 'admin' | 'doc';
 }
 
 const Header: React.FC<HeaderNavigationProps> = ({ currentPage = 'roadmap' }) => {
+
+    const [appTitle, setAppTitle] = useState('IT + Digital Roadmap');
+
+    useEffect(() => {
+        // Laden des App-Titels beim Mounten der Komponente
+        const loadAppTitle = async () => {
+            try {
+                const title = await clientDataService.getSettingByKey('roadmapTitle');
+                setAppTitle(title?.value || 'IT + Digital Roadmap');
+            } catch (error) {
+                console.error('Fehler beim Laden des App-Titels:', error);
+            }
+        };
+
+        loadAppTitle();
+    }, []);
+
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     return (
@@ -16,7 +34,7 @@ const Header: React.FC<HeaderNavigationProps> = ({ currentPage = 'roadmap' }) =>
                     <div className="flex items-center">
                         <Link href="/">
                             <span className="flex-shrink-0 flex items-center cursor-pointer">
-                                <span className="text-xl font-bold text-white">IT + Digital Roadmap</span>
+                                <span className="text-xl font-bold text-white">{appTitle}</span>
                             </span>
                         </Link>
                     </div>

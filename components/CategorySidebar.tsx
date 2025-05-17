@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Category } from '../types';
+import { getIconByName } from '../utils/reactIcons';
+// Importieren Sie Fa für die Chevron-Icons
 import * as Fa from 'react-icons/fa';
-import * as Md from 'react-icons/md';
-import * as Fi from 'react-icons/fi';
-import * as Ai from 'react-icons/ai';
 
 interface CategorySidebarProps {
   categories: Category[];
@@ -18,38 +17,20 @@ const CategorySidebar: React.FC<CategorySidebarProps> = ({
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
 
-  // Function to render the correct React Icon based on the icon name
   const renderIcon = (iconName: string) => {
     if (!iconName) {
-      return <span>📁</span>;
+      return <span>❓</span>;
     }
     
-    // Check different icon libraries
-    // Format: library prefix + icon name (e.g., "FaFolder", "MdHome")
-    const iconLibrary = iconName.substring(0, 2).toLowerCase();
+    // Verwenden der getIconByName-Funktion aus utils/reactIcons.ts
+    const IconComponent = getIconByName(iconName);
     
-    // Choose the appropriate icon library based on prefix
-    switch (iconLibrary) {
-      case 'fa':
-        const FaIcon = Fa[iconName as keyof typeof Fa];
-        return FaIcon ? <FaIcon className="text-white" size={16} /> : <span>📁</span>;
-      
-      case 'md':
-        const MdIcon = Md[iconName as keyof typeof Md];
-        return MdIcon ? <MdIcon className="text-white" size={16} /> : <span>📁</span>;
-      
-      case 'fi':
-        const FiIcon = Fi[iconName as keyof typeof Fi];
-        return FiIcon ? <FiIcon className="text-white" size={16} /> : <span>📁</span>;
-      
-      case 'ai':
-        const AiIcon = Ai[iconName as keyof typeof Ai];
-        return AiIcon ? <AiIcon className="text-white" size={16} /> : <span>📁</span>;
-      
-      default:
-        // Try Font Awesome as default
-        const DefaultIcon = Fa[iconName as keyof typeof Fa];
-        return DefaultIcon ? <DefaultIcon className="text-white" size={16} /> : <span>📁</span>;
+    if (IconComponent) {
+      // Entfernen Sie die size-Eigenschaft, da sie nicht in SVGProps existiert
+      return <IconComponent className="text-white" style={{ fontSize: '16px' }} />;
+    } else {
+      // Fallback, wenn kein Icon gefunden wurde
+      return <span>❓</span>;
     }
   };
 

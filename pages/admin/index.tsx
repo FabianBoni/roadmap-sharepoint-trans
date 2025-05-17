@@ -4,23 +4,7 @@ import Link from 'next/link';
 import { clientDataService } from '@/utils/clientDataService';
 import { hasAdminAccess } from '@/utils/auth';
 import withAdminAuth from '@/components/withAdminAuth';
-import { AppSettings } from '@/types';
-
-interface Project {
-  id: string;
-  title: string;
-  category: string;
-  startQuarter: string;
-  endQuarter: string;
-  status: 'completed' | 'in-progress' | 'planned';
-}
-
-interface Category {
-  id: string;
-  name: string;
-  color: string;
-  icon: string;
-}
+import { AppSettings, Category, Project } from '@/types';
 
 const AdminPage: React.FC = () => {
   const router = useRouter();
@@ -47,7 +31,7 @@ const AdminPage: React.FC = () => {
         // Fetch categories
         const categoriesData = await clientDataService.getAllCategories();
 
-        const settingsData = await clientDataService.getAllSettings();
+        const settingsData = await clientDataService.getAppSettings();
         setSettings(settingsData);
 
         setProjects(projectsData);
@@ -152,6 +136,8 @@ const AdminPage: React.FC = () => {
       case 'completed': return 'bg-green-500';
       case 'in-progress': return 'bg-blue-500';
       case 'planned': return 'bg-gray-500';
+      case 'paused': return 'bg-yellow-500';
+      case 'cancelled': return 'bg-red-500';
       default: return 'bg-gray-500';
     }
   };
@@ -161,6 +147,8 @@ const AdminPage: React.FC = () => {
       case 'completed': return 'Abgeschlossen';
       case 'in-progress': return 'In Bearbeitung';
       case 'planned': return 'Geplant';
+      case 'paused': return 'Pausiert';
+      case 'cancelled': return 'Abgebrochen';
       default: return 'Unbekannt';
     }
   };

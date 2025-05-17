@@ -20,7 +20,7 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
-      const settings = await clientDataService.getAllSettings();
+      const settings = await clientDataService.getAppSettings();
       return res.status(200).json(settings);
     } catch (error) {
       console.error('Error fetching settings:', error);
