@@ -8,7 +8,8 @@ export interface Project {
     status: 'planned' | 'in-progress' | 'completed' | 'paused' | 'cancelled';
     ProjectFields: string[];
     projektleitung: string;
-    teamMembers?: TeamMember[] | string[];
+    projektleitungImageUrl?: string | null;
+    teamMembers?: TeamMember[];
     bisher: string;
     zukunft: string;
     fortschritt: number;
@@ -29,10 +30,12 @@ export interface Category {
 }
 
 export interface TeamMember {
-  id?: string;
-  name: string;
-  role: string;
-  projectId?: string;
+    id?: string;
+    name: string;
+    role: string;
+    userIdentifier?: string;
+    imageUrl?: string | null;
+    projectId?: string;
 }
 
 export interface Field {

@@ -234,11 +234,27 @@ const ProjectDetailPage: React.FC = () => {
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 shadow-md">
               <h3 className="text-xl font-bold mb-4 pb-3 border-b border-gray-700 text-white">Team</h3>
               <div className="space-y-4">
+                {/* Project Lead */}
                 {project.projektleitung && (
                   <div key='0' className="bg-gray-700 rounded-lg p-4 flex items-center space-x-3">
-                    <div className="w-12 h-12 flex-shrink-0 rounded-full bg-gray-600 flex items-center justify-center text-white text-lg">
+                    {project.projektleitungImageUrl ? (
+                      <img
+                        src={project.projektleitungImageUrl}
+                        alt={project.projektleitung}
+                        className="w-12 h-12 flex-shrink-0 rounded-full object-cover border border-gray-600"
+                        onError={(e) => {
+                          // If image fails to load, fall back to initials
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+
+                    {/* Fallback to initials */}
+                    <div className={`w-12 h-12 flex-shrink-0 rounded-full bg-gray-600 flex items-center justify-center text-white text-lg ${project.projektleitungImageUrl ? 'hidden' : ''}`}>
                       {project.projektleitung[0]}
                     </div>
+
                     <div className="min-w-0 flex-1">
                       <p className="text-white font-medium truncate">{project.projektleitung}</p>
                       <p className="text-gray-400 text-sm truncate">Projektleitung</p>
@@ -246,26 +262,40 @@ const ProjectDetailPage: React.FC = () => {
                   </div>
                 )}
 
+                {/* Team Members */}
                 {project.teamMembers && project.teamMembers.length > 0 ? (
-                  project.teamMembers.map((teamMember: string | TeamMember, index: number) => {
-                    const member = typeof teamMember === 'string' ? { name: teamMember, role: 'Teammitglied' } : teamMember
-                    return (
-                      <div key={index} className="bg-gray-700 rounded-lg p-4 flex items-center space-x-3">
-                        <div className="w-12 h-12 flex-shrink-0 rounded-full bg-gray-600 flex items-center justify-center text-white text-lg">
-                          {member.name ? member.name.charAt(0) : 'T'}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-white font-medium truncate">{member.name || 'Team Member'}</p>
-                          <p className="text-gray-400 text-sm truncate">{member.role || 'Teammitglied'}</p>
-                        </div>
+                  project.teamMembers.map((teamMember: TeamMember, index: number) => (
+                    <div key={index} className="bg-gray-700 rounded-lg p-4 flex items-center space-x-3">
+                      {teamMember.imageUrl ? (
+                        <img
+                          src={teamMember.imageUrl}
+                          alt={teamMember.name}
+                          className="w-12 h-12 flex-shrink-0 rounded-full object-cover border border-gray-600"
+                          onError={(e) => {
+                            // If image fails to load, fall back to initials
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+
+                      {/* Fallback to initials */}
+                      <div className={`w-12 h-12 flex-shrink-0 rounded-full bg-gray-600 flex items-center justify-center text-white text-lg ${teamMember.imageUrl ? 'hidden' : ''}`}>
+                        {teamMember.name ? teamMember.name.charAt(0) : 'T'}
                       </div>
-                    )
-                  })
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-white font-medium truncate">{teamMember.name || 'Team Member'}</p>
+                        <p className="text-gray-400 text-sm truncate">{teamMember.role || 'Teammitglied'}</p>
+                      </div>
+                    </div>
+                  ))
                 ) : (
                   <p className="text-gray-400">Keine weiteren Team-Mitglieder</p>
                 )}
               </div>
             </div>
+
           </div>
 
           {/* Right Column - 3 boxes */}

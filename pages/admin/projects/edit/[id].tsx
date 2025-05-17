@@ -25,7 +25,7 @@ const EditProjectPage: React.FC = () => {
             clientDataService.getAllCategories(),
             clientDataService.getTeamMembersForProject(id)
           ]);
-          
+
           setProject(projectData);
           setCategories(categoriesData);
           setTeamMembers(teamMembersData);
@@ -46,74 +46,175 @@ const EditProjectPage: React.FC = () => {
 
   const handleSubmit = async (updatedProject: Project) => {
     try {
-      // Kopie des Projekts erstellen, um die Originaldaten nicht zu verändern
-      const projectToSave = { ...updatedProject };
+      // Create a clean object with only primitive values for SharePoint
+      const projectToSave = {
+        id: updatedProject.id,
+        title: updatedProject.title || '',
+        category: updatedProject.category || '',
+        startQuarter: updatedProject.startQuarter || '',
+        endQuarter: updatedProject.endQuarter || '',
+        description: updatedProject.description || '',
+        status: updatedProject.status || 'planned',
+        projektleitung: updatedProject.projektleitung || '',
+        bisher: updatedProject.bisher || '',
+        zukunft: updatedProject.zukunft || '',
+        fortschritt: typeof updatedProject.fortschritt === 'number' ? updatedProject.fortschritt : 0,
+        geplante_umsetzung: updatedProject.geplante_umsetzung || '',
+        budget: updatedProject.budget || '',
+        startDate: '',
+        endDate: '',
+        // Make sure ProjectFields is an array to match the Project type
+        ProjectFields: [] as string[]
+      };
 
-      // Datumsfelder korrekt formatieren für SharePoint
-      if (projectToSave.startDate) {
-        // Wenn startDate ein ISO-String ist, formatieren wir ihn für SharePoint
+      // Format date fields correctly for SharePoint
+      if (updatedProject.startDate) {
         try {
-          const startDate = new Date(projectToSave.startDate);
+          const startDate = new Date(updatedProject.startDate);
           if (!isNaN(startDate.getTime())) {
-            // SharePoint erwartet Datum im Format: YYYY-MM-DDT00:00:00Z
             projectToSave.startDate = startDate.toISOString().split('T')[0] + 'T00:00:00Z';
-          } else {
-            // Wenn das Datum ungültig ist, setzen wir es auf null
-            projectToSave.startDate = '';
           }
         } catch (e) {
           console.error('Fehler beim Formatieren des Startdatums:', e);
-          projectToSave.startDate = '';
         }
       }
 
-      if (projectToSave.endDate) {
-        // Wenn endDate ein ISO-String ist, formatieren wir ihn für SharePoint
+      if (updatedProject.endDate) {
         try {
-          const endDate = new Date(projectToSave.endDate);
+          const endDate = new Date(updatedProject.endDate);
           if (!isNaN(endDate.getTime())) {
-            // SharePoint erwartet Datum im Format: YYYY-MM-DDT00:00:00Z
             projectToSave.endDate = endDate.toISOString().split('T')[0] + 'T00:00:00Z';
-          } else {
-            // Wenn das Datum ungültig ist, setzen wir es auf null
-            projectToSave.endDate = '';
           }
         } catch (e) {
           console.error('Fehler beim Formatieren des Enddatums:', e);
-          projectToSave.endDate = '';
+        }
+      }
+
+      // Handle ProjectFields - ensure it's an array of strings
+      if (updatedProject.ProjectFields) {
+        if (Array.isArray(updatedProject.ProjectFields)) {
+          // Keep the array as is, but ensure all elements are strings
+          projectToSave.ProjectFields = updatedProject.ProjectFields.map(field => String(field));
+        } else if (typeof updatedProject.ProjectFields === 'string') {
+          // Split by semicolons or commas, but only if it contains those characters
+          const fieldString = updatedProject.ProjectFields as string;
+          if (fieldString.includes(';') || fieldString.includes(',')) {
+            projectToSave.ProjectFields = fieldString
+              .split(/[;,]/)
+              .map(item => item.trim())
+              .filter(Boolean);
+          } else {
+            // If it's a single value without delimiters, treat it as a single field
+            projectToSave.ProjectFields = [fieldString];
+          }
+        } else {
+          projectToSave.ProjectFields = [String(updatedProject.ProjectFields)];
+        }
+      }
+
+      console.log('ProjectFields to save:', projectToSave.ProjectFields);
+
+      console.log('ProjectFields to save:', projectToSave.ProjectFields);
+
+      // Extract team members, ensuring we handle all possible formats
+      let teamMembersToSave: Array<string | { name: string; role?: string }> = [];
+
+      if (updatedProject.teamMembers) {
+        if (Array.isArray(updatedProject.teamMembers)) {
+          teamMembersToSave = updatedProject.teamMembers.map(member => {
+            if (typeof member === 'string') {
+              return member;
+            } else if (typeof member === 'object' && member !== null) {
+              return {
+                name: member.name || '',
+                role: member.role || 'Teammitglied'
+              };
+            }
+            return '';
+          }).filter(Boolean);
+        } else if (typeof updatedProject.teamMembers === 'string') {
+          // Handle the case where teamMembers might be a comma-separated string
+          teamMembersToSave = (updatedProject.teamMembers as string).split(',').map(m => m.trim()).filter(Boolean);
         }
       }
 
       console.log('Projekt vor dem Speichern:', projectToSave);
+      console.log('Team members to save:', teamMembersToSave);
 
-      // Speichern des Projekts mit allen Feldern
-      const savedProject = await clientDataService.saveProject(projectToSave);
+      // Save the basic project data
+      const savedProject = await clientDataService.updateProject(projectToSave.id, projectToSave as Partial<Project>);
       console.log('Gespeichertes Projekt:', savedProject);
 
-      // Teammitglieder speichern, falls vorhanden
-      if (Array.isArray(projectToSave.teamMembers) && projectToSave.teamMembers.length > 0) {
-        // Zuerst alle vorhandenen Teammitglieder löschen
-        await clientDataService.deleteTeamMembersForProject(savedProject.id);
+      // Process team members
+      if (teamMembersToSave.length > 0) {
+        try {
+          // Delete existing team members
+          await clientDataService.deleteTeamMembersForProject(savedProject.id);
+          console.log('Existing team members deleted');
 
-        // Dann neue Teammitglieder hinzufügen - convert strings to TeamMember objects if needed
-        const memberNames = projectToSave.teamMembers as unknown as string[];
-        for (const memberName of memberNames) {
-          await clientDataService.createTeamMember({
-            name: memberName,
-            role: 'Teammitglied',
-            projectId: savedProject.id
-          });
+          // Add new team members
+          for (const member of teamMembersToSave) {
+            const memberName = typeof member === 'string' ? member : member.name;
+            const memberRole = typeof member === 'object' && member.role ? member.role : 'Teammitglied';
+
+            if (memberName) {
+              console.log(`Creating team member: ${memberName} with role ${memberRole}`);
+              await clientDataService.createTeamMember({
+                name: memberName,
+                role: memberRole,
+                projectId: savedProject.id
+              });
+            }
+          }
+          console.log('New team members created');
+        } catch (error) {
+          console.error('Error updating team members:', error);
+        }
+      } else {
+        // If no team members provided, still delete any existing ones
+        try {
+          await clientDataService.deleteTeamMembersForProject(savedProject.id);
+          console.log('Existing team members deleted (no new members to add)');
+        } catch (error) {
+          console.error('Error deleting team members:', error);
         }
       }
 
-      // Weiterleitung zur Admin-Seite nach erfolgreichem Speichern
+      // Process links if they exist
+      if (updatedProject.links && Array.isArray(updatedProject.links) && updatedProject.links.length > 0) {
+        try {
+          // Delete existing links
+          await clientDataService.deleteProjectLinks(savedProject.id);
+          console.log('Existing project links deleted');
+
+          // Add new links
+          for (const link of updatedProject.links) {
+            if (typeof link === 'object' && link.title && link.url) {
+              console.log(`Creating link: ${link.title} with URL ${link.url}`);
+
+              // Ensure projectId is set correctly as a string
+              await clientDataService.createProjectLink({
+                title: link.title,
+                url: link.url,
+                projectId: savedProject.id
+              });
+            }
+          }
+          console.log('New project links created');
+        } catch (error) {
+          console.error('Error updating links:', error);
+          // Continue with save process even if links fail
+        }
+      }
+
+
+      // Navigate back to admin page
       router.push('/admin');
     } catch (error) {
       console.error('Error saving project:', error);
       alert('Fehler beim Speichern des Projekts: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
-
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="bg-gray-800 py-4 px-6 border-b border-gray-700">
@@ -137,8 +238,11 @@ const EditProjectPage: React.FC = () => {
             <ProjectForm
               initialProject={{
                 ...project,
-                // Extract team member names for the form
-                teamMembers: teamMembers.map(member => member.name)
+                teamMembers: teamMembers.map(member => ({
+                  name: member.name,
+                  role: member.role,
+                  projectId: member.projectId
+                }))
               }}
               categories={categories}
               onSubmit={handleSubmit}
@@ -160,5 +264,4 @@ const EditProjectPage: React.FC = () => {
     </div>
   );
 };
-
 export default withAdminAuth(EditProjectPage);

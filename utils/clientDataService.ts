@@ -246,6 +246,22 @@ class ClientDataService {
             const item = await response.json();
             const teamMembers = await this.getTeamMembersForProject(item.Id.toString());
 
+            let projectFields: string[] = [];
+            if (item.ProjectFields) {
+                if (typeof item.ProjectFields === 'string') {
+                    if (item.ProjectFields.includes(';') || item.ProjectFields.includes(',')) {
+                        projectFields = item.ProjectFields
+                            .split(/[;,]/)
+                            .map((field: string) => field.trim())
+                            .filter(Boolean);
+                    } else {
+                        projectFields = [item.ProjectFields];
+                    }
+                } else if (Array.isArray(item.ProjectFields)) {
+                    projectFields = item.ProjectFields;
+                }
+            }
+
             const project = {
                 id: item.Id.toString(),
                 title: item.Title,
@@ -254,8 +270,9 @@ class ClientDataService {
                 endQuarter: item.EndQuarter,
                 description: item.Description || '',
                 status: (item.Status?.toLowerCase() || 'planned') as 'planned' | 'in-progress' | 'completed',
-                ProjectFields: item.ProjectFields || '',
+                ProjectFields: projectFields || '',
                 projektleitung: item.Projektleitung || '',
+                projektleitungImageUrl: null as string | null,
                 teamMembers: teamMembers,
                 bisher: item.Bisher || '',
                 zukunft: item.Zukunft || '',
@@ -267,13 +284,19 @@ class ClientDataService {
                 links: await this.getProjectLinks(item.Id.toString()) // Hole Links für das Projekt
             };
 
+            let projektLeitungMailParts = project.projektleitung.split(' ');
+            let projektLeitungMail = projektLeitungMailParts[0].toLowerCase() + '.' + projektLeitungMailParts[1].toLowerCase() + '@jsd.bs.ch';
+
+            if (project.projektleitung) {
+                project.projektleitungImageUrl = await this.getUserProfilePictureUrl(projektLeitungMail);
+            }
+
             return project;
         } catch (error) {
             console.error(`Error fetching project ${id}:`, error);
             return null;
         }
     }
-
     async deleteProject(id: string): Promise<void> {
         try {
             const webUrl = this.getWebUrl();
@@ -317,28 +340,108 @@ class ClientDataService {
 
     async updateProject(id: string, projectData: Partial<Project>): Promise<Project> {
         try {
-            // Zuerst das bestehende Projekt abrufen
+            // Fetch existing project first to ensure we have all the data
             const existingProject = await this.getProjectById(id);
 
             if (!existingProject) {
                 throw new Error(`Project with ID ${id} not found`);
             }
 
-            // Das aktualisierte Projekt erstellen, indem die neuen Daten mit dem bestehenden Projekt zusammengeführt werden
+            // Get SharePoint environment details
+            const webUrl = this.getWebUrl();
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.PROJECTS}')/items(${id})`;
+            const requestDigest = await this.getRequestDigest();
+            const itemType = await this.getListMetadata(SP_LISTS.PROJECTS);
+
+            // Process ProjectFields value
+            let projectFieldsValue = '';
+
+            if (projectData.ProjectFields !== undefined) {
+                if (Array.isArray(projectData.ProjectFields)) {
+                    projectFieldsValue = projectData.ProjectFields.join('; ');
+                } else if (typeof projectData.ProjectFields === 'string') {
+                    projectFieldsValue = projectData.ProjectFields;
+                } else if (projectData.ProjectFields) {
+                    projectFieldsValue = String(projectData.ProjectFields);
+                }
+            } else if (existingProject.ProjectFields) {
+                // Use existing value if available
+                if (Array.isArray(existingProject.ProjectFields)) {
+                    projectFieldsValue = existingProject.ProjectFields.join('; ');
+                } else {
+                    projectFieldsValue = String(existingProject.ProjectFields);
+                }
+            }
+
+            // Create a clean request body with all fields included
+            const body = {
+                '__metadata': { 'type': itemType },
+                'Title': projectData.title || existingProject.title || '',
+                'Category': projectData.category || existingProject.category || '',
+                'StartQuarter': projectData.startQuarter || existingProject.startQuarter || '',
+                'EndQuarter': projectData.endQuarter || existingProject.endQuarter || '',
+                'Description': projectData.description || existingProject.description || '',
+                'Status': projectData.status || existingProject.status || 'planned',
+                'Projektleitung': projectData.projektleitung || existingProject.projektleitung || '',
+                'Bisher': projectData.bisher || existingProject.bisher || '',
+                'Zukunft': projectData.zukunft || existingProject.zukunft || '',
+                'Fortschritt': typeof projectData.fortschritt === 'number' ? projectData.fortschritt : (existingProject.fortschritt || 0),
+                'GeplantUmsetzung': projectData.geplante_umsetzung || existingProject.geplante_umsetzung || '',
+                'Budget': projectData.budget || existingProject.budget || '',
+                'StartDate': projectData.startDate || existingProject.startDate || '',
+                'EndDate': projectData.endDate || existingProject.endDate || '',
+                'ProjectFields': projectFieldsValue
+            };
+
+            console.log('Data being sent to SharePoint:', JSON.stringify(body));
+
+            // Send the update request to SharePoint
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=nometadata',
+                    'Content-Type': 'application/json;odata=verbose',
+                    'X-HTTP-Method': 'MERGE',
+                    'IF-MATCH': '*',
+                    'X-RequestDigest': requestDigest
+                },
+                body: JSON.stringify(body),
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                // Enhanced error logging
+                let errorDetails = '';
+                try {
+                    const errorText = await response.text();
+                    errorDetails = errorText;
+                    console.error('SharePoint Error Response:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        url: response.url,
+                        body: errorText
+                    });
+                } catch (e) {
+                    errorDetails = 'Could not read error details';
+                }
+
+                throw new Error(`Failed to update project: ${response.statusText}. Details: ${errorDetails}`);
+            }
+
+            // Create the updated project object to return
             const updatedProject: Project = {
                 ...existingProject,
                 ...projectData,
-                id // Stellen Sie sicher, dass die ID erhalten bleibt
+                id, // Ensure ID is preserved
             };
 
-            // Die saveProject-Methode verwenden, um das aktualisierte Projekt zu speichern
-            return await this.saveProject(updatedProject);
+            // Return the updated project
+            return updatedProject;
         } catch (error) {
             console.error(`Error updating project ${id}:`, error);
             throw error;
         }
     }
-
 
     async createProject(projectData: Omit<Project, 'id'>): Promise<Project> {
         try {
@@ -584,6 +687,34 @@ class ClientDataService {
             // Get the correct metadata type
             const itemType = await this.getListMetadata(SP_LISTS.PROJECT_LINKS);
 
+            // SharePoint might expect ProjectId as a complex object if it's a lookup field
+            // We need to examine the actual structure required
+
+            // First, try to determine if ProjectId is a lookup field
+            const isLookupField = true; // We're assuming it's a lookup field based on the error
+
+            let requestBody;
+            if (isLookupField) {
+                // For lookup fields, we need to structure differently
+                requestBody = {
+                    '__metadata': { 'type': itemType },
+                    'Title': link.title,
+                    'Url': link.url,
+                    // If ProjectId is a lookup field, SharePoint expects it in a different format
+                    'ProjectIdId': link.projectId // Use ProjectIdId instead of ProjectId
+                };
+            } else {
+                // Original approach for non-lookup fields
+                requestBody = {
+                    '__metadata': { 'type': itemType },
+                    'Title': link.title,
+                    'Url': link.url,
+                    'ProjectId': link.projectId
+                };
+            }
+
+            console.log('Creating project link with data:', JSON.stringify(requestBody));
+
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
@@ -591,26 +722,37 @@ class ClientDataService {
                     'Content-Type': 'application/json;odata=verbose',
                     'X-RequestDigest': requestDigest
                 },
-                body: JSON.stringify({
-                    '__metadata': { 'type': itemType },
-                    'Title': link.title,
-                    'Url': link.url,
-                    'ProjectId': link.projectId
-                }),
+                body: JSON.stringify(requestBody),
                 credentials: 'same-origin'
             });
 
             if (!response.ok) {
-                throw new Error(`Failed to create project link: ${response.statusText}`);
+                // Enhanced error logging
+                let errorDetails = '';
+                try {
+                    const errorText = await response.text();
+                    errorDetails = errorText;
+                    console.error('SharePoint Error Response for createProjectLink:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        url: response.url,
+                        body: errorText,
+                        requestBody: requestBody
+                    });
+                } catch (e) {
+                    errorDetails = 'Could not read error details';
+                }
+
+                throw new Error(`Failed to create project link: ${response.statusText}. Details: ${errorDetails}`);
             }
 
             const newItem = await response.json();
 
             return {
-                id: newItem.Id.toString(),
-                title: newItem.Title,
-                url: newItem.Url,
-                projectId: newItem.ProjectId
+                id: newItem.Id?.toString() || '',
+                title: newItem.Title || link.title,
+                url: newItem.Url || link.url,
+                projectId: newItem.ProjectId || link.projectId
             };
         } catch (error) {
             console.error('Error creating project link:', error);
@@ -701,22 +843,31 @@ class ClientDataService {
         }
     }
 
-    // SAVE PROJECT WITH LINKS
     async saveProject(project: Project): Promise<Project> {
         const cleanFields = (fields: string | string[] | undefined): string => {
             if (!fields) return '';
 
             if (Array.isArray(fields)) {
-                return fields.filter(Boolean).join('; ');
+                return fields
+                    .map(field => String(field).trim())
+                    .filter(Boolean)
+                    .join('; ');
             }
 
             // If it's a string, clean it up
-            return fields.toString()
-                .replace(/<[^>]*>/g, '') // Remove HTML tags
-                .split(/[;,]/) // Split by semicolons or commas
-                .map(item => item.trim())
-                .filter(Boolean)
-                .join('; '); // Join with semicolon and space
+            const fieldStr = String(fields);
+
+            // If it already contains semicolons or commas, assume it's already formatted
+            if (fieldStr.includes(';') || fieldStr.includes(',')) {
+                return fieldStr
+                    .split(/[;,]/)
+                    .map(item => item.trim())
+                    .filter(Boolean)
+                    .join('; ');
+            }
+
+            // Otherwise, treat it as a single field
+            return fieldStr.trim();
         };
 
         try {
@@ -728,6 +879,17 @@ class ClientDataService {
 
             // Get the correct metadata type
             const itemType = await this.getListMetadata(SP_LISTS.PROJECTS);
+
+            // Clone project to avoid modifying the original
+            const projectData = { ...project };
+
+            // Store links separately
+            const links = projectData.links || [];
+            delete projectData.links;
+
+            // Store team members separately
+            const teamMembers = projectData.teamMembers || [];
+            delete projectData.teamMembers;
 
             // Prepare the endpoint and method
             const endpoint = isNewProject
@@ -752,21 +914,21 @@ class ClientDataService {
             // Prepare the request body
             const body = {
                 '__metadata': { 'type': itemType },
-                'Title': project.title,
-                'Category': project.category,
-                'StartQuarter': project.startQuarter,
-                'EndQuarter': project.endQuarter,
-                'Description': project.description,
-                'Status': project.status,
-                'Projektleitung': project.projektleitung,
-                'Bisher': project.bisher,
-                'Zukunft': project.zukunft,
-                'Fortschritt': project.fortschritt,
-                'GeplantUmsetzung': project.geplante_umsetzung,
-                'Budget': project.budget,
-                'StartDate': project.startDate,
-                'EndDate': project.endDate,
-                'ProjectFields': cleanFields(project.ProjectFields)
+                'Title': projectData.title,
+                'Category': projectData.category,
+                'StartQuarter': projectData.startQuarter,
+                'EndQuarter': projectData.endQuarter,
+                'Description': projectData.description,
+                'Status': projectData.status,
+                'Projektleitung': projectData.projektleitung,
+                'Bisher': projectData.bisher,
+                'Zukunft': projectData.zukunft,
+                'Fortschritt': projectData.fortschritt,
+                'GeplantUmsetzung': projectData.geplante_umsetzung,
+                'Budget': projectData.budget,
+                'StartDate': projectData.startDate,
+                'EndDate': projectData.endDate,
+                'ProjectFields': cleanFields(projectData.ProjectFields)
             };
 
             // Send the request
@@ -778,6 +940,13 @@ class ClientDataService {
             });
 
             if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Project Save Error Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                    body: errorText
+                });
                 throw new Error(`Failed to save project: ${response.statusText}`);
             }
 
@@ -787,26 +956,36 @@ class ClientDataService {
             if (isNewProject) {
                 const newItem = await response.json();
                 savedProject = {
-                    ...project,
-                    id: newItem.Id.toString()
+                    ...projectData,
+                    id: newItem.Id.toString(),
+                    links: [],
+                    teamMembers: []
                 };
             } else {
-                savedProject = { ...project };
+                savedProject = {
+                    ...projectData,
+                    id: project.id,
+                    links: [],
+                    teamMembers: []
+                };
             }
 
             // Handle links
-            if (project.links && project.links.length > 0) {
+            if (links && links.length > 0) {
                 // Delete existing links
                 await this.deleteProjectLinks(savedProject.id);
 
                 // Create new links
-                for (const link of project.links) {
+                for (const link of links) {
                     await this.createProjectLink({
                         title: link.title,
                         url: link.url,
                         projectId: savedProject.id
                     });
                 }
+
+                // Add links to returned project
+                savedProject.links = links;
             }
 
             return savedProject;
@@ -814,10 +993,78 @@ class ClientDataService {
             console.error('Error saving project:', error);
             throw error;
         }
-    }    // TEAM MEMBERS OPERATIONS
+    }
+
+    // TEAM MEMBERS OPERATIONS
+    // Get user profile picture URL from SharePoint
+    async getUserProfilePictureUrl(userNameOrEmail: string): Promise<string | null> {
+        try {
+            const webUrl = this.getWebUrl();
+
+            // First, try to find the user account in SharePoint
+            // Remove domain part if username contains it
+            let accountName = userNameOrEmail;
+
+            // If it's an email, try to format it for SharePoint
+            if (userNameOrEmail.includes('@')) {
+                // For SharePoint Online format (example: i:0#.f|membership|user@domain.com)
+                accountName = `i:0#.f|membership|${userNameOrEmail}`;
+            } else {
+                // For on-premises SharePoint format (example: domain\\username)
+                // You may need to adjust this based on your SharePoint configuration
+                accountName = `i:0#.w|${userNameOrEmail}`;
+            }
+
+            // URL encode the account name
+            const encodedAccount = encodeURIComponent(`'${accountName}'`);
+
+            // Call the SharePoint API to get user profile
+            const endpoint = `${webUrl}/_api/SP.UserProfiles.PeopleManager/GetPropertiesFor(accountName=@v)?@v=${encodedAccount}`;
+
+            const response = await fetch(endpoint, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json;odata=verbose'
+                },
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                console.warn(`Could not find user profile for ${userNameOrEmail}: ${response.statusText}`);
+                return null;
+            }
+
+            const userData = await response.json();
+
+            // Get the picture URL from user profile properties
+            if (userData && userData.d && userData.d.PictureUrl) {
+                return userData.d.PictureUrl;
+            }
+
+            // Alternative: Try to directly access the profile picture
+            const pictureUrl = `${webUrl}/_layouts/15/userphoto.aspx?size=L&accountname=${encodeURIComponent(userNameOrEmail)}`;
+
+            // Verify if the image exists by making a HEAD request
+            const imageCheck = await fetch(pictureUrl, {
+                method: 'HEAD',
+                credentials: 'same-origin'
+            });
+
+            if (imageCheck.ok) {
+                return pictureUrl;
+            }
+
+            return null;
+        } catch (error) {
+            console.warn(`Error getting profile picture for ${userNameOrEmail}:`, error);
+            return null;
+        }
+    }
+
     async getTeamMembersForProject(projectId: string): Promise<TeamMember[]> {
         try {
             const webUrl = this.getWebUrl();
+            // Add UserName or UserEmail to the select query if available in your SharePoint list
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.TEAM_MEMBERS}')/items?$filter=ProjectId eq '${projectId}'&$select=Id,Title,Role,ProjectId`;
 
             const response = await fetch(endpoint, {
@@ -835,12 +1082,30 @@ class ClientDataService {
             const data = await response.json();
             const items = data.value || [];
 
-            return items.map((item: any) => ({
-                id: item.Id.toString(),
-                name: item.Title,
+            // Create team members with basic info
+            const teamMembers = items.map((item: any) => ({
+                id: item.Id?.toString() || '',
+                name: item.Title || '',
                 role: item.Role || 'Teammitglied',
-                projectId: item.ProjectId
+                projectId: item.ProjectId || projectId,
+                // Store the username or email for profile lookup
+                userIdentifier: item.Title || '',
+                imageUrl: null
             }));
+
+            // Fetch profile pictures for each team member
+            await Promise.all(teamMembers.map(async (member: TeamMember) => {
+                if (member.userIdentifier) {
+                    let mailParts = member.userIdentifier.split(' ');
+                    var mail = mailParts[0].toLowerCase() + '.' + mailParts[1].toLowerCase() + '@jsd.bs.ch';
+                    if (mail) {
+                        // Try to get profile picture using their identifier
+                        member.imageUrl = await this.getUserProfilePictureUrl(mail);
+                    }
+                }
+            }));
+
+            return teamMembers;
         } catch (error) {
             console.error(`Error fetching team members for project ${projectId}:`, error);
             return [];

@@ -46,7 +46,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
     // If it's already string[], use it directly
     if (typeof initialProject.teamMembers[0] === 'string') {
-      return initialProject.teamMembers as string[];
+      return initialProject.teamMembers as unknown as string[];
     }
 
     // If it's TeamMember[], extract the names
@@ -63,7 +63,25 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   const [newLinkUrl, setNewLinkUrl] = useState('');
 
   // Felder-Verwaltung
-  const [selectedFields, setSelectedFields] = useState<string[]>(initialProject?.ProjectFields || []);
+  const [selectedFields, setSelectedFields] = useState<string[]>(() => {
+    if (!initialProject?.ProjectFields) return [];
+    
+    // Handle array of strings
+    if (Array.isArray(initialProject.ProjectFields)) {
+      return initialProject.ProjectFields;
+    }
+    
+    // Handle string that might be semicolon or comma delimited
+    if (typeof initialProject.ProjectFields === 'string') {
+      const fieldStr = initialProject.ProjectFields as string;
+      if (fieldStr.includes(';') || fieldStr.includes(',')) {
+        return fieldStr.split(/[;,]/).map(f => f.trim()).filter(Boolean);
+      }
+      return [fieldStr];
+    }
+    
+    return [];
+  });
 
   // Validierung
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -76,11 +94,13 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
   // Feld umschalten
   const toggleField = (fieldValue: string) => {
-    if (selectedFields.includes(fieldValue)) {
-      setSelectedFields(selectedFields.filter(name => name !== fieldValue));
-    } else {
-      setSelectedFields([...selectedFields, fieldValue]);
-    }
+    setSelectedFields(prev => {
+      if (prev.includes(fieldValue)) {
+        return prev.filter(name => name !== fieldValue);
+      } else {
+        return [...prev, fieldValue];
+      }
+    });
   };
 
   // Teammitglied hinzufügen
@@ -180,14 +200,13 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       fortschritt,
       geplante_umsetzung: geplantUmsetzung,
       budget,
-      teamMembers,
+      teamMembers: teamMembers.map(member => ({ name: member, role: 'Teammitglied' })),
       links,
       ProjectFields: selectedFields
     };
 
     onSubmit(projectData);
-  };
-
+  };  
   // Definieren Sie die verfügbaren Felder
   const availableFields = [
     { id: 'process', name: 'Prozess', description: 'Prozessbezogene Aspekte' },
@@ -432,6 +451,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
           <p className="text-sm text-gray-400 mb-4">
             Wählen Sie die Felder aus, die für dieses Projekt relevant sind:
           </p>
+          {/* For debugging */}
+          <p className="text-xs text-gray-500 mb-2">Selected fields: {selectedFields.join(', ')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {availableFields.map(field => (
               <div key={field.id} className="flex items-center space-x-2">
