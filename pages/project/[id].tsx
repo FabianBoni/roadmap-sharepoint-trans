@@ -320,7 +320,7 @@ const ProjectDetailPage: React.FC = () => {
 
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 shadow-md">
               <h2 className="text-xl font-bold mb-4 pb-3 border-b border-gray-700 text-white">Budget</h2>
-              <p className="text-gray-300 text-2xl font-semibold">{project.budget}</p>
+              <p className="text-gray-300 text-2xl font-semibold">{project.budget} ₣</p>
             </div>
           </div>
         </div>

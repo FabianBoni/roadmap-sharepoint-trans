@@ -6,7 +6,7 @@ import { clientDataService } from '../utils/clientDataService';
 import CategorySidebar from './CategorySidebar';
 import Footer from './Footer';
 import { FaBars, FaTimes } from 'react-icons/fa';
-import Header from './Header';
+import Nav from './Nav';
 
 interface RoadmapProps {
   initialProjects: Project[];
@@ -22,6 +22,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [viewType, setViewType] = useState<'quarters' | 'months' | 'weeks'>('quarters');
   const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
+  const [siteTitle, setSiteTitle] = useState('IT + Digital Roadmap');
 
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -37,6 +38,20 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
+  }, []);
+
+  useEffect(() => {
+    // Laden des Site-Titels beim Mounten der Komponente
+    const loadAppTitle = async () => {
+      try {
+        const title = await clientDataService.getSettingByKey('siteTitle');
+        setSiteTitle(title?.value || 'IT + Digital Roadmap');
+      } catch (error) {
+        console.error('Fehler beim Laden des Site-Titels:', error);
+      }
+    };
+
+    loadAppTitle();
   }, []);
 
   // Hilfsfunktion zum Extrahieren des Jahres aus einem ISO-Datumsstring
@@ -271,13 +286,12 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   return (
     <>
       {/* Top Navigation Bar */}
-      <Header currentPage="roadmap" />
-
       <div className="min-h-screen pt-20 px-4 md:px-8 lg:px-20 font-sans bg-gray-900 text-white overflow-hidden p-0 m-0">
-        <header className="py-4 md:py-8 px-4 md:px-10">
+        <header className="w-full flex flex-row justify-between py-4 md:py-8 px-4 md:px-10">
           <h1 className="text-3xl md:text-5xl font-bold m-0 uppercase tracking-wider bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent shadow-xl">
-            IT + Digital Roadmap {currentYear}
+            {siteTitle}
           </h1>
+          <Nav currentPage="roadmap" />
         </header>
 
         {/* Controls section - View type and Year navigation */}

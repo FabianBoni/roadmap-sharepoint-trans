@@ -5,6 +5,7 @@ import { clientDataService } from '@/utils/clientDataService';
 import { hasAdminAccess } from '@/utils/auth';
 import withAdminAuth from '@/components/withAdminAuth';
 import { AppSettings, Category, Project } from '@/types';
+import { Triangle } from 'react-loader-spinner';
 
 const AdminPage: React.FC = () => {
   const router = useRouter();
@@ -186,7 +187,15 @@ const AdminPage: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
-        <p>Lade Daten...</p>
+        <Triangle
+          visible={true}
+          height="80"
+          width="80"
+          color="#60a5fa"
+          ariaLabel="triangle-loading"
+          wrapperStyle={{}}
+          wrapperClass=""
+        />
       </div>
     );
   }
@@ -443,17 +452,6 @@ const AdminPage: React.FC = () => {
                   )}
                 </tbody>
               </table>
-            </div>
-
-            {/* Add a note about the roadmapTitle setting */}
-            <div className="mt-4 p-4 bg-gray-800 rounded-lg">
-              <h3 className="text-lg font-medium text-white mb-2">Hinweise:</h3>
-              <p className="text-gray-300 mb-2">
-                - Erstellen Sie eine Einstellung mit dem Schlüssel &quot;roadmapTitle&quot;, um den Titel der Roadmap anzupassen.
-              </p>
-              <p className="text-gray-300">
-                - Sie können {'{year}'} im Wert verwenden, um das aktuelle Jahr dynamisch einzufügen.
-              </p>
             </div>
           </>
         )}

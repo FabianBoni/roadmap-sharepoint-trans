@@ -7,7 +7,7 @@ interface HeaderNavigationProps {
     currentPage?: 'roadmap' | 'admin' | 'doc';
 }
 
-const Header: React.FC<HeaderNavigationProps> = ({ currentPage = 'roadmap' }) => {
+const Nav: React.FC<HeaderNavigationProps> = ({ currentPage = 'roadmap' }) => {
 
     const [appTitle, setAppTitle] = useState('IT + Digital Roadmap');
 
@@ -97,4 +97,4 @@ const Header: React.FC<HeaderNavigationProps> = ({ currentPage = 'roadmap' }) =>
     );
 };
 
-export default Header;
+export default Nav;
