@@ -701,7 +701,7 @@ class ClientDataService {
                     'Title': link.title,
                     'Url': link.url,
                     // If ProjectId is a lookup field, SharePoint expects it in a different format
-                    'ProjectIdId': link.projectId // Use ProjectIdId instead of ProjectId
+                    'ProjectId': link.projectId // Use ProjectId
                 };
             } else {
                 // Original approach for non-lookup fields
@@ -1064,7 +1064,6 @@ class ClientDataService {
     async getTeamMembersForProject(projectId: string): Promise<TeamMember[]> {
         try {
             const webUrl = this.getWebUrl();
-            // Add UserName or UserEmail to the select query if available in your SharePoint list
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.TEAM_MEMBERS}')/items?$filter=ProjectId eq '${projectId}'&$select=Id,Title,Role,ProjectId`;
 
             const response = await fetch(endpoint, {
@@ -1096,11 +1095,14 @@ class ClientDataService {
             // Fetch profile pictures for each team member
             await Promise.all(teamMembers.map(async (member: TeamMember) => {
                 if (member.userIdentifier) {
-                    let mailParts = member.userIdentifier.split(' ');
-                    var mail = mailParts[0].toLowerCase() + '.' + mailParts[1].toLowerCase() + '@jsd.bs.ch';
-                    if (mail) {
-                        // Try to get profile picture using their identifier
-                        member.imageUrl = await this.getUserProfilePictureUrl(mail);
+                    // Check if the name contains a space (indicating first and last name)
+                    const mailParts = member.userIdentifier.split(' ');
+                    if (mailParts.length >= 2 && mailParts[0] && mailParts[1]) {
+                        const mail = mailParts[0].toLowerCase() + '.' + mailParts[1].toLowerCase() + '@jsd.bs.ch';
+                        if (mail) {
+                            // Try to get profile picture using their identifier
+                            member.imageUrl = await this.getUserProfilePictureUrl(mail);
+                        }
                     }
                 }
             }));
