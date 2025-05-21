@@ -1444,6 +1444,82 @@ class ClientDataService {
             return false;
         }
     }
+
+    // Add this method to the ClientDataService class
+
+    async searchUsers(query: string): Promise<TeamMember[]> {
+        try {
+            if (!query || query.trim().length < 2) {
+                return [];
+            }
+
+            const webUrl = this.getWebUrl();
+
+            // Using SharePoint's People Picker API to search users across the entire environment
+            const endpoint = `${webUrl}/_api/SP.UI.ApplicationPages.ClientPeoplePickerWebServiceInterface.clientPeoplePickerSearchUser`;
+
+            // Get request digest for this POST operation
+            const requestDigest = await this.getRequestDigest();
+
+            // Configure search parameters
+            const searchRequest = {
+                'queryParams': {
+                    'AllowEmailAddresses': true,
+                    'AllowMultipleEntities': false,
+                    'AllUrlZones': false,
+                    'MaximumEntitySuggestions': 20,
+                    'PrincipalSource': 15, // All sources (15)
+                    'PrincipalType': 1, // User (1)
+                    'QueryString': query
+                }
+            };
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json;odata=verbose',
+                    'Content-Type': 'application/json;odata=verbose',
+                    'X-RequestDigest': requestDigest
+                },
+                body: JSON.stringify(searchRequest),
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to search users: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            // Parse the ClientPeoplePickerSearchUser response
+            // It returns a string that needs to be parsed as JSON
+            const clientPeoplePickerData = JSON.parse(data.d.ClientPeoplePickerSearchUser);
+
+            // Map user data to TeamMember format
+            return clientPeoplePickerData.map((item: any) => {
+                // Extract display name - usually in format "Lastname, Firstname"
+                let displayName = item.DisplayText || '';
+
+                // If name is in "Lastname, Firstname" format, reformat to "Firstname Lastname"
+                if (displayName.includes(',')) {
+                    const parts = displayName.split(',').map((part: string) => part.trim());
+                    displayName = `${parts[1]} ${parts[0]}`;
+                }
+
+                return {
+                    id: item.Key || item.EntityData?.SPUserID || `user-${Date.now()}`,
+                    name: displayName,
+                    role: 'Teammitglied', // Default role
+                    email: item.EntityData?.Email || '',
+                    userIdentifier: item.Key || '',
+                    imageUrl: null
+                };
+            });
+        } catch (error) {
+            console.error('Error searching users:', error);
+            return [];
+        }
+    }
 }
 
 // Create a singleton instance

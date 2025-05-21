@@ -6,6 +6,7 @@ import ProjectForm from '../../../../components/ProjectForm';
 import withAdminAuth from '@/components/withAdminAuth';
 import { clientDataService } from '@/utils/clientDataService';
 import { Project, Category, TeamMember } from '@/types';
+import { Triangle } from 'react-loader-spinner';
 
 const EditProjectPage: React.FC = () => {
   const router = useRouter();
@@ -112,31 +113,16 @@ const EditProjectPage: React.FC = () => {
         }
       }
 
-      console.log('ProjectFields to save:', projectToSave.ProjectFields);
-
-      console.log('ProjectFields to save:', projectToSave.ProjectFields);
-
-      // Extract team members, ensuring we handle all possible formats
-      let teamMembersToSave: Array<string | { name: string; role?: string }> = [];
-
-      if (updatedProject.teamMembers) {
-        if (Array.isArray(updatedProject.teamMembers)) {
-          teamMembersToSave = updatedProject.teamMembers.map(member => {
-            if (typeof member === 'string') {
-              return member;
-            } else if (typeof member === 'object' && member !== null) {
-              return {
-                name: member.name || '',
-                role: member.role || 'Teammitglied'
-              };
-            }
-            return '';
-          }).filter(Boolean);
-        } else if (typeof updatedProject.teamMembers === 'string') {
-          // Handle the case where teamMembers might be a comma-separated string
-          teamMembersToSave = (updatedProject.teamMembers as string).split(',').map(m => m.trim()).filter(Boolean);
-        }
-      }
+      // Extract team members from updatedProject
+      const teamMembersToSave = updatedProject.teamMembers
+        ? (Array.isArray(updatedProject.teamMembers)
+          ? updatedProject.teamMembers.map(member =>
+            typeof member === 'string'
+              ? { name: member, role: 'Teammitglied' }
+              : { name: member.name, role: member.role || 'Teammitglied' }
+          )
+          : [])
+        : [];
 
       console.log('Projekt vor dem Speichern:', projectToSave);
       console.log('Team members to save:', teamMembersToSave);
@@ -154,8 +140,8 @@ const EditProjectPage: React.FC = () => {
 
           // Add new team members
           for (const member of teamMembersToSave) {
-            const memberName = typeof member === 'string' ? member : member.name;
-            const memberRole = typeof member === 'object' && member.role ? member.role : 'Teammitglied';
+            const memberName = member.name;
+            const memberRole = member.role || 'Teammitglied';
 
             if (memberName) {
               console.log(`Creating team member: ${memberName} with role ${memberRole}`);
@@ -207,7 +193,6 @@ const EditProjectPage: React.FC = () => {
         }
       }
 
-
       // Navigate back to admin page
       router.push('/admin');
     } catch (error) {
@@ -215,6 +200,7 @@ const EditProjectPage: React.FC = () => {
       alert('Fehler beim Speichern des Projekts: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="bg-gray-800 py-4 px-6 border-b border-gray-700">
@@ -232,7 +218,15 @@ const EditProjectPage: React.FC = () => {
         <div className="bg-gray-800 rounded-lg shadow p-6">
           {loading ? (
             <div className="text-center py-8">
-              <p>Projekt wird geladen...</p>
+              <Triangle
+                visible={true}
+                height="80"
+                width="80"
+                color="#60a5fa"
+                ariaLabel="triangle-loading"
+                wrapperStyle={{}}
+                wrapperClass=""
+              />
             </div>
           ) : id && typeof id === 'string' && project ? (
             <ProjectForm
@@ -241,7 +235,8 @@ const EditProjectPage: React.FC = () => {
                 teamMembers: teamMembers.map(member => ({
                   name: member.name,
                   role: member.role,
-                  projectId: member.projectId
+                  projectId: member.projectId,
+                  id: member.id
                 }))
               }}
               categories={categories}
@@ -264,4 +259,5 @@ const EditProjectPage: React.FC = () => {
     </div>
   );
 };
+
 export default withAdminAuth(EditProjectPage);
