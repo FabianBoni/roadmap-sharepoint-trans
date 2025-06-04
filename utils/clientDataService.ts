@@ -218,11 +218,11 @@ class ClientDataService {
             return [];
         }
     }
+
     async getProjectById(id: string): Promise<Project | null> {
         try {
             const webUrl = this.getWebUrl();
             const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.PROJECTS}')/items(${id})?$select=Id,Title,Category,StartQuarter,EndQuarter,Description,Status,Projektleitung,Bisher,Zukunft,Fortschritt,GeplantUmsetzung,Budget,StartDate,EndDate,ProjectFields`;
-
             const response = await fetch(endpoint, {
                 method: 'GET',
                 headers: {
@@ -284,10 +284,22 @@ class ClientDataService {
                 links: await this.getProjectLinks(item.Id.toString()) // Hole Links für das Projekt
             };
 
-            let projektLeitungMailParts = project.projektleitung.split(' ');
-            let projektLeitungMail = projektLeitungMailParts[0].toLowerCase() + '.' + projektLeitungMailParts[1].toLowerCase() + '@jsd.bs.ch';
+            // Fixed code section for handling project leader email
+            let projektLeitungMail = '';
+            if (project.projektleitung && project.projektleitung.trim()) {
+                let projektLeitungMailParts = project.projektleitung.split(' ');
+                if (projektLeitungMailParts.length >= 2) {
+                    projektLeitungMail = projektLeitungMailParts[0].toLowerCase() + '.' +
+                        projektLeitungMailParts[1].toLowerCase() + '@jsd.bs.ch';
+                } else {
+                    // Handle case where there's only one name or the format is unexpected
+                    projektLeitungMail = projektLeitungMailParts[0].toLowerCase() + '@jsd.bs.ch';
+                    console.log(`Project ${id} has incomplete projektleitung format: ${project.projektleitung}`);
+                }
+            }
 
-            if (project.projektleitung) {
+            // Only try to get profile picture if we have a valid email
+            if (projektLeitungMail) {
                 project.projektleitungImageUrl = await this.getUserProfilePictureUrl(projektLeitungMail);
             }
 
@@ -297,6 +309,7 @@ class ClientDataService {
             return null;
         }
     }
+
     async deleteProject(id: string): Promise<void> {
         try {
             const webUrl = this.getWebUrl();

@@ -214,8 +214,39 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       newErrors.category = 'Eine Kategorie muss ausgewählt sein';
     }
 
+    if (!startDate) {
+      newErrors.startDate = 'Startdatum ist erforderlich';
+    }
+
+    if (!endDate) {
+      newErrors.endDate = 'Enddatum ist erforderlich';
+    }
+
     if (startDate && endDate && startDate > endDate) {
       newErrors.dates = 'Das Enddatum muss nach dem Startdatum liegen';
+    }
+
+    if (!projektleitung.trim()) {
+      newErrors.projektleitung = 'Projektleitung ist erforderlich';
+    }
+
+    if (!bisher.trim()) {
+      newErrors.bisher = 'Bisher-Feld ist erforderlich';
+    }
+
+    if (!zukunft.trim()) {
+      newErrors.zukunft = 'Zukunft-Feld ist erforderlich';
+    }
+
+    if (!geplantUmsetzung.trim()) {
+      newErrors.geplantUmsetzung = 'Geplante Umsetzung ist erforderlich';
+    }
+
+    // Add type check before trim for budget
+    if (!budget || (typeof budget === 'string' && !budget.trim())) {
+      newErrors.budget = 'Budget ist erforderlich';
+    } else if (typeof budget === 'string' && !/^\d+$/.test(budget.trim())) {
+      newErrors.budget = 'Budget muss eine Zahl sein';
     }
 
     setErrors(newErrors);
@@ -318,13 +349,14 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       {/* Status */}
       <div>
         <label htmlFor="status" className="block text-sm font-medium mb-1">
-          Status
+          Status <span className="text-red-500">*</span>
         </label>
         <select
           id="status"
           value={status}
           onChange={(e) => setStatus(e.target.value as "planned" | "in-progress" | "completed" | "paused" | "cancelled")}
           className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+          required
         >
           <option value="planned">Geplant</option>
           <option value="in-progress">In Bearbeitung</option>
@@ -338,32 +370,34 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="startDate" className="block text-sm font-medium mb-1">
-            Startdatum
+            Startdatum <span className="text-red-500">*</span>
           </label>
           <DatePicker
             id="startDate"
             selected={startDate}
             onChange={setStartDate}
-            className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+            className={`w-full bg-gray-800 border ${errors.startDate ? 'border-red-500' : 'border-gray-700'} rounded p-2`}
             dateFormat="dd.MM.yyyy"
             placeholderText="TT.MM.JJJJ"
             required
           />
+          {errors.startDate && <p className="text-red-500 text-sm mt-1">{errors.startDate}</p>}
         </div>
         <div>
           <label htmlFor="endDate" className="block text-sm font-medium mb-1">
-            Enddatum
+            Enddatum <span className="text-red-500">*</span>
           </label>
           <DatePicker
             id="endDate"
             selected={endDate}
             onChange={setEndDate}
-            className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+            className={`w-full bg-gray-800 border ${errors.endDate ? 'border-red-500' : 'border-gray-700'} rounded p-2`}
             dateFormat="dd.MM.yyyy"
             placeholderText="TT.MM.JJJJ"
             minDate={startDate || undefined}
             required
           />
+          {errors.endDate && <p className="text-red-500 text-sm mt-1">{errors.endDate}</p>}
         </div>
       </div>
       {errors.dates && <p className="text-red-500 text-sm mt-1">{errors.dates}</p>}
@@ -404,16 +438,17 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       {/* Projektleitung */}
       <div>
         <label htmlFor="projektleitung" className="block text-sm font-medium mb-1">
-          Projektleitung
+          Projektleitung <span className="text-red-500">*</span>
         </label>
         <input
           id="projektleitung"
           type="text"
           value={projektleitung}
           onChange={(e) => setProjektleitung(e.target.value)}
-          className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+          className={`w-full bg-gray-800 border ${errors.projektleitung ? 'border-red-500' : 'border-gray-700'} rounded p-2`}
           required
         />
+        {errors.projektleitung && <p className="text-red-500 text-sm mt-1">{errors.projektleitung}</p>}
       </div>
 
       {/* Fortschritt */}
@@ -430,7 +465,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
             value={fortschritt}
             onChange={(e) => setFortschritt(parseInt(e.target.value))}
             className="flex-grow"
-            required
           />
           <span className="w-12 text-center">{fortschritt}%</span>
         </div>
@@ -445,65 +479,69 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       {/* Budget */}
       <div>
         <label htmlFor="budget" className="block text-sm font-medium mb-1">
-          Budget
+          Budget <span className="text-red-500">*</span>
         </label>
         <input
           id="budget"
           type="text"
           value={budget}
           onChange={(e) => setBudget(e.target.value)}
-          className="w-full bg-gray-800 border border-gray-700 rounded p-2"
-          placeholder="z.B. CHF 150'000"
+          className={`w-full bg-gray-800 border ${errors.budget ? 'border-red-500' : 'border-gray-700'} rounded p-2`}
+          placeholder="Nur Zahlen eingeben (z.B. 150000)"
           required
         />
+        {errors.budget && <p className="text-red-500 text-sm mt-1">{errors.budget}</p>}
       </div>
 
       {/* Bisher */}
       <div>
         <label htmlFor="bisher" className="block text-sm font-medium mb-1">
-          Bisher
+          Bisher <span className="text-red-500">*</span>
         </label>
         <textarea
           id="bisher"
           value={bisher}
           onChange={(e) => setBisher(e.target.value)}
           rows={3}
-          className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+          className={`w-full bg-gray-800 border ${errors.bisher ? 'border-red-500' : 'border-gray-700'} rounded p-2`}
           placeholder="Was wurde bisher erreicht?"
           required
         />
+        {errors.bisher && <p className="text-red-500 text-sm mt-1">{errors.bisher}</p>}
       </div>
 
       {/* Zukunft */}
       <div>
         <label htmlFor="zukunft" className="block text-sm font-medium mb-1">
-          In Zukunft
+          In Zukunft <span className="text-red-500">*</span>
         </label>
         <textarea
           id="zukunft"
           value={zukunft}
           onChange={(e) => setZukunft(e.target.value)}
           rows={3}
-          className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+          className={`w-full bg-gray-800 border ${errors.zukunft ? 'border-red-500' : 'border-gray-700'} rounded p-2`}
           placeholder="Was ist für die Zukunft geplant?"
           required
         />
+        {errors.zukunft && <p className="text-red-500 text-sm mt-1">{errors.zukunft}</p>}
       </div>
 
       {/* Geplante Umsetzung */}
       <div>
         <label htmlFor="geplantUmsetzung" className="block text-sm font-medium mb-1">
-          Geplante Umsetzung
+          Geplante Umsetzung <span className="text-red-500">*</span>
         </label>
         <textarea
           id="geplantUmsetzung"
           value={geplantUmsetzung}
           onChange={(e) => setGeplantUmsetzung(e.target.value)}
           rows={3}
-          className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+          className={`w-full bg-gray-800 border ${errors.geplantUmsetzung ? 'border-red-500' : 'border-gray-700'} rounded p-2`}
           placeholder="Wie soll das Projekt umgesetzt werden?"
           required
         />
+        {errors.geplantUmsetzung && <p className="text-red-500 text-sm mt-1">{errors.geplantUmsetzung}</p>}
       </div>
 
       {/* Felder */}
