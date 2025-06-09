@@ -3,7 +3,7 @@ import { Project, Category, ProjectLink, TeamMember } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { FaTrash, FaPlus } from 'react-icons/fa';
+import { FaTrash, FaPlus, FaTimes } from 'react-icons/fa';
 import { clientDataService } from '@/utils/clientDataService';
 
 interface ProjectFormProps {
@@ -72,7 +72,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   const [links, setLinks] = useState<ProjectLink[]>(initialProject?.links || []);
   const [newLinkTitle, setNewLinkTitle] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
-
   // Felder-Verwaltung
   const [selectedFields, setSelectedFields] = useState<string[]>(() => {
     if (!initialProject?.ProjectFields) return [];
@@ -93,6 +92,20 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
     return [];
   });
+
+  // Tags-Verwaltung (neu)
+  const [tags, setTags] = useState<string[]>(initialProject?.tags || []);
+  const [newTag, setNewTag] = useState('');
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'critical'>(
+    initialProject?.priority || 'medium'
+  );
+
+  // Vordefinierte Tags für bessere UX
+  const predefinedTags = [
+    'RPA', 'M365', 'Lifecycle', 'Bauprojekt', 'KI/AI', 'Cloud', 
+    'Security', 'Integration', 'Mobile', 'Analytics', 'Infrastructure',
+    'Process Automation', 'Digital Transformation', 'Data Migration'
+  ];
 
   // Validierung
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -192,10 +205,37 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       setNewLinkUrl('');
     }
   };
-
   // Link entfernen
   const removeLink = (linkId: string) => {
     setLinks(links.filter(link => link.id !== linkId));
+  };
+
+  // Tag-Management-Funktionen
+  const addTag = (tagToAdd: string) => {
+    const trimmedTag = tagToAdd.trim();
+    if (trimmedTag && !tags.includes(trimmedTag)) {
+      setTags(prev => [...prev, trimmedTag]);
+    }
+    setNewTag('');
+  };
+
+  const addNewTag = () => {
+    addTag(newTag);
+  };
+
+  const addPredefinedTag = (tag: string) => {
+    addTag(tag);
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setTags(prev => prev.filter(tag => tag !== tagToRemove));
+  };
+
+  const handleTagKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addNewTag();
+    }
   };
 
   // Formular validieren
@@ -275,9 +315,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     if (endDate) {
       const quarter = Math.floor(endDate.getMonth() / 3) + 1;
       endQuarter = `Q${quarter} ${endDate.getFullYear()}`;
-    }
-
-    const projectData: Project = {
+    }    const projectData: Project = {
       id: initialProject?.id || '',
       title,
       description,
@@ -295,7 +333,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       budget,
       teamMembers,
       links,
-      ProjectFields: selectedFields
+      ProjectFields: selectedFields,
+      tags,
+      priority
     };
 
     onSubmit(projectData);
@@ -344,9 +384,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
           required
         />
         {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description}</p>}
-      </div>
-
-      {/* Status */}
+      </div>      {/* Status */}
       <div>
         <label htmlFor="status" className="block text-sm font-medium mb-1">
           Status <span className="text-red-500">*</span>
@@ -364,6 +402,97 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
           <option value="paused">Pausiert</option>
           <option value="cancelled">Abgebrochen</option>
         </select>
+      </div>
+
+      {/* Priorität */}
+      <div>
+        <label htmlFor="priority" className="block text-sm font-medium mb-1">
+          Priorität
+        </label>
+        <select
+          id="priority"
+          value={priority}
+          onChange={(e) => setPriority(e.target.value as 'low' | 'medium' | 'high' | 'critical')}
+          className="w-full bg-gray-800 border border-gray-700 rounded p-2"
+        >
+          <option value="low">Niedrig</option>
+          <option value="medium">Mittel</option>
+          <option value="high">Hoch</option>
+          <option value="critical">Kritisch</option>
+        </select>
+      </div>
+
+      {/* Tags/Metadaten */}
+      <div>
+        <label className="block text-sm font-medium mb-2">
+          Tags/Technologien
+        </label>
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+          {/* Aktuelle Tags */}
+          {tags.length > 0 && (
+            <div className="mb-4">
+              <p className="text-sm text-gray-400 mb-2">Aktuelle Tags:</p>
+              <div className="flex flex-wrap gap-2">
+                {tags.map(tag => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center px-3 py-1 bg-blue-600 text-white rounded-full text-sm"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => removeTag(tag)}
+                      className="ml-2 text-blue-200 hover:text-white"
+                    >
+                      <FaTimes size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Neuen Tag hinzufügen */}
+          <div className="mb-4">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                onKeyPress={handleTagKeyPress}
+                placeholder="Neuen Tag eingeben..."
+                className="flex-1 bg-gray-700 border border-gray-600 rounded p-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={addNewTag}
+                disabled={!newTag.trim() || tags.includes(newTag.trim())}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-sm"
+              >
+                <FaPlus />
+              </button>
+            </div>
+          </div>
+
+          {/* Vordefinierte Tags */}
+          <div>
+            <p className="text-sm text-gray-400 mb-2">Häufig verwendete Tags:</p>
+            <div className="flex flex-wrap gap-2">
+              {predefinedTags
+                .filter(tag => !tags.includes(tag))
+                .map(tag => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => addPredefinedTag(tag)}
+                    className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-sm border border-gray-600 hover:border-gray-500"
+                  >
+                    {tag}
+                  </button>
+                ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Datumsbereich */}

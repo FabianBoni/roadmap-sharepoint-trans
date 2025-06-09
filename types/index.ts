@@ -18,6 +18,8 @@ export interface Project {
     startDate: string; // Neues Feld für exaktes Startdatum
     endDate: string;   // Neues Feld für exaktes Enddatum
     links?: { id: string; title: string; url: string }[]; // Neues Feld für Links
+    tags?: string[]; // Neue Metadaten/Tags für RPA, M365, Lifecycle, Bauprojekt, etc.
+    priority?: 'low' | 'medium' | 'high' | 'critical'; // Priorität für bessere Sortierung
 }
 
 export interface Category {

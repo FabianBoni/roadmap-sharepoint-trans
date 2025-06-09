@@ -1,0 +1,11 @@
+{
+  "@microsoft/generator-sharepoint": {
+    "solutionName": "spfx-roadmap",
+    "componentType": "webpart",
+    "framework": "react",
+    "componentName": "RoadmapWebPart",
+    "isCreatingSolution": true,
+    "environment": "onprem",
+    "whichFolder": "subdir"
+  }
+}

@@ -7,7 +7,7 @@ const nextConfig = {
   },
   trailingSlash: true,       // Makes SharePoint paths work better
   basePath: process.env.NODE_ENV === 'production' 
-    ? '/JSD/QMServices/Roadmap/roadmapapp' // Adjusted to your SharePoint path
+    ? '/JSD/Digital/roadmapapp' // Adjusted to your SharePoint path
     : '',
 }
 

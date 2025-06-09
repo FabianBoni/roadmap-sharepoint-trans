@@ -22,7 +22,7 @@ class ClientDataService {
     private getWebUrl(): string {
         // For development/testing with a hardcoded URL that matches your environment
         if (process.env.NODE_ENV === 'development') {
-            return 'https://spi-u.intranet.bs.ch/JSD/QMServices/Roadmap';
+            return 'https://spi.intranet.bs.ch/JSD/Digital';
         }
 
         // For production, try to derive from the current URL
@@ -47,7 +47,7 @@ class ClientDataService {
         }
 
         // Fallback to the hardcoded path
-        return 'https://spi-u.intranet.bs.ch/JSD/QMServices/Roadmap';
+        return 'https://spi.intranet.bs.ch/JSD/Digital';
     }
 
     private async getRequestDigest(): Promise<string> {

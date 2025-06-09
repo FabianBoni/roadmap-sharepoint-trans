@@ -15,7 +15,7 @@ export const getSP = (context?: any) => {
   
   // When running in standalone mode (like local dev)
   // You'll need to update this URL to your actual SharePoint site
-  return spfi("https://spi-u.intranet.bs.ch/JSD/QMServices/Roadmap/roadmapapp")
+  return spfi("https://spi.intranet.bs.ch/JSD/Digital/roadmapapp")
     .using(PnPLogging(2)); // 2 is LogLevel.Warning
 };
 
