@@ -183,10 +183,9 @@ class ClientDataService {
 
     // PROJECT OPERATIONS
     async getAllProjects(): Promise<Project[]> {
-        try {
-            const items = await this.fetchFromSharePoint(
+        try {            const items = await this.fetchFromSharePoint(
                 SP_LISTS.PROJECTS,
-                'Id,Title,Category,StartQuarter,EndQuarter,Description,Status,Projektleitung,Bisher,Zukunft,Fortschritt,GeplantUmsetzung,Budget,StartDate,EndDate'
+                'Id,Title,Category,StartQuarter,EndQuarter,Description,Status,Projektleitung,Bisher,Zukunft,Fortschritt,GeplantUmsetzung,Budget,StartDate,EndDate,Tags,Priority'
             );
 
             const projects = items.map(item => ({
@@ -203,10 +202,11 @@ class ClientDataService {
                 bisher: item.Bisher || '',
                 zukunft: item.Zukunft || '',
                 fortschritt: item.Fortschritt || 0,
-                geplante_umsetzung: item.GeplantUmsetzung || '',
-                budget: item.Budget || '',
+                geplante_umsetzung: item.GeplantUmsetzung || '',                budget: item.Budget || '',
                 startDate: item.StartDate || '', // Neues Feld
                 endDate: item.EndDate || '',     // Neues Feld
+                tags: item.Tags ? item.Tags.split(',').map((tag: string) => tag.trim()).filter(Boolean) : [], // Tags aus kommagetrennte Liste
+                priority: item.Priority as 'low' | 'medium' | 'high' | 'critical' || undefined, // Priorität
                 links: [] as ProjectLink[] // Explicitly type the empty array
             }));
 
@@ -225,7 +225,7 @@ class ClientDataService {
     async getProjectById(id: string): Promise<Project | null> {
         try {
             const webUrl = this.getWebUrl();
-            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.PROJECTS}')/items(${id})?$select=Id,Title,Category,StartQuarter,EndQuarter,Description,Status,Projektleitung,Bisher,Zukunft,Fortschritt,GeplantUmsetzung,Budget,StartDate,EndDate,ProjectFields`;
+            const endpoint = `${webUrl}/_api/web/lists/getByTitle('${SP_LISTS.PROJECTS}')/items(${id})?$select=Id,Title,Category,StartQuarter,EndQuarter,Description,Status,Projektleitung,Bisher,Zukunft,Fortschritt,GeplantUmsetzung,Budget,StartDate,EndDate,ProjectFields,Tags,Priority`;
             const response = await fetch(endpoint, {
                 method: 'GET',
                 headers: {
@@ -280,10 +280,11 @@ class ClientDataService {
                 bisher: item.Bisher || '',
                 zukunft: item.Zukunft || '',
                 fortschritt: item.Fortschritt || 0,
-                geplante_umsetzung: item.GeplantUmsetzung || '',
-                budget: item.Budget || '',
+                geplante_umsetzung: item.GeplantUmsetzung || '',                budget: item.Budget || '',
                 startDate: item.StartDate || '', // Neues Feld
                 endDate: item.EndDate || '',     // Neues Feld
+                tags: item.Tags ? item.Tags.split(',').map((tag: string) => tag.trim()).filter(Boolean) : [], // Tags aus kommagetrennte Liste
+                priority: item.Priority as 'low' | 'medium' | 'high' | 'critical' || undefined, // Priorität
                 links: await this.getProjectLinks(item.Id.toString()) // Hole Links für das Projekt
             };
 
@@ -402,10 +403,11 @@ class ClientDataService {
                 'Bisher': projectData.bisher || existingProject.bisher || '',
                 'Zukunft': projectData.zukunft || existingProject.zukunft || '',
                 'Fortschritt': typeof projectData.fortschritt === 'number' ? projectData.fortschritt : (existingProject.fortschritt || 0),
-                'GeplantUmsetzung': projectData.geplante_umsetzung || existingProject.geplante_umsetzung || '',
-                'Budget': projectData.budget || existingProject.budget || '',
+                'GeplantUmsetzung': projectData.geplante_umsetzung || existingProject.geplante_umsetzung || '',                'Budget': projectData.budget || existingProject.budget || '',
                 'StartDate': projectData.startDate || existingProject.startDate || '',
                 'EndDate': projectData.endDate || existingProject.endDate || '',
+                'Tags': projectData.tags ? projectData.tags.join(', ') : (existingProject.tags ? existingProject.tags.join(', ') : ''),
+                'Priority': projectData.priority || existingProject.priority || '',
                 'ProjectFields': projectFieldsValue
             };
 
@@ -940,10 +942,11 @@ class ClientDataService {
                 'Bisher': projectData.bisher,
                 'Zukunft': projectData.zukunft,
                 'Fortschritt': projectData.fortschritt,
-                'GeplantUmsetzung': projectData.geplante_umsetzung,
-                'Budget': projectData.budget,
+                'GeplantUmsetzung': projectData.geplante_umsetzung,                'Budget': projectData.budget,
                 'StartDate': projectData.startDate,
                 'EndDate': projectData.endDate,
+                'Tags': projectData.tags ? projectData.tags.join(', ') : '',
+                'Priority': projectData.priority || '',
                 'ProjectFields': cleanFields(projectData.ProjectFields)
             };
 

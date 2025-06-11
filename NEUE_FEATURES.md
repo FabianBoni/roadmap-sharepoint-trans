@@ -7,8 +7,15 @@
 - **Farbkodierte Tags**: RPA, M365, Lifecycle, Bauprojekt, etc.
 - **Intelligente Filterung** nach Technologien
 - **Projektanzahl** wird für jeden Tag angezeigt
+- **⚠️ WICHTIG**: Tags werden in SharePoint-Liste gespeichert (siehe unten)
 
-### 2. **Gruppierte Kategorien-Ansicht**
+### 2. **SharePoint-Integration für Tags**
+- **Neues Feld**: `Tags` (Text, 1000 Zeichen) in "Roadmap Projects"-Liste
+- **Neues Feld**: `Priority` (Choice: low/medium/high/critical)
+- **Automatische Konvertierung**: Array ↔ kommagetrennte Liste
+- **Update-Script**: `scripts/updateSharePointForTags.ps1` für bestehende Listen
+
+### 3. **Gruppierte Kategorien-Ansicht**
 - **Projekte werden nach Kategorien gruppiert** dargestellt
 - **Übersichtliche Struktur** statt chaotischer Timeline
 - **Kategorie-Header** mit Projektanzahl
