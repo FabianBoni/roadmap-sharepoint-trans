@@ -6,12 +6,13 @@ const nextConfig = {
     unoptimized: true,       // Required for static export
   },
   trailingSlash: true,       // Makes SharePoint paths work better
-  basePath: process.env.NODE_ENV === 'production' 
-    ? '/JSD/Digital/roadmapapp' // Adjusted to your SharePoint path
-    : '/JSD/QMServices/Roadmap/roadmapapp', // Adjusted to your SharePoint path
-  assetPrefix: process.env.NODE_ENV === 'production' 
-    ? '/JSD/Digital/roadmapapp' 
-    : '/JSD/QMServices/Roadmap/roadmapapp',
+  // Temporarily remove basePath and assetPrefix to troubleshoot
+  // basePath: process.env.NODE_ENV === 'production' 
+  //   ? '/JSD/Digital/roadmapapp' 
+  //   : '/JSD/QMServices/Roadmap/roadmapapp',
+  // assetPrefix: process.env.NODE_ENV === 'production' 
+  //   ? '/JSD/Digital/roadmapapp' 
+  //   : '/JSD/QMServices/Roadmap/roadmapapp',
 }
 
 module.exports = nextConfig

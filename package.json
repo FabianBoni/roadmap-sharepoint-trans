@@ -2,11 +2,11 @@
   "name": "roadmap-app",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev --turbopack",
+  "scripts": {    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "deploy:sharepoint": "powershell -ExecutionPolicy Bypass -File scripts/deploy-sharepoint.ps1",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
