@@ -221,95 +221,97 @@ const GroupedRoadmap: React.FC<GroupedRoadmapProps> = ({
                           ))}
                         </div>
                       )}
-                    </div>
-
-                    {/* Projekt-Bar */}
+                    </div>                    {/* Projekt-Bar */}
                     <div
-                      className="absolute top-2 bottom-2 rounded cursor-pointer transition-all duration-200 hover:shadow-lg"
+                      className="absolute top-1 bottom-1 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-lg hover:z-10"
                       style={{
                         left: `${startPosition}%`,
                         width: `${width}%`,
                         backgroundColor: getStatusColor(project.status),
-                        minWidth: '120px'
+                        minWidth: '150px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
                       }}
                       onClick={() => onProjectClick(project.id)}
                       onMouseOver={(e) => onMouseOver(e, project)}
-                      onMouseLeave={onMouseLeave}                    >
-                      <div className="p-2 h-full flex items-center justify-between text-white relative">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2">
+                      onMouseLeave={onMouseLeave}
+                    >
+                      <div className="p-2 h-full flex flex-col justify-between text-white relative overflow-hidden">
+                        {/* Obere Zeile: Titel und Priorität */}
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center space-x-2 flex-1 min-w-0">
                             {getPriorityIcon(project.priority) && (
-                              <span className="text-sm">{getPriorityIcon(project.priority)}</span>
+                              <span className="text-sm flex-shrink-0">{getPriorityIcon(project.priority)}</span>
                             )}
-                            <span className="font-medium text-sm truncate">{project.title}</span>
+                            <span className="font-semibold text-sm truncate">{project.title}</span>
                           </div>
+                          <FaExternalLinkAlt className="text-xs opacity-60 flex-shrink-0 ml-2" />
+                        </div>
+                        
+                        {/* Untere Zeile: Projektinfo und Tags */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3 text-xs opacity-90">
+                            <div className="flex items-center">
+                              <FaUser className="mr-1 flex-shrink-0" />
+                              <span className="truncate max-w-20">{project.projektleitung}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <FaClock className="mr-1 flex-shrink-0" />
+                              <span>{project.fortschritt}%</span>
+                            </div>                          </div>
                           
-                          {/* Responsive Tag-Anzeige */}
-                          <div className="flex items-center justify-between mt-1">
-                            <div className="flex items-center space-x-3 text-xs opacity-90">
-                              <div className="flex items-center">
-                                <FaUser className="mr-1" />
-                                <span className="truncate max-w-20">{project.projektleitung}</span>
+                          {/* Tags mit intelligentem Layout */}
+                          {project.tags && project.tags.length > 0 && (
+                            <div className="flex items-center ml-2">
+                              {/* Desktop: Bei ausreichend Platz alle Tags anzeigen */}
+                              <div className="hidden xl:flex items-center space-x-1">
+                                {project.tags.slice(0, 3).map(tag => (
+                                  <span
+                                    key={tag}
+                                    className="px-2 py-0.5 rounded-full text-xs font-medium text-white border"
+                                    style={{
+                                      backgroundColor: getTagColor(tag),
+                                      borderColor: getTagColor(tag),
+                                      filter: 'brightness(0.9)'
+                                    }}
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                                {project.tags.length > 3 && (
+                                  <span className="px-2 py-0.5 rounded-full text-xs bg-gray-600 text-white border border-gray-500">
+                                    +{project.tags.length - 3}
+                                  </span>
+                                )}
                               </div>
-                              <div className="flex items-center">
-                                <FaClock className="mr-1" />
-                                <span>{project.fortschritt}%</span>
+                              
+                              {/* Tablet: Bei weniger Platz erste 2 Tags anzeigen */}
+                              <div className="hidden lg:flex xl:hidden items-center space-x-1">
+                                {project.tags.slice(0, 2).map(tag => (
+                                  <span
+                                    key={tag}
+                                    className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                                    style={{ 
+                                      backgroundColor: getTagColor(tag),
+                                      filter: 'brightness(0.9)'
+                                    }}
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                                {project.tags.length > 2 && (
+                                  <span className="px-2 py-0.5 rounded-full text-xs bg-gray-600 text-white">
+                                    +{project.tags.length - 2}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* Mobile: Nur Tag-Symbol mit Anzahl */}
+                              <div className="flex lg:hidden items-center bg-gray-600 px-2 py-1 rounded-full border border-gray-500">
+                                <FaTag className="mr-1 text-xs text-yellow-400" />
+                                <span className="text-xs font-medium text-white">{project.tags.length}</span>
                               </div>
                             </div>
-                            
-                            {/* Tags mit intelligentem Layout */}
-                            {project.tags && project.tags.length > 0 && (
-                              <div className="flex items-center ml-2">
-                                {/* Bei ausreichend Platz: Tags einzeln anzeigen */}
-                                <div className="hidden xl:flex items-center space-x-1">
-                                  {project.tags.slice(0, 3).map(tag => (
-                                    <span
-                                      key={tag}
-                                      className="px-2 py-0.5 rounded-full text-xs bg-black bg-opacity-40 border border-white border-opacity-30"
-                                      style={{
-                                        backgroundColor: getTagColor(tag) + '80', // 50% opacity
-                                        borderColor: getTagColor(tag)
-                                      }}
-                                    >
-                                      {tag}
-                                    </span>
-                                  ))}
-                                  {project.tags.length > 3 && (
-                                    <span className="px-2 py-0.5 rounded-full text-xs bg-black bg-opacity-40 border border-white border-opacity-30">
-                                      +{project.tags.length - 3}
-                                    </span>
-                                  )}
-                                </div>
-                                
-                                {/* Bei wenig Platz: Erste 2 Tags anzeigen */}
-                                <div className="hidden lg:flex xl:hidden items-center space-x-1">
-                                  {project.tags.slice(0, 2).map(tag => (
-                                    <span
-                                      key={tag}
-                                      className="px-2 py-0.5 rounded-full text-xs bg-black bg-opacity-40"
-                                      style={{ backgroundColor: getTagColor(tag) + '80' }}
-                                    >
-                                      {tag}
-                                    </span>
-                                  ))}
-                                  {project.tags.length > 2 && (
-                                    <span className="px-2 py-0.5 rounded-full text-xs bg-black bg-opacity-40">
-                                      +{project.tags.length - 2}
-                                    </span>
-                                  )}
-                                </div>
-                                
-                                {/* Bei sehr wenig Platz: Nur Tag-Symbol mit Anzahl */}
-                                <div className="flex lg:hidden items-center bg-black bg-opacity-40 px-2 py-0.5 rounded-full">
-                                  <FaTag className="mr-1 text-xs" />
-                                  <span className="text-xs">{project.tags.length}</span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="ml-2">
-                          <FaExternalLinkAlt className="text-xs opacity-60" />
+                          )}
                         </div>
                       </div>
                     </div>

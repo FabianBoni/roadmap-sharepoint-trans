@@ -106,7 +106,6 @@ const RoadmapFilters: React.FC<RoadmapFiltersProps> = ({
       : [...currentValues, value];
     updateFilter(key, newValues);
   };
-
   const hasActiveFilters = () => {
     return filters.status.length > 0 ||
            filters.priority.length > 0 ||
@@ -119,23 +118,34 @@ const RoadmapFilters: React.FC<RoadmapFiltersProps> = ({
            filters.dateRange.end;
   };
 
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (filters.status.length > 0) count++;
+    if (filters.priority.length > 0) count++;
+    if (filters.tags.length > 0) count++;
+    if (filters.categories.length > 0) count++;
+    if (filters.projektleitung.length > 0) count++;
+    if (filters.fortschrittRange[0] > 0 || filters.fortschrittRange[1] < 100) count++;
+    if (filters.dateRange.start || filters.dateRange.end) count++;
+    return count;
+  };
   return (
-    <div className="bg-gray-800 border-b border-gray-700">
+    <div className="bg-gray-800 rounded-lg border border-gray-600 shadow-lg">
       {/* Filter Header */}
-      <div className="px-4 py-3 flex items-center justify-between">
+      <div className="px-4 py-3 flex items-center justify-between bg-gray-750 rounded-t-lg">
         <div className="flex items-center space-x-3">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center space-x-2 text-white hover:text-blue-400 transition-colors"
+            className="flex items-center space-x-2 text-white hover:text-yellow-400 transition-colors font-medium"
           >
-            <FaFilter />
-            <span className="font-medium">Filter</span>
-            {isExpanded ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
+            <FaFilter className="text-yellow-400" />
+            <span>Erweiterte Filter</span>
+            {isExpanded ? <FaChevronUp size={14} /> : <FaChevronDown size={14} />}
           </button>
           
           {hasActiveFilters() && (
-            <span className="bg-blue-600 text-white px-2 py-1 rounded-full text-xs">
-              Aktiv
+            <span className="bg-yellow-600 text-gray-900 px-2 py-1 rounded-full text-xs font-medium">
+              {getActiveFilterCount()} aktiv
             </span>
           )}
         </div>
@@ -143,10 +153,10 @@ const RoadmapFilters: React.FC<RoadmapFiltersProps> = ({
         {hasActiveFilters() && (
           <button
             onClick={onClearFilters}
-            className="flex items-center space-x-1 text-gray-400 hover:text-white text-sm transition-colors"
+            className="flex items-center space-x-1 text-gray-400 hover:text-red-400 text-sm transition-colors"
           >
             <FaTimes size={12} />
-            <span>Alle Filter zurücksetzen</span>
+            <span>Zurücksetzen</span>
           </button>
         )}
       </div>

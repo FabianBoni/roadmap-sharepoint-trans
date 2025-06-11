@@ -294,18 +294,7 @@ const NewRoadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
               initialYear={currentYear}
               onYearChange={setCurrentYear}
             />
-          </div>        </div>
-
-        {/* Erweiterte Filter */}
-        <RoadmapFilters
-          projects={displayedProjects}
-          categories={categories}
-          filters={filters}
-          onFiltersChange={handleFiltersChange}
-          onClearFilters={handleClearFilters}
-        />
-
-        {/* Main Layout */}
+          </div>        </div>        {/* Main Layout */}
         <div className="flex">
           {/* Sidebar */}
           <div
@@ -333,9 +322,7 @@ const NewRoadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
               className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden"
               onClick={() => setMobileSidebarOpen(false)}
             />
-          )}
-
-          {/* Main Content */}
+          )}          {/* Main Content */}
           <div className="flex-1 p-4 md:p-6 overflow-hidden">
             <GroupedRoadmap
               projects={filteredProjects}
@@ -346,6 +333,20 @@ const NewRoadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
               onMouseOver={handleMouseOver}
               onMouseLeave={handleMouseLeave}
             />
+              {/* Erweiterte Filter unterhalb der Timeline */}
+            <div className="mt-8 pt-6">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-white mb-2">Filter & Suchoptionen</h3>
+                <p className="text-sm text-gray-400">Verwenden Sie die Filter unten, um spezifische Projekte zu finden.</p>
+              </div>
+              <RoadmapFilters
+                projects={displayedProjects}
+                categories={categories}
+                filters={filters}
+                onFiltersChange={handleFiltersChange}
+                onClearFilters={handleClearFilters}
+              />
+            </div>
           </div>
         </div>
 
