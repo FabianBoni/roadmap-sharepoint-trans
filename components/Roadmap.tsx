@@ -440,50 +440,52 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
           </h1>
           <Nav currentPage="roadmap" />
         </header>        {/* Controls section - View type and Year navigation */}
-        <div className="flex flex-col md:flex-row justify-between items-center p-2 px-4 md:px-10 mb-4 gap-4">
-          {/* View type buttons - Bigger and more mobile-friendly */}
-          <div className="flex space-x-2 w-full md:w-auto">
-            <button
-              className={`px-4 py-2 text-sm font-medium rounded-lg flex-1 md:flex-none ${viewType === 'quarters' ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
-              onClick={() => setViewType('quarters')}
-            >
-              Quartale
-            </button>
-            <button
-              className={`px-4 py-2 text-sm font-medium rounded-lg flex-1 md:flex-none ${viewType === 'months' ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
-              onClick={() => setViewType('months')}
-            >
-              Monate
-            </button>            <button
-              className={`px-4 py-2 text-sm font-medium rounded-lg flex-1 md:flex-none ${viewType === 'weeks' ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
-              onClick={() => setViewType('weeks')}
-            >
-              Wochen
-            </button>
-          </div>
+        <div className='flex flex-col'>
+          <div className="flex flex-col md:flex-row justify-between items-center p-2 px-4 md:px-10 mb-4 gap-4">
+            {/* View type buttons - Bigger and more mobile-friendly */}
+            <div className="flex space-x-2 w-full md:w-auto">
+              <button
+                className={`px-4 py-2 text-sm font-medium rounded-lg flex-1 md:flex-none ${viewType === 'quarters' ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
+                onClick={() => setViewType('quarters')}
+              >
+                Quartale
+              </button>
+              <button
+                className={`px-4 py-2 text-sm font-medium rounded-lg flex-1 md:flex-none ${viewType === 'months' ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
+                onClick={() => setViewType('months')}
+              >
+                Monate
+              </button>            <button
+                className={`px-4 py-2 text-sm font-medium rounded-lg flex-1 md:flex-none ${viewType === 'weeks' ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
+                onClick={() => setViewType('weeks')}
+              >
+                Wochen
+              </button>
+            </div>
 
-          {/* Display Mode Toggle */}
-          <div className="flex space-x-2">
-            <button
-              className={`px-3 py-2 text-sm font-medium rounded-lg ${displayMode === 'timeline' ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
-              onClick={() => setDisplayMode('timeline')}
-              title="Timeline-Ansicht"
-            >
-              <FaList />
-            </button>
-            <button
-              className={`px-3 py-2 text-sm font-medium rounded-lg ${displayMode === 'cards' ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
-              onClick={() => setDisplayMode('cards')}
-              title="Karten-Ansicht"
-            >
-              <FaThLarge />
-            </button>
-          </div>          {/* Year navigation - Responsive */}
-          <div className="w-full md:w-auto flex justify-center md:justify-end">
-            <RoadmapYearNavigation
-              initialYear={currentYear}
-              onYearChange={setCurrentYear}
-            />
+            {/* Display Mode Toggle */}
+            <div className="flex space-x-2">
+              <button
+                className={`px-3 py-2 text-sm font-medium rounded-lg ${displayMode === 'timeline' ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
+                onClick={() => setDisplayMode('timeline')}
+                title="Timeline-Ansicht"
+              >
+                <FaList />
+              </button>
+              <button
+                className={`px-3 py-2 text-sm font-medium rounded-lg ${displayMode === 'cards' ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
+                onClick={() => setDisplayMode('cards')}
+                title="Karten-Ansicht"
+              >
+                <FaThLarge />
+              </button>
+            </div>          {/* Year navigation - Responsive */}
+            <div className="w-full md:w-auto flex justify-center md:justify-end">
+              <RoadmapYearNavigation
+                initialYear={currentYear}
+                onYearChange={setCurrentYear}
+              />
+            </div>
           </div>
           {/* Erweiterte Filter unterhalb der Timeline */}
           <div className="mt-8 pt-6 px-4 md:px-8 lg:px-20">
