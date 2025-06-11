@@ -21,6 +21,27 @@ const GroupedRoadmap: React.FC<GroupedRoadmapProps> = ({
   onMouseOver,
   onMouseLeave
 }) => {
+  // Tag-Farben-Funktion
+  const getTagColor = (tag: string): string => {
+    const tagColors: { [key: string]: string } = {
+      'RPA': '#6366F1',
+      'M365': '#0F766E',
+      'Lifecycle': '#7C3AED',
+      'Bauprojekt': '#DC2626',
+      'KI/AI': '#059669',
+      'Cloud': '#2563EB',
+      'Security': '#DC2626',
+      'Integration': '#EA580C',
+      'Mobile': '#7C2D12',
+      'Analytics': '#1F2937',
+      'Infrastructure': '#0891B2',
+      'Automatisierung': '#16A34A',
+      'Compliance': '#B91C1C',
+      'Training': '#CA8A04'
+    };
+    return tagColors[tag] || '#6B7280';
+  };
+
   // Gruppiere Projekte nach Kategorien
   const groupedProjects = categories.reduce((acc, category) => {
     const categoryProjects = projects.filter(project => project.category === category.id);
@@ -213,9 +234,8 @@ const GroupedRoadmap: React.FC<GroupedRoadmapProps> = ({
                       }}
                       onClick={() => onProjectClick(project.id)}
                       onMouseOver={(e) => onMouseOver(e, project)}
-                      onMouseLeave={onMouseLeave}
-                    >
-                      <div className="p-2 h-full flex items-center justify-between text-white">
+                      onMouseLeave={onMouseLeave}                    >
+                      <div className="p-2 h-full flex items-center justify-between text-white relative">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2">
                             {getPriorityIcon(project.priority) && (
@@ -223,20 +243,67 @@ const GroupedRoadmap: React.FC<GroupedRoadmapProps> = ({
                             )}
                             <span className="font-medium text-sm truncate">{project.title}</span>
                           </div>
-                          <div className="flex items-center space-x-3 mt-1 text-xs opacity-90">
-                            <div className="flex items-center">
-                              <FaUser className="mr-1" />
-                              <span className="truncate max-w-20">{project.projektleitung}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <FaClock className="mr-1" />
-                              <span>{project.fortschritt}%</span>
-                            </div>
-                            {project.tags && project.tags.length > 0 && (
+                          
+                          {/* Responsive Tag-Anzeige */}
+                          <div className="flex items-center justify-between mt-1">
+                            <div className="flex items-center space-x-3 text-xs opacity-90">
                               <div className="flex items-center">
-                                <FaTag className="mr-1" />
-                                <span>{project.tags.slice(0, 2).join(', ')}</span>
-                                {project.tags.length > 2 && <span>...</span>}
+                                <FaUser className="mr-1" />
+                                <span className="truncate max-w-20">{project.projektleitung}</span>
+                              </div>
+                              <div className="flex items-center">
+                                <FaClock className="mr-1" />
+                                <span>{project.fortschritt}%</span>
+                              </div>
+                            </div>
+                            
+                            {/* Tags mit intelligentem Layout */}
+                            {project.tags && project.tags.length > 0 && (
+                              <div className="flex items-center ml-2">
+                                {/* Bei ausreichend Platz: Tags einzeln anzeigen */}
+                                <div className="hidden xl:flex items-center space-x-1">
+                                  {project.tags.slice(0, 3).map(tag => (
+                                    <span
+                                      key={tag}
+                                      className="px-2 py-0.5 rounded-full text-xs bg-black bg-opacity-40 border border-white border-opacity-30"
+                                      style={{
+                                        backgroundColor: getTagColor(tag) + '80', // 50% opacity
+                                        borderColor: getTagColor(tag)
+                                      }}
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                  {project.tags.length > 3 && (
+                                    <span className="px-2 py-0.5 rounded-full text-xs bg-black bg-opacity-40 border border-white border-opacity-30">
+                                      +{project.tags.length - 3}
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {/* Bei wenig Platz: Erste 2 Tags anzeigen */}
+                                <div className="hidden lg:flex xl:hidden items-center space-x-1">
+                                  {project.tags.slice(0, 2).map(tag => (
+                                    <span
+                                      key={tag}
+                                      className="px-2 py-0.5 rounded-full text-xs bg-black bg-opacity-40"
+                                      style={{ backgroundColor: getTagColor(tag) + '80' }}
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                  {project.tags.length > 2 && (
+                                    <span className="px-2 py-0.5 rounded-full text-xs bg-black bg-opacity-40">
+                                      +{project.tags.length - 2}
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {/* Bei sehr wenig Platz: Nur Tag-Symbol mit Anzahl */}
+                                <div className="flex lg:hidden items-center bg-black bg-opacity-40 px-2 py-0.5 rounded-full">
+                                  <FaTag className="mr-1 text-xs" />
+                                  <span className="text-xs">{project.tags.length}</span>
+                                </div>
                               </div>
                             )}
                           </div>

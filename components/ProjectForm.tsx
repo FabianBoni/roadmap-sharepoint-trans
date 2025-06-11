@@ -312,12 +312,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       endQuarter = `Q${quarter} ${endDate.getFullYear()}`;
     }
 
-    // Debug: Log the tags before creating projectData
-    console.log('=== DEBUG ProjectForm handleSubmit ===');
-    console.log('Tags from state:', tags);
-    console.log('Tags type:', typeof tags);
-    console.log('Tags length:', tags ? tags.length : 'undefined');
-
     const projectData: Project = {
       id: initialProject?.id || '',
       title,
@@ -340,9 +334,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       tags,
       priority
     };
-
-    console.log('ProjectData tags:', projectData.tags);
-    console.log('===========================================');
 
     onSubmit(projectData);
   };

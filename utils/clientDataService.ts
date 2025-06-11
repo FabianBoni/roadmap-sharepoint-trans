@@ -927,25 +927,7 @@ class ClientDataService {
             if (!isNewProject) {
                 headers['X-HTTP-Method'] = 'MERGE';
                 headers['IF-MATCH'] = '*';
-            }            // Debug: Log the incoming project data
-            console.log('=== DEBUG saveProject ===');
-            console.log('Project ID:', projectData.id);
-            console.log('Project Title:', projectData.title);
-            console.log('Raw tags from projectData:', projectData.tags);
-            console.log('Tags type:', typeof projectData.tags);
-            console.log('Tags length:', projectData.tags ? projectData.tags.length : 'undefined');
-            
-            // Prepare tags string with detailed logging
-            let tagsString = '';
-            if (projectData.tags) {
-                console.log('Tags array contents:', projectData.tags);
-                tagsString = projectData.tags.join(', ');
-                console.log('Tags after join:', tagsString);
-            } else {
-                console.log('No tags found');
-            }
-
-            // Prepare the request body
+            }            // Prepare the request body
             const body = {
                 '__metadata': { 'type': itemType },
                 'Title': projectData.title,
@@ -962,13 +944,10 @@ class ClientDataService {
                 'Budget': projectData.budget,
                 'StartDate': projectData.startDate,
                 'EndDate': projectData.endDate,
-                'Tags': tagsString,
+                'Tags': projectData.tags ? projectData.tags.join(', ') : '',
                 'Priority': projectData.priority || '',
                 'ProjectFields': cleanFields(projectData.ProjectFields)
             };
-
-            console.log('Request body Tags field:', body.Tags);
-            console.log('==========================');
 
             // Send the request
             const response = await fetch(endpoint, {

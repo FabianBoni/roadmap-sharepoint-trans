@@ -6,6 +6,7 @@ import { clientDataService } from '../utils/clientDataService';
 import Footer from './Footer';
 import EnhancedSidebar from './EnhancedSidebar';
 import GroupedRoadmap from './GroupedRoadmap';
+import RoadmapFilters, { FilterState } from './RoadmapFilters';
 import { FaBars, FaTimes, FaCompressArrowsAlt } from 'react-icons/fa';
 import Nav from './Nav';
 
@@ -22,10 +23,20 @@ const NewRoadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   const [hoveredProject, setHoveredProject] = useState<Project | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [viewType, setViewType] = useState<'quarters' | 'months'>('quarters');
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [siteTitle, setSiteTitle] = useState('IT + Digital Roadmap');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);  const [siteTitle, setSiteTitle] = useState('IT + Digital Roadmap');
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [compactMode, setCompactMode] = useState(true);
+
+  // Filter state für erweiterte Filter
+  const [filters, setFilters] = useState<FilterState>({
+    status: [],
+    priority: [],
+    tags: [],
+    categories: [],
+    projektleitung: [],
+    fortschrittRange: [0, 100],
+    dateRange: { start: '', end: '' }
+  });
 
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -118,18 +129,61 @@ const NewRoadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
       setActiveCategories([...activeCategories, categoryId]);
     }
   };
-
-  // Main filtering logic
+  // Main filtering logic - erweitert für alle Filter
   const getFilteredProjects = (): Project[] => {
     let filtered = displayedProjects;
 
-    // Filter by categories
-    filtered = filtered.filter(project => activeCategories.includes(project.category));
+    // Filter by categories (sowohl Sidebar als auch erweiterte Filter)
+    const allActiveCategories = [...new Set([...activeCategories, ...filters.categories])];
+    if (allActiveCategories.length > 0) {
+      filtered = filtered.filter(project => allActiveCategories.includes(project.category));
+    }
 
-    // Filter by tags if any are selected
-    if (activeTags.length > 0) {
+    // Filter by tags (sowohl Sidebar als auch erweiterte Filter)
+    const allActiveTags = [...new Set([...activeTags, ...filters.tags])];
+    if (allActiveTags.length > 0) {
       filtered = filtered.filter(project => 
-        project.tags && project.tags.some(tag => activeTags.includes(tag))
+        project.tags && project.tags.some(tag => allActiveTags.includes(tag))
+      );
+    }
+
+    // Erweiterte Filter
+    // Status Filter
+    if (filters.status.length > 0) {
+      filtered = filtered.filter(project => filters.status.includes(project.status));
+    }
+
+    // Priorität Filter
+    if (filters.priority.length > 0) {
+      filtered = filtered.filter(project => 
+        project.priority && filters.priority.includes(project.priority)
+      );
+    }
+
+    // Projektleitung Filter
+    if (filters.projektleitung.length > 0) {
+      filtered = filtered.filter(project => 
+        filters.projektleitung.includes(project.projektleitung)
+      );
+    }
+
+    // Fortschritt Filter
+    if (filters.fortschrittRange[0] > 0 || filters.fortschrittRange[1] < 100) {
+      filtered = filtered.filter(project => 
+        project.fortschritt >= filters.fortschrittRange[0] && 
+        project.fortschritt <= filters.fortschrittRange[1]
+      );
+    }
+
+    // Datumsbereich Filter
+    if (filters.dateRange.start) {
+      filtered = filtered.filter(project => 
+        new Date(project.startDate) >= new Date(filters.dateRange.start)
+      );
+    }
+    if (filters.dateRange.end) {
+      filtered = filtered.filter(project => 
+        new Date(project.endDate) <= new Date(filters.dateRange.end)
       );
     }
 
@@ -152,9 +206,25 @@ const NewRoadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   const handleMouseLeave = () => {
     setHoveredProject(null);
   };
-
   const handleProjectClick = (projectId: string) => {
     router.push(`/project/${projectId}`);
+  };
+
+  // Filter-Handler-Funktionen
+  const handleFiltersChange = (newFilters: FilterState) => {
+    setFilters(newFilters);
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      status: [],
+      priority: [],
+      tags: [],
+      categories: [],
+      projektleitung: [],
+      fortschrittRange: [0, 100],
+      dateRange: { start: '', end: '' }
+    });
   };
 
   return (
@@ -224,8 +294,16 @@ const NewRoadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
               initialYear={currentYear}
               onYearChange={setCurrentYear}
             />
-          </div>
-        </div>
+          </div>        </div>
+
+        {/* Erweiterte Filter */}
+        <RoadmapFilters
+          projects={displayedProjects}
+          categories={categories}
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+          onClearFilters={handleClearFilters}
+        />
 
         {/* Main Layout */}
         <div className="flex">
