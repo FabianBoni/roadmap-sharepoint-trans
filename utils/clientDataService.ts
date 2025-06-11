@@ -18,8 +18,8 @@ class ClientDataService {
     private metadataCache: Record<string, string> = {};
     // Cache for request digest
     private requestDigestCache: { value: string; expiration: number } | null = null;    private getWebUrl(): string {
-        // Use conditional paths based on environment
-        if (process.env.NODE_ENV === 'development') {
+        // Use custom deployment environment variable
+        if (process.env.NEXT_PUBLIC_DEPLOYMENT_ENV === 'development') {
             return 'https://spi-u.intranet.bs.ch/JSD/QMServices/Roadmap';
         }
 

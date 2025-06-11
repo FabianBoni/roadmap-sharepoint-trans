@@ -12,8 +12,8 @@ export const getSP = (context?: any) => {
     // Use numeric value instead of enum
     return spfi().using(SPFx(context)).using(PnPLogging(2)); // 2 is LogLevel.Warning
   }  // When running in standalone mode (like local dev)
-  // Use conditional paths: development has -u, production doesn't
-  const basePath = process.env.NODE_ENV === 'production' 
+  // Use custom deployment environment variable instead of NODE_ENV
+  const basePath = process.env.NEXT_PUBLIC_DEPLOYMENT_ENV === 'production' 
     ? 'https://spi.intranet.bs.ch/JSD/Digital/roadmapapp'     // Production URL (ohne -u)
     : 'https://spi-u.intranet.bs.ch/JSD/QMServices/Roadmap/roadmapapp'; // Development URL (mit -u)
   

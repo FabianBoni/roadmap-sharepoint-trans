@@ -2,8 +2,8 @@ import Document, { Html, Head, Main, NextScript } from 'next/document';
 
 class MyDocument extends Document {
   render() {
-    // Conditional base path for favicon
-    const basePath = process.env.NODE_ENV === 'production' 
+    // Use custom deployment environment variable instead of NODE_ENV
+    const basePath = process.env.NEXT_PUBLIC_DEPLOYMENT_ENV === 'production' 
       ? '/JSD/Digital/roadmapapp' 
       : '/JSD/QMServices/Roadmap/roadmapapp';
 

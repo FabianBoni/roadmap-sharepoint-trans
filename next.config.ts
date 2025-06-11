@@ -6,10 +6,10 @@ const nextConfig = {
     unoptimized: true,       // Required for static export
   },
   trailingSlash: true,       // Makes SharePoint paths work better
-  basePath: process.env.NODE_ENV === 'production' 
+  basePath: process.env.NEXT_PUBLIC_DEPLOYMENT_ENV === 'production' 
     ? '/JSD/Digital/roadmapapp'           // Production URL
     : '/JSD/QMServices/Roadmap/roadmapapp', // Development URL
-  assetPrefix: process.env.NODE_ENV === 'production' 
+  assetPrefix: process.env.NEXT_PUBLIC_DEPLOYMENT_ENV === 'production' 
     ? '/JSD/Digital/roadmapapp'           // Production Asset URLs
     : '/JSD/QMServices/Roadmap/roadmapapp', // Development Asset URLs
 }
