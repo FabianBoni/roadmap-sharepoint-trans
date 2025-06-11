@@ -18,7 +18,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
   const [displayedProjects, setDisplayedProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeCategories, setActiveCategories] = useState<string[]>([]);  const [hoveredProject, setHoveredProject] = useState<Project | null>(null);  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [activeCategories, setActiveCategories] = useState<string[]>([]); const [hoveredProject, setHoveredProject] = useState<Project | null>(null); const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [viewType, setViewType] = useState<'quarters' | 'months' | 'weeks'>('quarters');
   const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
   const [siteTitle, setSiteTitle] = useState('IT + Digital Roadmap');
@@ -103,7 +103,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
       } catch (error) {
         console.error('Error fetching categories:', error);
       }
-    };    fetchCategories();
+    }; fetchCategories();
   }, [currentYear, initialProjects, getYearFromISOString]);
 
   // Debugging-Ausgaben
@@ -111,7 +111,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
     console.log('Initial projects:', initialProjects);
     console.log('Displayed projects:', displayedProjects);
     console.log('Active categories:', activeCategories);
-  }, [initialProjects, displayedProjects, activeCategories]);  const toggleCategory = (categoryId: string) => {
+  }, [initialProjects, displayedProjects, activeCategories]); const toggleCategory = (categoryId: string) => {
     if (activeCategories.includes(categoryId)) {
       setActiveCategories(activeCategories.filter(id => id !== categoryId));
     } else {
@@ -135,41 +135,41 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
 
     // Priorität Filter
     if (filters.priority.length > 0) {
-      filtered = filtered.filter(project => 
+      filtered = filtered.filter(project =>
         project.priority && filters.priority.includes(project.priority)
       );
     }
 
     // Tags Filter
     if (filters.tags.length > 0) {
-      filtered = filtered.filter(project => 
+      filtered = filtered.filter(project =>
         project.tags && project.tags.some(tag => filters.tags.includes(tag))
       );
     }
 
     // Projektleitung Filter
     if (filters.projektleitung.length > 0) {
-      filtered = filtered.filter(project => 
+      filtered = filtered.filter(project =>
         filters.projektleitung.includes(project.projektleitung)
       );
     }
 
     // Fortschritt Filter
     if (filters.fortschrittRange[0] > 0 || filters.fortschrittRange[1] < 100) {
-      filtered = filtered.filter(project => 
-        project.fortschritt >= filters.fortschrittRange[0] && 
+      filtered = filtered.filter(project =>
+        project.fortschritt >= filters.fortschrittRange[0] &&
         project.fortschritt <= filters.fortschrittRange[1]
       );
     }
 
     // Datumsbereich Filter
     if (filters.dateRange.start) {
-      filtered = filtered.filter(project => 
+      filtered = filtered.filter(project =>
         new Date(project.startDate) >= new Date(filters.dateRange.start)
       );
     }
     if (filters.dateRange.end) {
-      filtered = filtered.filter(project => 
+      filtered = filtered.filter(project =>
         new Date(project.endDate) <= new Date(filters.dateRange.end)
       );
     }
@@ -207,7 +207,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   // Gruppiere Projekte nach Kategorien für bessere Übersichtlichkeit
   const getGroupedProjects = () => {
     const grouped: { [categoryId: string]: { category: Category; projects: Project[] } } = {};
-    
+
     filteredProjects.forEach(project => {
       if (!grouped[project.category]) {
         const category = categories.find(cat => cat.id === project.category);
@@ -511,6 +511,20 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
               onToggleCategory={toggleCategory}
             />
           </div>          {/* Main content area */}
+          {/* Erweiterte Filter unterhalb der Timeline */}
+          <div className="mt-8 pt-6 px-4 md:px-8 lg:px-20">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-white mb-2">Filter & Suchoptionen</h3>
+              <p className="text-sm text-gray-400">Verwenden Sie die Filter unten, um spezifische Projekte zu finden.</p>
+            </div>
+            <RoadmapFilters
+              projects={displayedProjects}
+              categories={categories}
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
+              onClearFilters={handleClearFilters}
+            />
+          </div>
           <div className="flex-1 overflow-hidden">
             {displayMode === 'timeline' ? (
               // Timeline-Ansicht
@@ -547,7 +561,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                   ) : viewType === 'months' ? (
                     <div className="grid grid-cols-12 gap-1 md:gap-2 mb-4 md:mb-6">
                       {['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'].map((month, index) => (
-                        <div 
+                        <div
                           key={month}
                           className={`p-1 md:p-2 rounded-lg text-center font-semibold text-xs ${compactMode ? 'py-0.5' : ''}`}
                           style={{ background: `linear-gradient(to right, hsl(${40 - index * 2}, 90%, 50%), hsl(${35 - index * 2}, 90%, 45%))` }}
@@ -588,7 +602,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                             {projects.length} Projekt{projects.length !== 1 ? 'e' : ''}
                           </span>
                         </div>
-                        
+
                         {/* Projekte in dieser Kategorie */}
                         <div className={`space-y-1 ${compactMode ? 'space-y-0.5' : 'space-y-2'}`}>
                           {projects.map(project => {
@@ -634,9 +648,8 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
 
                                 {/* Project bar */}
                                 <div
-                                  className={`absolute top-0 h-full rounded-lg flex items-center cursor-pointer transition-all hover:brightness-110 hover:scale-y-110 group border border-white border-opacity-20 hover:border-opacity-60 ${
-                                    compactMode ? 'px-1 md:px-2' : 'px-2 md:px-3'
-                                  }`}
+                                  className={`absolute top-0 h-full rounded-lg flex items-center cursor-pointer transition-all hover:brightness-110 hover:scale-y-110 group border border-white border-opacity-20 hover:border-opacity-60 ${compactMode ? 'px-1 md:px-2' : 'px-2 md:px-3'
+                                    }`}
                                   style={{
                                     left: `${startPosition}%`,
                                     width: `${width}%`,
@@ -649,31 +662,28 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                                 >
                                   {/* Status indicator */}
                                   <div
-                                    className={`rounded-full mr-1 md:mr-2 flex-shrink-0 border border-white border-opacity-70 ${
-                                      compactMode ? 'h-1.5 w-1.5' : 'h-2 w-2 md:h-2.5 md:w-2.5'
-                                    }`}
+                                    className={`rounded-full mr-1 md:mr-2 flex-shrink-0 border border-white border-opacity-70 ${compactMode ? 'h-1.5 w-1.5' : 'h-2 w-2 md:h-2.5 md:w-2.5'
+                                      }`}
                                     style={{ backgroundColor: getStatusColor(project.status) }}
                                   />
 
                                   {/* Priority indicator */}
                                   {project.priority && (
                                     <div
-                                      className={`rounded-full mr-1 flex-shrink-0 border border-white border-opacity-70 ${
-                                        compactMode ? 'h-1.5 w-1.5' : 'h-2 w-2'
-                                      }`}
-                                      style={{ 
-                                        backgroundColor: project.priority === 'critical' ? '#DC2626' : 
-                                                        project.priority === 'high' ? '#EA580C' : 
-                                                        project.priority === 'medium' ? '#D97706' : '#65A30D' 
+                                      className={`rounded-full mr-1 flex-shrink-0 border border-white border-opacity-70 ${compactMode ? 'h-1.5 w-1.5' : 'h-2 w-2'
+                                        }`}
+                                      style={{
+                                        backgroundColor: project.priority === 'critical' ? '#DC2626' :
+                                          project.priority === 'high' ? '#EA580C' :
+                                            project.priority === 'medium' ? '#D97706' : '#65A30D'
                                       }}
                                       title={`Priorität: ${project.priority}`}
                                     />
                                   )}
 
                                   {/* Project title */}
-                                  <span className={`font-medium truncate px-1 md:px-2 py-0.5 rounded bg-black bg-opacity-40 text-white group-hover:bg-opacity-60 ${
-                                    compactMode ? 'text-xs' : 'text-xs md:text-sm'
-                                  }`}>
+                                  <span className={`font-medium truncate px-1 md:px-2 py-0.5 rounded bg-black bg-opacity-40 text-white group-hover:bg-opacity-60 ${compactMode ? 'text-xs' : 'text-xs md:text-sm'
+                                    }`}>
                                     {project.title}
                                   </span>                                  {/* Tags indicator - Responsive */}
                                   {project.tags && project.tags.length > 0 && (
@@ -697,7 +707,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                                           </span>
                                         )}
                                       </div>
-                                      
+
                                       {/* Mobile: Nur Tag-Symbol mit Anzahl */}
                                       <div className="flex md:hidden items-center bg-black bg-opacity-40 px-1.5 py-0.5 rounded">
                                         <span className="text-xs text-yellow-400">🏷️</span>
@@ -721,14 +731,13 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                     ))}
                   </div>
                 </div>
-              </div>            ) : (
+              </div>) : (
               // Verbesserte Karten-Ansicht mit Tag-Support
               <div className="overflow-y-auto">
-                <div className={`grid gap-4 ${
-                  compactMode 
-                    ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' 
+                <div className={`grid gap-4 ${compactMode
+                    ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
                     : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-                }`}>
+                  }`}>
                   {filteredProjects.map(project => (
                     <div
                       key={project.id}
@@ -745,10 +754,10 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                           {project.priority && (
                             <div
                               className="w-2 h-2 rounded-full"
-                              style={{ 
-                                backgroundColor: project.priority === 'critical' ? '#DC2626' : 
-                                               project.priority === 'high' ? '#EA580C' : 
-                                               project.priority === 'medium' ? '#D97706' : '#65A30D' 
+                              style={{
+                                backgroundColor: project.priority === 'critical' ? '#DC2626' :
+                                  project.priority === 'high' ? '#EA580C' :
+                                    project.priority === 'medium' ? '#D97706' : '#65A30D'
                               }}
                               title={`Priorität: ${project.priority}`}
                             />
@@ -766,7 +775,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                       <div className="mb-3">
                         <p className="text-sm text-gray-400 mb-1">{getCategoryName(project.category)}</p>
                         <div className="flex items-center space-x-2">
-                          <span 
+                          <span
                             className="px-2 py-1 rounded-full text-xs text-white"
                             style={{ backgroundColor: getStatusColor(project.status) }}
                           >
@@ -828,7 +837,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                     </div>
                   ))}
                 </div>
-                  {/* Leerer Zustand */}
+                {/* Leerer Zustand */}
                 {filteredProjects.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                     <div className="text-6xl mb-4">📋</div>
@@ -852,37 +861,37 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
             }}
           >
             <h3 className="font-bold text-base md:text-lg mb-2 text-white">{hoveredProject.title}</h3>
-            
+
             <div className="space-y-1 text-xs md:text-sm text-gray-300">
               <p>
                 <span className="font-medium text-gray-200">Kategorie:</span> {getCategoryName(hoveredProject.category)}
               </p>
-              
+
               <p>
-                <span className="font-medium text-gray-200">Status:</span> 
+                <span className="font-medium text-gray-200">Status:</span>
                 <span className="ml-1 px-2 py-0.5 rounded text-xs" style={{ backgroundColor: getStatusColor(hoveredProject.status), color: 'white' }}>
                   {hoveredProject.status}
                 </span>
               </p>
-              
+
               {hoveredProject.priority && (
                 <p>
-                  <span className="font-medium text-gray-200">Priorität:</span> 
-                  <span className="ml-1 px-2 py-0.5 rounded text-xs" style={{ 
-                    backgroundColor: hoveredProject.priority === 'critical' ? '#DC2626' : 
-                                   hoveredProject.priority === 'high' ? '#EA580C' : 
-                                   hoveredProject.priority === 'medium' ? '#D97706' : '#65A30D',
-                    color: 'white' 
+                  <span className="font-medium text-gray-200">Priorität:</span>
+                  <span className="ml-1 px-2 py-0.5 rounded text-xs" style={{
+                    backgroundColor: hoveredProject.priority === 'critical' ? '#DC2626' :
+                      hoveredProject.priority === 'high' ? '#EA580C' :
+                        hoveredProject.priority === 'medium' ? '#D97706' : '#65A30D',
+                    color: 'white'
                   }}>
                     {hoveredProject.priority}
                   </span>
                 </p>
               )}
-              
+
               <p>
                 <span className="font-medium text-gray-200">Fortschritt:</span> {hoveredProject.fortschritt}%
               </p>
-              
+
               <p>
                 <span className="font-medium text-gray-200">Zeitraum:</span> {
                   hoveredProject.startDate && hoveredProject.endDate ?
@@ -890,11 +899,11 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                     'Kein Zeitraum definiert'
                 }
               </p>
-              
+
               <p>
                 <span className="font-medium text-gray-200">Projektleitung:</span> {hoveredProject.projektleitung}
               </p>
-              
+
               {hoveredProject.tags && hoveredProject.tags.length > 0 && (
                 <div>
                   <span className="font-medium text-gray-200">Tags:</span>
@@ -911,7 +920,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                 </div>
               )}
             </div>
-            
+
             {hoveredProject.description && (
               <div className="mt-2 pt-2 border-t border-gray-600">
                 <p className="text-xs md:text-sm text-gray-300 leading-relaxed">
@@ -919,24 +928,8 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                 </p>
               </div>
             )}
-          </div>        )}
+          </div>)}
       </div>
-
-      {/* Erweiterte Filter unterhalb der Timeline */}
-      <div className="mt-8 pt-6 px-4 md:px-8 lg:px-20">
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold text-white mb-2">Filter & Suchoptionen</h3>
-          <p className="text-sm text-gray-400">Verwenden Sie die Filter unten, um spezifische Projekte zu finden.</p>
-        </div>
-        <RoadmapFilters
-          projects={displayedProjects}
-          categories={categories}
-          filters={filters}
-          onFiltersChange={handleFiltersChange}
-          onClearFilters={handleClearFilters}
-        />
-      </div>
-
       <Footer />
     </>
   );
