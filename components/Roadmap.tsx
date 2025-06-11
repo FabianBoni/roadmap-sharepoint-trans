@@ -488,11 +488,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
             </div>
           </div>
           {/* Erweiterte Filter unterhalb der Timeline */}
-          <div className="mt-8 pt-6 px-4 md:px-8 lg:px-20">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-white mb-2">Filter & Suchoptionen</h3>
-              <p className="text-sm text-gray-400">Verwenden Sie die Filter unten, um spezifische Projekte zu finden.</p>
-            </div>
+          <div className="p-4 mb-6 pt-6 px-4 md:px-8 lg:px-20">
             <RoadmapFilters
               projects={displayedProjects}
               categories={categories}
