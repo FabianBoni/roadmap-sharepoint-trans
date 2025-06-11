@@ -18,13 +18,12 @@ class ClientDataService {
     private metadataCache: Record<string, string> = {};
     // Cache for request digest
     private requestDigestCache: { value: string; expiration: number } | null = null;    private getWebUrl(): string {
-        // Use conditional path based on environment to match next.config.ts
+        // Use conditional paths based on environment
         if (process.env.NODE_ENV === 'development') {
-            return 'https://spi.intranet.bs.ch/JSD/QMServices/Roadmap';
+            return 'https://spi-u.intranet.bs.ch/JSD/QMServices/Roadmap';
         }
 
-        // For production, try to derive from the current URL
-        // This assumes your app is deployed to the SharePoint site
+        // For production, try to derive from the current URL first
         try {
             const origin = window.location.origin;
             const pathSegments = window.location.pathname.split('/');
@@ -40,17 +39,17 @@ class ClientDataService {
                 return origin + sitePath;
             }
 
-            // Alternative: look for JSD/Digital or JSD/QMServices pattern
+            // Alternative: look for JSD pattern
             const jsdIndex = pathSegments.findIndex(segment => segment === 'JSD');
-            if (jsdIndex !== -1 && pathSegments[jsdIndex + 1]) {
-                const sitePath = pathSegments.slice(0, jsdIndex + 2).join('/');
+            if (jsdIndex !== -1 && pathSegments[jsdIndex + 1] && pathSegments[jsdIndex + 2]) {
+                const sitePath = pathSegments.slice(0, jsdIndex + 3).join('/');
                 return origin + sitePath;
             }
         } catch (error) {
             console.error('Error determining SharePoint web URL:', error);
         }
 
-        // Fallback to the production path
+        // Fallback to the production path (without -u)
         return 'https://spi.intranet.bs.ch/JSD/Digital';
     }
 

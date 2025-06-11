@@ -11,12 +11,11 @@ export const getSP = (context?: any) => {
   if (context) {
     // Use numeric value instead of enum
     return spfi().using(SPFx(context)).using(PnPLogging(2)); // 2 is LogLevel.Warning
-  }
-    // When running in standalone mode (like local dev)
-  // Use conditional path based on environment
+  }  // When running in standalone mode (like local dev)
+  // Use conditional paths: development has -u, production doesn't
   const basePath = process.env.NODE_ENV === 'production' 
-    ? 'https://spi.intranet.bs.ch/JSD/Digital/roadmapapp' 
-    : 'https://spi.intranet.bs.ch/JSD/QMServices/Roadmap/roadmapapp';
+    ? 'https://spi.intranet.bs.ch/JSD/Digital/roadmapapp'     // Production URL (ohne -u)
+    : 'https://spi-u.intranet.bs.ch/JSD/QMServices/Roadmap/roadmapapp'; // Development URL (mit -u)
   
   return spfi(basePath)
     .using(PnPLogging(2)); // 2 is LogLevel.Warning
