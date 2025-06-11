@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import RoadmapYearNavigation from './RoadmapYearNavigation';
 import { Category, Project } from '../types';
@@ -56,12 +56,11 @@ const NewRoadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
 
     loadAppTitle();
   }, []);
-
   // Helper function to extract year from ISO date string
-  const getYearFromISOString = (isoString: string): number => {
+  const getYearFromISOString = useCallback((isoString: string): number => {
     const date = new Date(isoString);
     return !isNaN(date.getTime()) ? date.getFullYear() : currentYear;
-  };
+  }, [currentYear]);
 
   // Filter projects based on year and fetch categories
   useEffect(() => {

@@ -9,6 +9,9 @@ const nextConfig = {
   basePath: process.env.NODE_ENV === 'production' 
     ? '/JSD/Digital/roadmapapp' // Adjusted to your SharePoint path
     : '/JSD/QMServices/Roadmap/roadmapapp', // Adjusted to your SharePoint path
+  assetPrefix: process.env.NODE_ENV === 'production' 
+    ? '/JSD/Digital/roadmapapp' 
+    : '/JSD/QMServices/Roadmap/roadmapapp',
 }
 
 module.exports = nextConfig

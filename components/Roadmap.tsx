@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import RoadmapYearNavigation from './RoadmapYearNavigation';
 import { Category, Project } from '../types';
@@ -55,12 +55,11 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
 
     loadAppTitle();
   }, []);
-
   // Hilfsfunktion zum Extrahieren des Jahres aus einem ISO-Datumsstring
-  const getYearFromISOString = (isoString: string): number => {
+  const getYearFromISOString = useCallback((isoString: string): number => {
     const date = new Date(isoString);
     return !isNaN(date.getTime()) ? date.getFullYear() : currentYear;
-  };
+  }, [currentYear]);
 
   // Hilfsfunktion zum Extrahieren des Quartals aus einem Datum
   const getQuarterFromDate = (date: Date): number => {

@@ -17,12 +17,10 @@ class ClientDataService {
     // Cache for list metadata types
     private metadataCache: Record<string, string> = {};
     // Cache for request digest
-    private requestDigestCache: { value: string; expiration: number } | null = null;
-
-    private getWebUrl(): string {
-        // For development/testing with a hardcoded URL that matches your environment
+    private requestDigestCache: { value: string; expiration: number } | null = null;    private getWebUrl(): string {
+        // Use conditional path based on environment to match next.config.ts
         if (process.env.NODE_ENV === 'development') {
-            return 'https://spi.intranet.bs.ch/JSD/Digital';
+            return 'https://spi.intranet.bs.ch/JSD/QMServices/Roadmap';
         }
 
         // For production, try to derive from the current URL
@@ -31,22 +29,28 @@ class ClientDataService {
             const origin = window.location.origin;
             const pathSegments = window.location.pathname.split('/');
 
-            // Find the index of 'Roadmap' in the path
+            // Find the index of 'roadmapapp' in the path
             const roadmapIndex = pathSegments.findIndex(segment =>
-                segment.toLowerCase() === 'roadmap' ||
-                segment.toLowerCase() === 'roadmap-app'
+                segment.toLowerCase() === 'roadmapapp'
             );
 
             if (roadmapIndex !== -1) {
-                // Construct the path up to and including 'Roadmap'
-                const sitePath = pathSegments.slice(0, roadmapIndex + 1).join('/');
+                // Construct the path up to (but not including) 'roadmapapp'
+                const sitePath = pathSegments.slice(0, roadmapIndex).join('/');
+                return origin + sitePath;
+            }
+
+            // Alternative: look for JSD/Digital or JSD/QMServices pattern
+            const jsdIndex = pathSegments.findIndex(segment => segment === 'JSD');
+            if (jsdIndex !== -1 && pathSegments[jsdIndex + 1]) {
+                const sitePath = pathSegments.slice(0, jsdIndex + 2).join('/');
                 return origin + sitePath;
             }
         } catch (error) {
             console.error('Error determining SharePoint web URL:', error);
         }
 
-        // Fallback to the hardcoded path
+        // Fallback to the production path
         return 'https://spi.intranet.bs.ch/JSD/Digital';
     }
 
