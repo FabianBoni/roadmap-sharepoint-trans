@@ -12,10 +12,13 @@ export const getSP = (context?: any) => {
     // Use numeric value instead of enum
     return spfi().using(SPFx(context)).using(PnPLogging(2)); // 2 is LogLevel.Warning
   }
+    // When running in standalone mode (like local dev)
+  // Use conditional path based on environment
+  const basePath = process.env.NODE_ENV === 'production' 
+    ? 'https://spi.intranet.bs.ch/JSD/Digital/roadmapapp' 
+    : 'https://spi.intranet.bs.ch/JSD/QMServices/Roadmap/roadmapapp';
   
-  // When running in standalone mode (like local dev)
-  // You'll need to update this URL to your actual SharePoint site
-  return spfi("https://spi.intranet.bs.ch/JSD/Digital/roadmapapp")
+  return spfi(basePath)
     .using(PnPLogging(2)); // 2 is LogLevel.Warning
 };
 
