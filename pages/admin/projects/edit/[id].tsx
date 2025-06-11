@@ -44,9 +44,14 @@ const EditProjectPage: React.FC = () => {
   const handleCancel = () => {
     router.push('/admin');
   };
-
   const handleSubmit = async (updatedProject: Project) => {
     try {
+      // Debug: Log the tags from the form
+      console.log('=== DEBUG Edit Page handleSubmit ===');
+      console.log('Updated project tags:', updatedProject.tags);
+      console.log('Updated project tags type:', typeof updatedProject.tags);
+      console.log('Updated project tags length:', updatedProject.tags ? updatedProject.tags.length : 'undefined');
+      
       // Create a clean object with only primitive values for SharePoint
       const projectToSave = {
         id: updatedProject.id,
@@ -60,13 +65,18 @@ const EditProjectPage: React.FC = () => {
         bisher: updatedProject.bisher || '',
         zukunft: updatedProject.zukunft || '',
         fortschritt: typeof updatedProject.fortschritt === 'number' ? updatedProject.fortschritt : 0,
-        geplante_umsetzung: updatedProject.geplante_umsetzung || '',
-        budget: updatedProject.budget || '',
+        geplante_umsetzung: updatedProject.geplante_umsetzung || '',        budget: updatedProject.budget || '',
         startDate: '',
         endDate: '',
         // Make sure ProjectFields is an array to match the Project type
-        ProjectFields: [] as string[]
+        ProjectFields: [] as string[],
+        // Add tags and priority to the save object
+        tags: updatedProject.tags || [],
+        priority: updatedProject.priority || 'medium'
       };
+
+      console.log('Tags being saved:', projectToSave.tags);
+      console.log('Priority being saved:', projectToSave.priority);
 
       // Format date fields correctly for SharePoint
       if (updatedProject.startDate) {

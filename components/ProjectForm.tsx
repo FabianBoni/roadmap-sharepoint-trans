@@ -298,9 +298,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     if (!validateForm()) {
       setIsSubmitting(false);
       return;
-    }
-
-    // Berechnen der Quartale aus den Datumsangaben
+    }    // Berechnen der Quartale aus den Datumsangaben
     let startQuarter = '';
     let endQuarter = '';
 
@@ -312,7 +310,15 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     if (endDate) {
       const quarter = Math.floor(endDate.getMonth() / 3) + 1;
       endQuarter = `Q${quarter} ${endDate.getFullYear()}`;
-    }    const projectData: Project = {
+    }
+
+    // Debug: Log the tags before creating projectData
+    console.log('=== DEBUG ProjectForm handleSubmit ===');
+    console.log('Tags from state:', tags);
+    console.log('Tags type:', typeof tags);
+    console.log('Tags length:', tags ? tags.length : 'undefined');
+
+    const projectData: Project = {
       id: initialProject?.id || '',
       title,
       description,
@@ -334,6 +340,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       tags,
       priority
     };
+
+    console.log('ProjectData tags:', projectData.tags);
+    console.log('===========================================');
 
     onSubmit(projectData);
   };
