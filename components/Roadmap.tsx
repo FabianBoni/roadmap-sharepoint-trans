@@ -485,6 +485,20 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
               onYearChange={setCurrentYear}
             />
           </div>
+          {/* Erweiterte Filter unterhalb der Timeline */}
+          <div className="mt-8 pt-6 px-4 md:px-8 lg:px-20">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-white mb-2">Filter & Suchoptionen</h3>
+              <p className="text-sm text-gray-400">Verwenden Sie die Filter unten, um spezifische Projekte zu finden.</p>
+            </div>
+            <RoadmapFilters
+              projects={displayedProjects}
+              categories={categories}
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
+              onClearFilters={handleClearFilters}
+            />
+          </div>
         </div>
 
         {/* Mobile categories toggle button */}
@@ -511,20 +525,6 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
               onToggleCategory={toggleCategory}
             />
           </div>          {/* Main content area */}
-          {/* Erweiterte Filter unterhalb der Timeline */}
-          <div className="mt-8 pt-6 px-4 md:px-8 lg:px-20">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold text-white mb-2">Filter & Suchoptionen</h3>
-              <p className="text-sm text-gray-400">Verwenden Sie die Filter unten, um spezifische Projekte zu finden.</p>
-            </div>
-            <RoadmapFilters
-              projects={displayedProjects}
-              categories={categories}
-              filters={filters}
-              onFiltersChange={handleFiltersChange}
-              onClearFilters={handleClearFilters}
-            />
-          </div>
           <div className="flex-1 overflow-hidden">
             {displayMode === 'timeline' ? (
               // Timeline-Ansicht
@@ -735,8 +735,8 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
               // Verbesserte Karten-Ansicht mit Tag-Support
               <div className="overflow-y-auto">
                 <div className={`grid gap-4 ${compactMode
-                    ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
-                    : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                  ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+                  : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
                   }`}>
                   {filteredProjects.map(project => (
                     <div
