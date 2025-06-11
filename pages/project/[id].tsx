@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import Image from 'next/image';
 import { clientDataService } from '@/utils/clientDataService';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 import { Project, TeamMember } from '@/types';
@@ -234,14 +235,15 @@ const ProjectDetailPage: React.FC = () => {
             <div className="bg-gray-800 rounded-xl border border-gray-700 p-6 shadow-md">
               <h3 className="text-xl font-bold mb-4 pb-3 border-b border-gray-700 text-white">Team</h3>
               <div className="space-y-4">
-                {/* Project Lead */}
-                {project.projektleitung && (
+                {/* Project Lead */}                {project.projektleitung && (
                   <div key='0' className="bg-gray-700 rounded-lg p-4 flex items-center space-x-3">
                     {project.projektleitungImageUrl ? (
-                      <img
+                      <Image
                         src={project.projektleitungImageUrl}
                         alt={project.projektleitung}
-                        className="w-12 h-12 flex-shrink-0 rounded-full object-cover border border-gray-600"
+                        width={48}
+                        height={48}
+                        className="flex-shrink-0 rounded-full object-cover border border-gray-600"
                         onError={(e) => {
                           // If image fails to load, fall back to initials
                           (e.target as HTMLImageElement).style.display = 'none';
@@ -264,13 +266,14 @@ const ProjectDetailPage: React.FC = () => {
 
                 {/* Team Members */}
                 {project.teamMembers && project.teamMembers.length > 0 ? (
-                  project.teamMembers.map((teamMember: TeamMember, index: number) => (
-                    <div key={index} className="bg-gray-700 rounded-lg p-4 flex items-center space-x-3">
+                  project.teamMembers.map((teamMember: TeamMember, index: number) => (                    <div key={index} className="bg-gray-700 rounded-lg p-4 flex items-center space-x-3">
                       {teamMember.imageUrl ? (
-                        <img
+                        <Image
                           src={teamMember.imageUrl}
                           alt={teamMember.name}
-                          className="w-12 h-12 flex-shrink-0 rounded-full object-cover border border-gray-600"
+                          width={48}
+                          height={48}
+                          className="flex-shrink-0 rounded-full object-cover border border-gray-600"
                           onError={(e) => {
                             // If image fails to load, fall back to initials
                             (e.target as HTMLImageElement).style.display = 'none';

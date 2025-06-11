@@ -16,35 +16,32 @@ const TeamMemberSearch: React.FC<TeamMemberSearchProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<TeamMember[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-
   // Debounced search function
   const debouncedSearch = useCallback(
-    (() => {
+    (query: string) => {
       let timeout: NodeJS.Timeout | null = null;
       
-      return (query: string) => {
-        if (timeout) clearTimeout(timeout);
-        
-        if (!query.trim()) {
-          setSearchResults([]);
+      if (timeout) clearTimeout(timeout);
+      
+      if (!query.trim()) {
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
+      }
+      
+      setIsSearching(true);
+      timeout = setTimeout(async () => {
+        try {
+          const results = await clientDataService.searchUsers(query);
+          setSearchResults(results);
+        } catch (error) {
+          console.error('Error searching for users:', error);
+        } finally {
           setIsSearching(false);
-          return;
         }
-        
-        setIsSearching(true);
-        timeout = setTimeout(async () => {
-          try {
-            const results = await clientDataService.searchUsers(query);
-            setSearchResults(results);
-          } catch (error) {
-            console.error('Error searching for users:', error);
-          } finally {
-            setIsSearching(false);
-          }
-        }, 300);
-      };
-    })(),
-    []
+      }, 300);
+    },
+    [setSearchResults, setIsSearching]
   );
 
   // Auto-search when query changes

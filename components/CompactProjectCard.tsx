@@ -1,10 +1,9 @@
 import React from 'react';
 import { Project } from '../types';
-import { FaUser, FaClock, FaFlag, FaTag } from 'react-icons/fa';
+import { FaUser, FaClock, FaTag } from 'react-icons/fa';
 
 interface CompactProjectCardProps {
   project: Project;
-  categoryColor: string;
   categoryName: string;
   onMouseOver: (e: React.MouseEvent, project: Project) => void;
   onMouseLeave: () => void;
@@ -13,7 +12,6 @@ interface CompactProjectCardProps {
 
 const CompactProjectCard: React.FC<CompactProjectCardProps> = ({
   project,
-  categoryColor,
   categoryName,
   onMouseOver,
   onMouseLeave,

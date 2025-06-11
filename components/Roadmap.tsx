@@ -5,7 +5,7 @@ import { Category, Project } from '../types';
 import { clientDataService } from '../utils/clientDataService';
 import Footer from './Footer';
 import CategorySidebar from './CategorySidebar';
-import { FaBars, FaTimes, FaThLarge, FaList, FaCompressArrowsAlt } from 'react-icons/fa';
+import { FaBars, FaTimes, FaThLarge, FaList } from 'react-icons/fa';
 import Nav from './Nav';
 
 interface RoadmapProps {
@@ -18,14 +18,12 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   const [displayedProjects, setDisplayedProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategories, setActiveCategories] = useState<string[]>([]);
-  const [hoveredProject, setHoveredProject] = useState<Project | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [hoveredProject, setHoveredProject] = useState<Project | null>(null);  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [viewType, setViewType] = useState<'quarters' | 'months' | 'weeks'>('quarters');
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
   const [siteTitle, setSiteTitle] = useState('IT + Digital Roadmap');
   // Tag-System als Standard-Feature (vereinfacht)
-  const [compactMode, setCompactMode] = useState(true);
+  const [compactMode] = useState(true);
   const [displayMode, setDisplayMode] = useState<'timeline' | 'cards'>('timeline');
 
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -95,10 +93,8 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
       } catch (error) {
         console.error('Error fetching categories:', error);
       }
-    };
-
-    fetchCategories();
-  }, [currentYear, initialProjects]);
+    };    fetchCategories();
+  }, [currentYear, initialProjects, getYearFromISOString]);
 
   // Debugging-Ausgaben
   useEffect(() => {

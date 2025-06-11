@@ -86,10 +86,8 @@ const NewRoadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
       } catch (error) {
         console.error('Error fetching categories:', error);
       }
-    };
-
-    fetchCategories();
-  }, [currentYear, initialProjects]);
+    };    fetchCategories();
+  }, [currentYear, initialProjects, getYearFromISOString]);
 
   // Tag management functions
   const getAllAvailableTags = (): string[] => {
@@ -140,17 +138,10 @@ const NewRoadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   };
 
   const filteredProjects = getFilteredProjects();
-
   // Get category name by ID
   const getCategoryName = (categoryId: string) => {
     const category = categories.find(cat => cat.id === categoryId);
     return category?.name || 'Uncategorized';
-  };
-
-  // Get category color by ID
-  const getCategoryColor = (categoryId: string) => {
-    const category = categories.find(cat => cat.id === categoryId);
-    return category?.color || '#777777';
   };
 
   // Handle mouse events

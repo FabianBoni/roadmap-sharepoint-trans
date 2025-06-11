@@ -57,10 +57,9 @@ const ViewControls: React.FC<ViewControlsProps> = ({
           <label className="block text-xs font-medium text-gray-700 mb-2">
             <FaSortAmountDown className="inline mr-1" />
             Sortierung
-          </label>
-          <select
+          </label>          <select
             value={sortBy}
-            onChange={(e) => onSortChange(e.target.value as any)}
+            onChange={(e) => onSortChange(e.target.value as 'priority' | 'status' | 'startDate' | 'title')}
             className="w-full px-3 py-2 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
             <option value="priority">Priorität</option>
