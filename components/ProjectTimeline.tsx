@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
 interface Project {
@@ -61,12 +61,18 @@ const projectsOverlap = (p1: Project, p2: Project): boolean => {
 
 const ProjectTimeline: React.FC<ProjectTimelineProps> = ({ projects, categories }) => {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   
   // State for custom tooltip
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
+
+  // Ensure component is mounted before using router
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Sort projects by start date and then by duration (longer projects first)
   const sortedProjects = [...projects].sort((a, b) => {
@@ -92,9 +98,10 @@ const ProjectTimeline: React.FC<ProjectTimelineProps> = ({ projects, categories 
     
     projectsWithRows.push({ project, row });
   });
-
   const handleProjectClick = (projectId: string) => {
-    router.push(`/project/${projectId}`);
+    if (mounted) {
+      router.push(`/project/${projectId}`);
+    }
   };
 
   const handleMouseEnter = (e: React.MouseEvent, project: Project, category: Category | undefined) => {

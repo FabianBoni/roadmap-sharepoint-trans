@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Footer from './Footer';
@@ -9,8 +9,15 @@ interface DocsLayoutProps {
 
 const DocsLayout: React.FC<DocsLayoutProps> = ({ children }) => {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  // Ensure component is mounted before using router
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const isActive = (path: string) => {
+    if (!mounted) return 'text-gray-300 hover:text-white'; // Default style during SSR
     return router.pathname.startsWith(path) ? 'text-blue-400 font-medium' : 'text-gray-300 hover:text-white';
   };
 

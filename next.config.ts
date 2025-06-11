@@ -1,7 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'export',          // For static export to SharePoint
+  // Only use export for production builds
+  ...(process.env.NODE_ENV === 'production' && {
+    output: 'export',          // For static export to SharePoint
+  }),
   images: {
     unoptimized: true,       // Required for static export
   },

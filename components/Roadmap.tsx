@@ -5,6 +5,7 @@ import { Category, Project } from '../types';
 import { clientDataService } from '../utils/clientDataService';
 import Footer from './Footer';
 import CategorySidebar from './CategorySidebar';
+import RoadmapFilters, { FilterState } from './RoadmapFilters';
 import { FaBars, FaTimes, FaThLarge, FaList } from 'react-icons/fa';
 import Nav from './Nav';
 
@@ -17,14 +18,24 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
   const [displayedProjects, setDisplayedProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeCategories, setActiveCategories] = useState<string[]>([]);
-  const [hoveredProject, setHoveredProject] = useState<Project | null>(null);  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [activeCategories, setActiveCategories] = useState<string[]>([]);  const [hoveredProject, setHoveredProject] = useState<Project | null>(null);  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [viewType, setViewType] = useState<'quarters' | 'months' | 'weeks'>('quarters');
   const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
   const [siteTitle, setSiteTitle] = useState('IT + Digital Roadmap');
   // Tag-System als Standard-Feature (vereinfacht)
   const [compactMode] = useState(true);
   const [displayMode, setDisplayMode] = useState<'timeline' | 'cards'>('timeline');
+
+  // Filter state für erweiterte Filter
+  const [filters, setFilters] = useState<FilterState>({
+    status: [],
+    priority: [],
+    tags: [],
+    categories: [],
+    projektleitung: [],
+    fortschrittRange: [0, 100],
+    dateRange: { start: '', end: '' }
+  });
 
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -106,13 +117,62 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
     } else {
       setActiveCategories([...activeCategories, categoryId]);
     }
-  };
-  // Vereinfachte Projektfilterung
+  };  // Erweiterte Projektfilterung mit RoadmapFilters
   const getFilteredProjects = (): Project[] => {
     let filtered = displayedProjects;
 
-    // Filter nach Kategorien
-    filtered = filtered.filter(project => activeCategories.includes(project.category));
+    // Filter nach Kategorien (sowohl Sidebar als auch erweiterte Filter)
+    const allActiveCategories = [...new Set([...activeCategories, ...filters.categories])];
+    if (allActiveCategories.length > 0) {
+      filtered = filtered.filter(project => allActiveCategories.includes(project.category));
+    }
+
+    // Erweiterte Filter
+    // Status Filter
+    if (filters.status.length > 0) {
+      filtered = filtered.filter(project => filters.status.includes(project.status));
+    }
+
+    // Priorität Filter
+    if (filters.priority.length > 0) {
+      filtered = filtered.filter(project => 
+        project.priority && filters.priority.includes(project.priority)
+      );
+    }
+
+    // Tags Filter
+    if (filters.tags.length > 0) {
+      filtered = filtered.filter(project => 
+        project.tags && project.tags.some(tag => filters.tags.includes(tag))
+      );
+    }
+
+    // Projektleitung Filter
+    if (filters.projektleitung.length > 0) {
+      filtered = filtered.filter(project => 
+        filters.projektleitung.includes(project.projektleitung)
+      );
+    }
+
+    // Fortschritt Filter
+    if (filters.fortschrittRange[0] > 0 || filters.fortschrittRange[1] < 100) {
+      filtered = filtered.filter(project => 
+        project.fortschritt >= filters.fortschrittRange[0] && 
+        project.fortschritt <= filters.fortschrittRange[1]
+      );
+    }
+
+    // Datumsbereich Filter
+    if (filters.dateRange.start) {
+      filtered = filtered.filter(project => 
+        new Date(project.startDate) >= new Date(filters.dateRange.start)
+      );
+    }
+    if (filters.dateRange.end) {
+      filtered = filtered.filter(project => 
+        new Date(project.endDate) <= new Date(filters.dateRange.end)
+      );
+    }
 
     return filtered;
   };
@@ -124,9 +184,25 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
       return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
     });
   };
-
   // Hauptfilter-Pipeline
   const filteredProjects = getSortedProjects(getFilteredProjects());
+
+  // Filter-Handler-Funktionen
+  const handleFiltersChange = (newFilters: FilterState) => {
+    setFilters(newFilters);
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      status: [],
+      priority: [],
+      tags: [],
+      categories: [],
+      projektleitung: [],
+      fortschrittRange: [0, 100],
+      dateRange: { start: '', end: '' }
+    });
+  };
 
   // Gruppiere Projekte nach Kategorien für bessere Übersichtlichkeit
   const getGroupedProjects = () => {
@@ -178,7 +254,6 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
     const category = categories.find(cat => cat.id === categoryId);
     return category?.color || '#777777';
   };
-
   // Get status color
   const getStatusColor = (status: string): string => {
     switch (status.toLowerCase()) {
@@ -189,6 +264,27 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
       case 'cancelled': return '#EF4444'; // red-500
       default: return '#6B7280'; // gray-500
     }
+  };
+
+  // Get tag color - consistent with other components
+  const getTagColor = (tag: string): string => {
+    const tagColors: { [key: string]: string } = {
+      'RPA': '#6366F1',
+      'M365': '#0F766E',
+      'Lifecycle': '#7C3AED',
+      'Bauprojekt': '#DC2626',
+      'KI/AI': '#059669',
+      'Cloud': '#2563EB',
+      'Security': '#DC2626',
+      'Integration': '#EA580C',
+      'Mobile': '#7C2D12',
+      'Analytics': '#1F2937',
+      'Infrastructure': '#0891B2',
+      'Automatisierung': '#16A34A',
+      'Compliance': '#B91C1C',
+      'Training': '#CA8A04'
+    };
+    return tagColors[tag] || '#6B7280';
   };
 
   // Handle mouse over for project tooltip
@@ -579,14 +675,34 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                                     compactMode ? 'text-xs' : 'text-xs md:text-sm'
                                   }`}>
                                     {project.title}
-                                  </span>
-
-                                  {/* Tags indicator */}
+                                  </span>                                  {/* Tags indicator - Responsive */}
                                   {project.tags && project.tags.length > 0 && (
-                                    <div className="ml-auto mr-1 flex items-center">
-                                      <span className="text-xs bg-black bg-opacity-40 px-1 rounded">
-                                        🏷️ {project.tags.length}
-                                      </span>
+                                    <div className="ml-auto mr-1 flex items-center">                                      {/* Desktop: Zeige erste 2 Tags */}
+                                      <div className="hidden md:flex items-center space-x-1">
+                                        {project.tags.slice(0, 2).map(tag => (
+                                          <span
+                                            key={tag}
+                                            className="px-1.5 py-0.5 rounded-full text-xs font-medium text-white border border-white border-opacity-30"
+                                            style={{
+                                              backgroundColor: getTagColor(tag),
+                                              filter: 'brightness(0.9)'
+                                            }}
+                                          >
+                                            {tag}
+                                          </span>
+                                        ))}
+                                        {project.tags.length > 2 && (
+                                          <span className="px-1.5 py-0.5 rounded-full text-xs bg-gray-600 text-white">
+                                            +{project.tags.length - 2}
+                                          </span>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Mobile: Nur Tag-Symbol mit Anzahl */}
+                                      <div className="flex md:hidden items-center bg-black bg-opacity-40 px-1.5 py-0.5 rounded">
+                                        <span className="text-xs text-yellow-400">🏷️</span>
+                                        <span className="text-xs text-white ml-1">{project.tags.length}</span>
+                                      </div>
                                     </div>
                                   )}
 
@@ -803,9 +919,24 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                 </p>
               </div>
             )}
-          </div>
-        )}
+          </div>        )}
       </div>
+
+      {/* Erweiterte Filter unterhalb der Timeline */}
+      <div className="mt-8 pt-6 px-4 md:px-8 lg:px-20">
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-white mb-2">Filter & Suchoptionen</h3>
+          <p className="text-sm text-gray-400">Verwenden Sie die Filter unten, um spezifische Projekte zu finden.</p>
+        </div>
+        <RoadmapFilters
+          projects={displayedProjects}
+          categories={categories}
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+          onClearFilters={handleClearFilters}
+        />
+      </div>
+
       <Footer />
     </>
   );
