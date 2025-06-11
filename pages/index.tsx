@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import Roadmap from '../components/Roadmap';
 import { clientDataService } from '../utils/clientDataService';
-import { Project } from '../types'; // Import the Project interface
-import { Triangle } from 'react-loader-spinner'
+import { Project } from '../types';
+import { Triangle } from 'react-loader-spinner';
 
 const HomePage: React.FC = () => {
-  // Properly type the state as Project[]
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 

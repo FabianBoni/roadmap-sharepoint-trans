@@ -3,12 +3,9 @@ import { useRouter } from 'next/router';
 import RoadmapYearNavigation from './RoadmapYearNavigation';
 import { Category, Project } from '../types';
 import { clientDataService } from '../utils/clientDataService';
-import CategorySidebar from './CategorySidebar';
 import Footer from './Footer';
-import TagFilter from './TagFilter';
-import ViewControls from './ViewControls';
-import CompactProjectCard from './CompactProjectCard';
-import { FaBars, FaTimes, FaThLarge, FaList } from 'react-icons/fa';
+import CategorySidebar from './CategorySidebar';
+import { FaBars, FaTimes, FaThLarge, FaList, FaCompressArrowsAlt } from 'react-icons/fa';
 import Nav from './Nav';
 
 interface RoadmapProps {
@@ -24,14 +21,11 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   const [hoveredProject, setHoveredProject] = useState<Project | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [viewType, setViewType] = useState<'quarters' | 'months' | 'weeks'>('quarters');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
   const [siteTitle, setSiteTitle] = useState('IT + Digital Roadmap');
-  
-  // Neue State-Variablen für erweiterte Features
-  const [viewMode, setViewMode] = useState<'category' | 'technology'>('category');
-  const [activeTags, setActiveTags] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<'priority' | 'status' | 'startDate' | 'title'>('priority');
-  const [compactMode, setCompactMode] = useState(false);
+  // Tag-System als Standard-Feature (vereinfacht)
+  const [compactMode, setCompactMode] = useState(true);
   const [displayMode, setDisplayMode] = useState<'timeline' | 'cards'>('timeline');
 
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -111,83 +105,72 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
     console.log('Initial projects:', initialProjects);
     console.log('Displayed projects:', displayedProjects);
     console.log('Active categories:', activeCategories);
-  }, [initialProjects, displayedProjects, activeCategories]);
-  const toggleCategory = (categoryId: string) => {
+  }, [initialProjects, displayedProjects, activeCategories]);  const toggleCategory = (categoryId: string) => {
     if (activeCategories.includes(categoryId)) {
       setActiveCategories(activeCategories.filter(id => id !== categoryId));
     } else {
       setActiveCategories([...activeCategories, categoryId]);
     }
   };
-
-  // Neue Funktionen für Tag-Management
-  const getAllAvailableTags = (): string[] => {
-    const allTags = new Set<string>();
-    displayedProjects.forEach(project => {
-      if (project.tags) {
-        project.tags.forEach(tag => allTags.add(tag));
-      }
-    });
-    return Array.from(allTags).sort();
-  };
-
-  const toggleTag = (tag: string) => {
-    if (activeTags.includes(tag)) {
-      setActiveTags(activeTags.filter(t => t !== tag));
-    } else {
-      setActiveTags([...activeTags, tag]);
-    }
-  };
-
-  const clearAllTags = () => {
-    setActiveTags([]);
-  };
-
-  // Erweiterte Projektfilterung basierend auf Modus
+  // Vereinfachte Projektfilterung
   const getFilteredProjects = (): Project[] => {
     let filtered = displayedProjects;
 
-    // Filter nach Kategorien (immer aktiv)
+    // Filter nach Kategorien
     filtered = filtered.filter(project => activeCategories.includes(project.category));
-
-    // Filter nach Tags (nur wenn Technologie-Modus aktiv ist oder Tags ausgewählt sind)
-    if (viewMode === 'technology' && activeTags.length > 0) {
-      filtered = filtered.filter(project => 
-        project.tags && project.tags.some(tag => activeTags.includes(tag))
-      );
-    }
 
     return filtered;
   };
 
-  // Sortier-Logik
+  // Vereinfachte Sortier-Logik
   const getSortedProjects = (projects: Project[]): Project[] => {
     return [...projects].sort((a, b) => {
-      switch (sortBy) {
-        case 'priority': {
-          const priorityOrder = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1 };
-          const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
-          const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
-          return bPriority - aPriority; // Absteigende Reihenfolge
-        }
-        case 'status': {
-          const statusOrder = { 'in-progress': 4, 'planned': 3, 'paused': 2, 'completed': 1, 'cancelled': 0 };
-          const aStatus = statusOrder[a.status as keyof typeof statusOrder] || 0;
-          const bStatus = statusOrder[b.status as keyof typeof statusOrder] || 0;
-          return bStatus - aStatus;
-        }
-        case 'startDate':
-          return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
-        case 'title':
-          return a.title.localeCompare(b.title);
-        default:
-          return 0;
-      }
+      // Sortiere nach Startdatum
+      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
     });
   };
 
   // Hauptfilter-Pipeline
   const filteredProjects = getSortedProjects(getFilteredProjects());
+
+  // Gruppiere Projekte nach Kategorien für bessere Übersichtlichkeit
+  const getGroupedProjects = () => {
+    const grouped: { [categoryId: string]: { category: Category; projects: Project[] } } = {};
+    
+    filteredProjects.forEach(project => {
+      if (!grouped[project.category]) {
+        const category = categories.find(cat => cat.id === project.category);
+        if (category) {
+          grouped[project.category] = {
+            category,
+            projects: []
+          };
+        }
+      }
+      if (grouped[project.category]) {
+        grouped[project.category].projects.push(project);
+      }
+    });
+
+    // Sortiere Projekte innerhalb jeder Kategorie nach Priorität und Startdatum
+    Object.values(grouped).forEach(group => {
+      group.projects.sort((a, b) => {
+        // Zuerst nach Priorität (falls vorhanden)
+        if (a.priority && b.priority) {
+          const priorityOrder = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1 };
+          const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] || 0;
+          const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] || 0;
+          if (aPriority !== bPriority) {
+            return bPriority - aPriority;
+          }
+        }
+        // Dann nach Startdatum
+        return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+      });
+    });
+
+    return grouped;
+  };
 
   // Get category name by ID
   const getCategoryName = (categoryId: string) => {
@@ -380,8 +363,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
               onClick={() => setViewType('months')}
             >
               Monate
-            </button>
-            <button
+            </button>            <button
               className={`px-4 py-2 text-sm font-medium rounded-lg flex-1 md:flex-none ${viewType === 'weeks' ? 'bg-yellow-600 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
               onClick={() => setViewType('weeks')}
             >
@@ -405,37 +387,13 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
             >
               <FaThLarge />
             </button>
-          </div>
-
-          {/* Year navigation - Responsive */}
+          </div>          {/* Year navigation - Responsive */}
           <div className="w-full md:w-auto flex justify-center md:justify-end">
             <RoadmapYearNavigation
               initialYear={currentYear}
               onYearChange={setCurrentYear}
             />
           </div>
-        </div>
-
-        {/* Erweiterte Steuerelemente */}
-        <div className="px-4 md:px-10 mb-4">
-          <ViewControls
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-            sortBy={sortBy}
-            onSortChange={setSortBy}
-            compactMode={compactMode}
-            onCompactModeToggle={() => setCompactMode(!compactMode)}
-          />
-          
-          {/* Tag-Filter nur anzeigen wenn Technologie-Modus aktiv ist */}
-          {viewMode === 'technology' && (
-            <TagFilter
-              availableTags={getAllAvailableTags()}
-              activeTags={activeTags}
-              onTagToggle={toggleTag}
-              onClearTags={clearAllTags}
-            />
-          )}
         </div>
 
         {/* Mobile categories toggle button */}
@@ -524,113 +482,136 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                         </div>
                       ))}
                     </div>
-                  )}
-
-                  {/* Project timeline bars */}
-                  <div className={`space-y-2 md:space-y-4 relative ${compactMode ? 'space-y-1 md:space-y-2' : ''}`}>
-                    {filteredProjects.map(project => {
-                      // Use the appropriate position calculation based on view type
-                      const { startPosition, width } = viewType === 'quarters'
-                        ? calculateQuarterPosition(project)
-                        : viewType === 'months'
-                          ? calculateMonthPosition(project)
-                          : calculateWeekPosition(project);
-
-                      // Skip projects with invalid positions
-                      if (width <= 0) {
-                        return null;
-                      }
-
-                      return (
-                        <div
-                          key={project.id}
-                          className={`relative mb-1 md:mb-2 ${compactMode ? 'h-6 md:h-8' : 'h-8 md:h-12'}`}
-                        >
-                          {/* Background grid */}
-                          <div className="absolute top-0 left-0 right-0 h-full pointer-events-none">
-                            {viewType === 'quarters' ? (
-                              <div className="grid grid-cols-4 gap-2 md:gap-4 h-full">
-                                {Array.from({ length: 4 }, (_, i) => (
-                                  <div key={i} className="bg-gray-800 rounded-lg opacity-30"></div>
-                                ))}
-                              </div>
-                            ) : viewType === 'months' ? (
-                              <div className="grid grid-cols-12 gap-1 md:gap-2 h-full">
-                                {Array.from({ length: 12 }, (_, i) => (
-                                  <div key={i} className="bg-gray-800 rounded-lg opacity-30"></div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-52 gap-0 h-full">
-                                {Array.from({ length: 52 }, (_, i) => (
-                                  <div key={i} className="bg-gray-800 rounded-lg opacity-30"></div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Project bar */}
+                  )}                  {/* Gruppierte Project timeline bars */}
+                  <div className="space-y-6">
+                    {Object.entries(getGroupedProjects()).map(([categoryId, { category, projects }]) => (
+                      <div key={categoryId} className="space-y-2">
+                        {/* Kategorie-Header */}
+                        <div className="flex items-center space-x-3 mb-3 pt-4 border-t border-gray-700 first:border-t-0 first:pt-0">
                           <div
-                            className={`absolute top-0 h-full rounded-lg flex items-center cursor-pointer transition-all hover:brightness-110 group border border-white border-opacity-30 hover:border-opacity-70 ${
-                              compactMode ? 'px-1 md:px-2' : 'px-1 md:px-3'
-                            }`}
-                            style={{
-                              left: `${startPosition}%`,
-                              width: `${width}%`,
-                              backgroundColor: getCategoryColor(project.category),
-                              opacity: 0.85
-                            }}
-                            onMouseEnter={(e) => handleMouseOver(e, project)}
-                            onMouseLeave={handleMouseLeave}
-                            onClick={() => handleProjectClick(project.id)}
-                            onTouchStart={(e) => {
-                              const touch = e.touches[0];
-                              handleMouseOver({ clientX: touch.clientX, clientY: touch.clientY } as React.MouseEvent, project);
-                            }}
-                            onTouchEnd={() => {
-                              setTimeout(() => handleMouseLeave(), 500);
-                            }}
-                          >
-                            {/* Status indicator */}
-                            <div
-                              className={`rounded-full mr-1 md:mr-2 flex-shrink-0 border border-white border-opacity-70 ${
-                                compactMode ? 'h-1.5 w-1.5 md:h-2 md:w-2' : 'h-2 w-2 md:h-3 md:w-3'
-                              }`}
-                              style={{ backgroundColor: getStatusColor(project.status) }}
-                            />
-
-                            {/* Priority indicator */}
-                            {project.priority && (
-                              <div
-                                className={`rounded-full mr-1 flex-shrink-0 border border-white border-opacity-70 ${
-                                  compactMode ? 'h-1.5 w-1.5' : 'h-2 w-2'
-                                }`}
-                                style={{ backgroundColor: project.priority === 'critical' ? '#DC2626' : project.priority === 'high' ? '#EA580C' : '#D97706' }}
-                              />
-                            )}
-
-                            {/* Project title */}
-                            <span className={`font-medium truncate px-1 md:px-2 py-0.5 rounded bg-black bg-opacity-40 text-white group-hover:bg-opacity-60 ${
-                              compactMode ? 'text-xs' : 'text-xs md:text-sm'
-                            }`}>
-                              {project.title}
-                            </span>
-
-                            {/* Progress indicator */}
-                            {!compactMode && (
-                              <div className="ml-auto mr-2 text-xs bg-black bg-opacity-40 px-1 rounded">
-                                {project.fortschritt}%
-                              </div>
-                            )}
-                          </div>
+                            className="w-4 h-4 rounded-full"
+                            style={{ backgroundColor: category.color }}
+                          />
+                          <h3 className="text-lg font-semibold text-white">{category.name}</h3>
+                          <span className="px-2 py-1 bg-gray-700 text-gray-300 rounded-full text-xs">
+                            {projects.length} Projekt{projects.length !== 1 ? 'e' : ''}
+                          </span>
                         </div>
-                      );
-                    })}
+                        
+                        {/* Projekte in dieser Kategorie */}
+                        <div className={`space-y-1 ${compactMode ? 'space-y-0.5' : 'space-y-2'}`}>
+                          {projects.map(project => {
+                            // Use the appropriate position calculation based on view type
+                            const { startPosition, width } = viewType === 'quarters'
+                              ? calculateQuarterPosition(project)
+                              : viewType === 'months'
+                                ? calculateMonthPosition(project)
+                                : calculateWeekPosition(project);
+
+                            // Skip projects with invalid positions
+                            if (width <= 0) {
+                              return null;
+                            }
+
+                            return (
+                              <div
+                                key={project.id}
+                                className={`relative ${compactMode ? 'h-5 md:h-6' : 'h-8 md:h-10'} mb-1`}
+                              >
+                                {/* Background grid */}
+                                <div className="absolute top-0 left-0 right-0 h-full pointer-events-none opacity-20">
+                                  {viewType === 'quarters' ? (
+                                    <div className="grid grid-cols-4 gap-2 md:gap-4 h-full">
+                                      {Array.from({ length: 4 }, (_, i) => (
+                                        <div key={i} className="bg-gray-600 rounded"></div>
+                                      ))}
+                                    </div>
+                                  ) : viewType === 'months' ? (
+                                    <div className="grid grid-cols-12 gap-1 md:gap-2 h-full">
+                                      {Array.from({ length: 12 }, (_, i) => (
+                                        <div key={i} className="bg-gray-600 rounded"></div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="grid grid-cols-52 gap-0 h-full">
+                                      {Array.from({ length: 52 }, (_, i) => (
+                                        <div key={i} className="bg-gray-600"></div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Project bar */}
+                                <div
+                                  className={`absolute top-0 h-full rounded-lg flex items-center cursor-pointer transition-all hover:brightness-110 hover:scale-y-110 group border border-white border-opacity-20 hover:border-opacity-60 ${
+                                    compactMode ? 'px-1 md:px-2' : 'px-2 md:px-3'
+                                  }`}
+                                  style={{
+                                    left: `${startPosition}%`,
+                                    width: `${width}%`,
+                                    backgroundColor: category.color,
+                                    opacity: 0.9
+                                  }}
+                                  onMouseEnter={(e) => handleMouseOver(e, project)}
+                                  onMouseLeave={handleMouseLeave}
+                                  onClick={() => handleProjectClick(project.id)}
+                                >
+                                  {/* Status indicator */}
+                                  <div
+                                    className={`rounded-full mr-1 md:mr-2 flex-shrink-0 border border-white border-opacity-70 ${
+                                      compactMode ? 'h-1.5 w-1.5' : 'h-2 w-2 md:h-2.5 md:w-2.5'
+                                    }`}
+                                    style={{ backgroundColor: getStatusColor(project.status) }}
+                                  />
+
+                                  {/* Priority indicator */}
+                                  {project.priority && (
+                                    <div
+                                      className={`rounded-full mr-1 flex-shrink-0 border border-white border-opacity-70 ${
+                                        compactMode ? 'h-1.5 w-1.5' : 'h-2 w-2'
+                                      }`}
+                                      style={{ 
+                                        backgroundColor: project.priority === 'critical' ? '#DC2626' : 
+                                                        project.priority === 'high' ? '#EA580C' : 
+                                                        project.priority === 'medium' ? '#D97706' : '#65A30D' 
+                                      }}
+                                      title={`Priorität: ${project.priority}`}
+                                    />
+                                  )}
+
+                                  {/* Project title */}
+                                  <span className={`font-medium truncate px-1 md:px-2 py-0.5 rounded bg-black bg-opacity-40 text-white group-hover:bg-opacity-60 ${
+                                    compactMode ? 'text-xs' : 'text-xs md:text-sm'
+                                  }`}>
+                                    {project.title}
+                                  </span>
+
+                                  {/* Tags indicator */}
+                                  {project.tags && project.tags.length > 0 && (
+                                    <div className="ml-auto mr-1 flex items-center">
+                                      <span className="text-xs bg-black bg-opacity-40 px-1 rounded">
+                                        🏷️ {project.tags.length}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* Progress indicator */}
+                                  {!compactMode && (
+                                    <div className="ml-2 text-xs bg-black bg-opacity-40 px-1 rounded">
+                                      {project.fortschritt}%
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            ) : (
-              // Karten-Ansicht
+              </div>            ) : (
+              // Verbesserte Karten-Ansicht mit Tag-Support
               <div className="overflow-y-auto">
                 <div className={`grid gap-4 ${
                   compactMode 
@@ -638,27 +619,111 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                     : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
                 }`}>
                   {filteredProjects.map(project => (
-                    <CompactProjectCard
+                    <div
                       key={project.id}
-                      project={project}
-                      categoryColor={getCategoryColor(project.category)}
-                      categoryName={getCategoryName(project.category)}
-                      onMouseOver={handleMouseOver}
+                      className="bg-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-700 transition-all border border-gray-600 hover:border-gray-500 hover:shadow-lg"
+                      onClick={() => handleProjectClick(project.id)}
+                      onMouseOver={(e) => handleMouseOver(e, project)}
                       onMouseLeave={handleMouseLeave}
-                      onClick={handleProjectClick}
-                    />
+                    >
+                      {/* Header mit Titel und Kategorie-Indikator */}
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 className="font-medium text-white truncate flex-1 mr-2">{project.title}</h3>
+                        <div className="flex items-center space-x-1 flex-shrink-0">
+                          {/* Prioritäts-Indikator */}
+                          {project.priority && (
+                            <div
+                              className="w-2 h-2 rounded-full"
+                              style={{ 
+                                backgroundColor: project.priority === 'critical' ? '#DC2626' : 
+                                               project.priority === 'high' ? '#EA580C' : 
+                                               project.priority === 'medium' ? '#D97706' : '#65A30D' 
+                              }}
+                              title={`Priorität: ${project.priority}`}
+                            />
+                          )}
+                          {/* Kategorie-Indikator */}
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: getCategoryColor(project.category) }}
+                            title={getCategoryName(project.category)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Kategorie und Status */}
+                      <div className="mb-3">
+                        <p className="text-sm text-gray-400 mb-1">{getCategoryName(project.category)}</p>
+                        <div className="flex items-center space-x-2">
+                          <span 
+                            className="px-2 py-1 rounded-full text-xs text-white"
+                            style={{ backgroundColor: getStatusColor(project.status) }}
+                          >
+                            {project.status}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {project.fortschritt}% Complete
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Fortschrittsbalken */}
+                      <div className="mb-3">
+                        <div className="w-full bg-gray-700 rounded-full h-2">
+                          <div
+                            className="h-2 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${project.fortschritt}%`,
+                              backgroundColor: getStatusColor(project.status)
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Tags */}
+                      {project.tags && project.tags.length > 0 && (
+                        <div className="mb-3">
+                          <div className="flex flex-wrap gap-1">
+                            {project.tags.slice(0, 3).map(tag => (
+                              <span
+                                key={tag}
+                                className="px-2 py-1 bg-blue-600 text-white rounded-full text-xs"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                            {project.tags.length > 3 && (
+                              <span className="px-2 py-1 bg-gray-600 text-gray-300 rounded-full text-xs">
+                                +{project.tags.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Footer mit Zeitraum und Projektleitung */}
+                      <div className="text-xs text-gray-500 border-t border-gray-700 pt-2">
+                        <p className="mb-1">
+                          <span className="font-medium">Leitung:</span> {project.projektleitung}
+                        </p>
+                        {project.startDate && project.endDate && (
+                          <p>
+                            <span className="font-medium">Zeitraum:</span>{' '}
+                            {new Date(project.startDate).toLocaleDateString('de-DE', { month: 'short', year: '2-digit' })} - {' '}
+                            {new Date(project.endDate).toLocaleDateString('de-DE', { month: 'short', year: '2-digit' })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
-                
-                {/* Leerer Zustand */}
+                  {/* Leerer Zustand */}
                 {filteredProjects.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                     <div className="text-6xl mb-4">📋</div>
                     <h3 className="text-lg font-medium mb-2">Keine Projekte gefunden</h3>
                     <p className="text-sm text-center">
-                      {viewMode === 'technology' && activeTags.length > 0
-                        ? 'Keine Projekte mit den ausgewählten Tags gefunden.'
-                        : 'Keine Projekte für die ausgewählten Filter gefunden.'}
+                      Keine Projekte für die ausgewählten Filter gefunden.
                     </p>
                   </div>
                 )}
