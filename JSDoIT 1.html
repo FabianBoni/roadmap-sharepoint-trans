@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>JSDoIT – Feinerer Cursor</title>
+  <style>
+    body {
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .logo {
+      display: inline-block;
+      font-family: 'Courier New', monospace;
+      font-size: 4rem;
+      font-weight: bold;
+      white-space: nowrap;
+      overflow: hidden;
+      border-right: 1px solid #fff;    /* feinerer Cursor */
+      width: 6ch;
+      animation:
+        typing 3s steps(6) forwards,
+        blink 0.75s step-end infinite;
+    }
+
+    @keyframes typing {
+      from { width: 0ch; }
+      to   { width: 6ch; }
+    }
+    @keyframes blink {
+      50% { border-color: transparent; }
+    }
+
+    .js { color: #ffffff; }
+    .do { color: #f5c000; }
+    .it { color: #00bfff; }
+  </style>
+</head>
+<body>
+
+  <div class="logo">
+    <span class="js">JS</span><span class="do">Do</span><span class="it">IT</span>
+  </div>
+
+</body>
+</html>
