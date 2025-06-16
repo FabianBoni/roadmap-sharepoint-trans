@@ -11,17 +11,16 @@ const nextConfig = {
     : '/JSD/QMServices/Roadmap/roadmapapp', // Development URL
   assetPrefix: process.env.NEXT_PUBLIC_DEPLOYMENT_ENV === 'production' 
     ? '/JSD/Digital/roadmapapp'           // Production Asset URLs
-    : '/JSD/QMServices/Roadmap/roadmapapp', // Development Asset URLs  // Exclude dynamic routes from static generation
+    : '/JSD/QMServices/Roadmap/roadmapapp', // Development Asset URLs  // For static export, we need to pre-generate all possible project pages
   exportPathMap: async function (
     defaultPathMap: any,
     { dev, dir, outDir, distDir, buildId }: any
   ) {
-    // Remove dynamic routes from the path map for static export
     const pathMap = { ...defaultPathMap };
     
-    // Remove any dynamic routes that would cause build issues
+    // Remove admin dynamic routes but keep project routes for fallback behavior
     Object.keys(pathMap).forEach((path) => {
-      if (path.includes('[') && path.includes(']')) {
+      if (path.includes('[') && path.includes(']') && path.includes('/admin/')) {
         delete pathMap[path];
       }
     });

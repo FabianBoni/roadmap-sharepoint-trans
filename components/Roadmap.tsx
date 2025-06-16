@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import RoadmapYearNavigation from './RoadmapYearNavigation';
 import { Category, Project } from '../types';
 import { clientDataService } from '../utils/clientDataService';
@@ -13,6 +14,7 @@ interface RoadmapProps {
 }
 
 const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
+  const router = useRouter();
   const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
   const [displayedProjects, setDisplayedProjects] = useState<Project[]>([]);  const [categories, setCategories] = useState<Category[]>([]);
   const [activeCategories, setActiveCategories] = useState<string[]>([]); 
@@ -21,8 +23,6 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
   const [viewType, setViewType] = useState<'quarters' | 'months' | 'weeks'>('quarters');
   const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
   const [siteTitle, setSiteTitle] = useState('IT + Digital Roadmap');
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
   // Tag-System als Standard-Feature (vereinfacht)
   const [compactMode] = useState(true);
   const [displayMode, setDisplayMode] = useState<'timeline' | 'cards'>('timeline');
@@ -299,21 +299,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
     setHoveredProject(null);
   };  // Handle clicks on projects
   const handleProjectClick = (projectId: string) => {
-    const project = displayedProjects.find(p => p.id === projectId);
-    if (project) {
-      setSelectedProject(project);
-      setModalOpen(true);
-    }
-  };
-
-  // Helper function for modal
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('de-DE', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+    router.push(`/project/${projectId}`);
   };
 
   // Calculate position for quarter view
@@ -948,115 +934,6 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
               </div>
             )}          </div>)}
       </div>
-      
-      {/* Project Detail Modal */}
-      {modalOpen && selectedProject && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-gray-800 p-6 border-b border-gray-700 flex justify-between items-start">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-2">{selectedProject.title}</h2>
-                <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(selectedProject.status)}`}>
-                  {getStatusText(selectedProject.status)}
-                </span>
-              </div>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="text-gray-400 hover:text-white text-2xl p-2"
-              >
-                ×
-              </button>
-            </div>
-            
-            {/* Modal Content */}
-            <div className="p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left Column */}
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-3">Beschreibung</h3>
-                    <p className="text-gray-300">{selectedProject.description}</p>
-                  </div>
-                  
-                  {selectedProject.bisher && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-white mb-3">Bisher</h3>
-                      <p className="text-gray-300">{selectedProject.bisher}</p>
-                    </div>
-                  )}
-                  
-                  {selectedProject.zukunft && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-white mb-3">In Zukunft</h3>
-                      <p className="text-gray-300">{selectedProject.zukunft}</p>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Right Column */}
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-3">Projektdetails</h3>
-                    <div className="space-y-2 text-gray-300">
-                      <p><strong>Zeitraum:</strong> {formatDate(selectedProject.startDate)} bis {formatDate(selectedProject.endDate)}</p>
-                      {selectedProject.priority && (
-                        <p><strong>Priorität:</strong> {selectedProject.priority}</p>
-                      )}
-                      {selectedProject.projektleitung && (
-                        <p><strong>Projektleitung:</strong> {selectedProject.projektleitung}</p>
-                      )}
-                      {selectedProject.fortschritt !== undefined && (
-                        <p><strong>Fortschritt:</strong> {selectedProject.fortschritt}%</p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Links */}
-                  {selectedProject.links && selectedProject.links.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-white mb-3">Links</h3>
-                      <div className="space-y-2">
-                        {selectedProject.links.map((link, index) => (
-                          <a
-                            key={index}
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center text-blue-400 hover:text-blue-300 transition-colors"
-                          >
-                            {link.title || link.url}
-                            <svg className="w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                            </svg>
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Tags */}
-                  {selectedProject.tags && selectedProject.tags.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-white mb-3">Tags</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedProject.tags.map((tag, index) => (
-                          <span
-                            key={index}
-                            className="px-2 py-1 bg-blue-600 text-white text-xs rounded-full"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       
       <Footer />
     </>
