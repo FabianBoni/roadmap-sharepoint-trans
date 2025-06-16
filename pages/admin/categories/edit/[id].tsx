@@ -5,6 +5,7 @@ import { clientDataService } from '@/utils/clientDataService';
 import { toast } from 'react-toastify';
 import withAdminAuth from '@/components/withAdminAuth';
 import { Category } from '@/types';
+import JSDoITLoader from '@/components/JSDoITLoader';
 
 const EditCategoryPage: React.FC = () => {
   const router = useRouter();
@@ -42,11 +43,10 @@ const EditCategoryPage: React.FC = () => {
   const handleCancel = () => {
     router.push('/admin');
   };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
-        <div className="text-xl">Loading...</div>
+        <JSDoITLoader size="large" />
       </div>
     );
   }

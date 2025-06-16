@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Roadmap from '../components/Roadmap';
 import { clientDataService } from '../utils/clientDataService';
 import { Project } from '../types';
-import { Triangle } from 'react-loader-spinner';
+import JSDoITLoader from '../components/JSDoITLoader';
 
 const HomePage: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -22,19 +22,10 @@ const HomePage: React.FC = () => {
 
     fetchProjects();
   }, []);
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <Triangle
-          visible={true}
-          height="80"
-          width="80"
-          color="#60a5fa"
-          ariaLabel="triangle-loading"
-          wrapperStyle={{}}
-          wrapperClass=""
-        />
+        <JSDoITLoader size="large" />
       </div>
     );
   }

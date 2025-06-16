@@ -5,7 +5,7 @@ import { clientDataService } from '@/utils/clientDataService';
 import { hasAdminAccess } from '@/utils/auth';
 import withAdminAuth from '@/components/withAdminAuth';
 import { AppSettings, Category, Project } from '@/types';
-import { Triangle } from 'react-loader-spinner';
+import JSDoITLoader from '@/components/JSDoITLoader';
 
 const AdminPage: React.FC = () => {
   const router = useRouter();
@@ -183,19 +183,10 @@ const AdminPage: React.FC = () => {
     setEditingSetting(null);
     setNewSettingValue('');
   };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
-        <Triangle
-          visible={true}
-          height="80"
-          width="80"
-          color="#60a5fa"
-          ariaLabel="triangle-loading"
-          wrapperStyle={{}}
-          wrapperClass=""
-        />
+        <JSDoITLoader size="large" />
       </div>
     );
   }

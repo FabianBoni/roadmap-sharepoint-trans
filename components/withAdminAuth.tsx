@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { hasAdminAccess } from '@/utils/auth';
+import JSDoITLoader from './JSDoITLoader';
 
 // Define a generic type parameter for the component props
 export default function withAdminAuth<P extends object>(
@@ -40,11 +41,10 @@ export default function withAdminAuth<P extends object>(
       
       checkAuth();
     }, [router]);
-    
-    if (isLoading) {
+      if (isLoading) {
       return (
         <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-          <div className="text-xl">Loading...</div>
+          <JSDoITLoader size="large" />
         </div>
       );
     }

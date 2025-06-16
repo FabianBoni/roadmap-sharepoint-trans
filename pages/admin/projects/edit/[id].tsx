@@ -6,7 +6,7 @@ import ProjectForm from '../../../../components/ProjectForm';
 import withAdminAuth from '@/components/withAdminAuth';
 import { clientDataService } from '@/utils/clientDataService';
 import { Project, Category, TeamMember } from '@/types';
-import { Triangle } from 'react-loader-spinner';
+import JSDoITLoader from '@/components/JSDoITLoader';
 
 const EditProjectPage: React.FC = () => {
   const router = useRouter();
@@ -214,18 +214,9 @@ const EditProjectPage: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="bg-gray-800 rounded-lg shadow p-6">
-          {loading ? (
+        <div className="bg-gray-800 rounded-lg shadow p-6">          {loading ? (
             <div className="text-center py-8">
-              <Triangle
-                visible={true}
-                height="80"
-                width="80"
-                color="#60a5fa"
-                ariaLabel="triangle-loading"
-                wrapperStyle={{}}
-                wrapperClass=""
-              />
+              <JSDoITLoader size="medium" />
             </div>
           ) : id && typeof id === 'string' && project ? (
             <ProjectForm

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { clientDataService } from '@/utils/clientDataService';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 import { Project, TeamMember } from '@/types';
+import JSDoITLoader from '@/components/JSDoITLoader';
 
 const getStatusColor = (status: string): string => {
   switch (status) {
@@ -129,11 +130,10 @@ const ProjectDetailPage: React.FC = () => {
       console.log('Team members structure:', JSON.stringify(project.teamMembers, null, 2));
     }
   }, [project]);
-
   if (loading) {
     return (
       <div className="w-full min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <p>Loading project details...</p>
+        <JSDoITLoader size="large" />
       </div>
     );
   }
