@@ -11,8 +11,7 @@ const nextConfig = {
     : '/JSD/QMServices/Roadmap/roadmapapp', // Development URL
   assetPrefix: process.env.NEXT_PUBLIC_DEPLOYMENT_ENV === 'production' 
     ? '/JSD/Digital/roadmapapp'           // Production Asset URLs
-    : '/JSD/QMServices/Roadmap/roadmapapp', // Development Asset URLs
-  // Exclude dynamic routes from static generation
+    : '/JSD/QMServices/Roadmap/roadmapapp', // Development Asset URLs  // Exclude dynamic routes from static generation
   exportPathMap: async function (
     defaultPathMap: any,
     { dev, dir, outDir, distDir, buildId }: any
