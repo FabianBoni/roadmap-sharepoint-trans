@@ -99,9 +99,15 @@ const ProjectDetailPage: React.FC = () => {
   const { id } = router.query;
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  // Ensure component is mounted before using router
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
-    if (id) {
+    if (mounted && id) {
       setLoading(true);
       clientDataService.getProjectById(id as string)
         .then((data: { startDate: string; endDate: string } & Project | null) => {
@@ -116,7 +122,7 @@ const ProjectDetailPage: React.FC = () => {
           setLoading(false);
         });
     }
-  }, [id]);
+  }, [mounted, id]);
 
   useEffect(() => {
     if (project && project.teamMembers) {

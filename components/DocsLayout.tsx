@@ -1,6 +1,5 @@
 import React, { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
 import Footer from './Footer';
 
 interface DocsLayoutProps {
@@ -8,17 +7,18 @@ interface DocsLayoutProps {
 }
 
 const DocsLayout: React.FC<DocsLayoutProps> = ({ children }) => {
-  const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [currentPath, setCurrentPath] = useState('');
 
   // Ensure component is mounted before using router
   useEffect(() => {
     setMounted(true);
-  }, []);
-
-  const isActive = (path: string) => {
-    if (!mounted) return 'text-gray-300 hover:text-white'; // Default style during SSR
-    return router.pathname.startsWith(path) ? 'text-blue-400 font-medium' : 'text-gray-300 hover:text-white';
+    if (typeof window !== 'undefined') {
+      setCurrentPath(window.location.pathname);
+    }
+  }, []);  const isActive = (path: string) => {
+    if (!mounted || !currentPath) return 'text-gray-300 hover:text-white'; // Default style during SSR
+    return currentPath.startsWith(path) ? 'text-blue-400 font-medium' : 'text-gray-300 hover:text-white';
   };
 
   return (
@@ -42,10 +42,9 @@ const DocsLayout: React.FC<DocsLayoutProps> = ({ children }) => {
               <h3 className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-3">
                 Erste Schritte
               </h3>
-              <ul className="space-y-2">
-                <li>
+              <ul className="space-y-2">                <li>
                   <Link href="/docs/erste-schritte">
-                    <span className={`block py-1 ${isActive('/docs/pages')}`}>
+                    <span className={`block py-1 ${isActive('/docs/erste-schritte')}`}>
                       Übersicht
                     </span>
                   </Link>
@@ -71,10 +70,9 @@ const DocsLayout: React.FC<DocsLayoutProps> = ({ children }) => {
               <h3 className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-3">
                 Funktionen
               </h3>
-              <ul className="space-y-2">
-                <li>
+              <ul className="space-y-2">                <li>
                   <Link href="/docs/funktionen">
-                    <span className={`block py-1 ${isActive('/docs/funktionen/index')}`}>
+                    <span className={`block py-1 ${isActive('/docs/funktionen')}`}>
                       Übersicht
                     </span>
                   </Link>
@@ -107,10 +105,9 @@ const DocsLayout: React.FC<DocsLayoutProps> = ({ children }) => {
               <h3 className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-3">
                 API-Referenz
               </h3>
-              <ul className="space-y-2">
-                <li>
+              <ul className="space-y-2">                <li>
                   <Link href="/docs/api">
-                    <span className={`block py-1 ${isActive('/docs/api/index')}`}>
+                    <span className={`block py-1 ${isActive('/docs/api')}`}>
                       Übersicht
                     </span>
                   </Link>
@@ -143,10 +140,9 @@ const DocsLayout: React.FC<DocsLayoutProps> = ({ children }) => {
               <h3 className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-3">
                 Admin
               </h3>
-              <ul className="space-y-2">
-                <li>
+              <ul className="space-y-2">                <li>
                   <Link href="/docs/admin">
-                    <span className={`block py-1 ${isActive('/docs/admin/index')}`}>
+                    <span className={`block py-1 ${isActive('/docs/admin')}`}>
                       Übersicht
                     </span>
                   </Link>

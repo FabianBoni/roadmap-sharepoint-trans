@@ -227,6 +227,18 @@ const NewRoadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
     });
   };
 
+  // Status-Lokalisierung für deutsche Anzeige
+  const getStatusText = (status: string): string => {
+    switch (status.toLowerCase()) {
+      case 'completed': return 'Abgeschlossen';
+      case 'in-progress': return 'In Bearbeitung';
+      case 'planned': return 'Geplant';
+      case 'paused': return 'Pausiert';
+      case 'cancelled': return 'Abgebrochen';
+      default: return status;
+    }
+  };
+
   return (
     <>
       <div className="min-h-screen bg-gray-900 text-white">
@@ -338,10 +350,8 @@ const NewRoadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
               <div className="mb-4">
                 <h3 className="text-lg font-semibold text-white mb-2">Filter & Suchoptionen</h3>
                 <p className="text-sm text-gray-400">Verwenden Sie die Filter unten, um spezifische Projekte zu finden.</p>
-              </div>
-              <RoadmapFilters
+              </div>              <RoadmapFilters
                 projects={displayedProjects}
-                categories={categories}
                 filters={filters}
                 onFiltersChange={handleFiltersChange}
                 onClearFilters={handleClearFilters}
@@ -363,7 +373,7 @@ const NewRoadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
             <h3 className="font-bold text-white mb-2">{hoveredProject.title}</h3>
             <div className="text-sm text-gray-300 space-y-1">
               <p><strong>Kategorie:</strong> {getCategoryName(hoveredProject.category)}</p>
-              <p><strong>Status:</strong> {hoveredProject.status}</p>
+              <p><strong>Status:</strong> {getStatusText(hoveredProject.status)}</p>
               <p><strong>Fortschritt:</strong> {hoveredProject.fortschritt}%</p>
               <p><strong>Leitung:</strong> {hoveredProject.projektleitung}</p>
               {hoveredProject.tags && hoveredProject.tags.length > 0 && (

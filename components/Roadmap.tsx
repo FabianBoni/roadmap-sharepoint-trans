@@ -430,6 +430,18 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
     return { startPosition, width };
   };
 
+  // Status-Lokalisierung für deutsche Anzeige
+  const getStatusText = (status: string): string => {
+    switch (status.toLowerCase()) {
+      case 'completed': return 'Abgeschlossen';
+      case 'in-progress': return 'In Bearbeitung';
+      case 'planned': return 'Geplant';
+      case 'paused': return 'Pausiert';
+      case 'cancelled': return 'Abgebrochen';
+      default: return status;
+    }
+  };
+
   return (
     <>
       {/* Top Navigation Bar */}
@@ -488,10 +500,8 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
             </div>
           </div>
           {/* Erweiterte Filter unterhalb der Timeline */}
-          <div className="p-4 mb-6 pt-6 px-4 md:px-8 lg:px-20">
-            <RoadmapFilters
+          <div className="p-4 mb-6 pt-6 px-4 md:px-8 lg:px-20">            <RoadmapFilters
               projects={displayedProjects}
-              categories={categories}
               filters={filters}
               onFiltersChange={handleFiltersChange}
               onClearFilters={handleClearFilters}
@@ -690,8 +700,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                                         {project.tags.slice(0, 2).map(tag => (
                                           <span
                                             key={tag}
-                                            className="px-1.5 py-0.5 rounded-full text-xs font-medium text-white border border-white border-opacity-30"
-                                            style={{
+                                            className="px-1.5 py-0.5 rounded-full text-xs font-medium text-white border border-white border-opacity-30"                                            style={{
                                               backgroundColor: getTagColor(tag),
                                               filter: 'brightness(0.9)'
                                             }}
@@ -777,7 +786,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
                             className="px-2 py-1 rounded-full text-xs text-white"
                             style={{ backgroundColor: getStatusColor(project.status) }}
                           >
-                            {project.status}
+                            {getStatusText(project.status)}
                           </span>
                           <span className="text-xs text-gray-500">
                             {project.fortschritt}% Complete
@@ -868,7 +877,7 @@ const Roadmap: React.FC<RoadmapProps> = ({ initialProjects }) => {
               <p>
                 <span className="font-medium text-gray-200">Status:</span>
                 <span className="ml-1 px-2 py-0.5 rounded text-xs" style={{ backgroundColor: getStatusColor(hoveredProject.status), color: 'white' }}>
-                  {hoveredProject.status}
+                  {getStatusText(hoveredProject.status)}
                 </span>
               </p>
 
