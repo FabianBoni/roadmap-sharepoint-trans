@@ -2,7 +2,9 @@
   "name": "roadmap-app",
   "version": "0.1.0",
   "private": true,
-  "scripts": {    "dev": "next dev --turbopack",    "build": "next build",
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
     "build:dev": "cross-env NEXT_PUBLIC_DEPLOYMENT_ENV=development next build",
     "build:prod": "cross-env NEXT_PUBLIC_DEPLOYMENT_ENV=production next build",
     "start": "next start",
@@ -53,6 +55,7 @@
     "@types/react": "^19",
     "@types/react-beautiful-dnd": "^13.1.8",
     "@types/react-dom": "^19",
+    "cross-env": "^7.0.3",
     "eslint": "^9",
     "eslint-config-next": "15.2.0",
     "tailwindcss": "^4.0.14",
