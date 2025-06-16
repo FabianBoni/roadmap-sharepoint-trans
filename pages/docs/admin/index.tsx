@@ -1,160 +1,173 @@
 import React from 'react';
 import DocsLayout from '../../../components/DocsLayout';
+import Link from 'next/link';
 
 const AdminDocsPage: React.FC = () => {
   return (
     <DocsLayout>
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold mb-8">Admin-Anleitung</h1>
+        <h1 className="text-4xl font-bold mb-8">👨‍💼 Administrator-Leitfaden</h1>
 
         <div className="prose prose-invert max-w-none">
-          <p>
-            Diese Anleitung bietet einen umfassenden Überblick über die Administrationsfunktionen von Roadmap JSD. Als Administrator haben Sie Zugriff auf erweiterte Funktionen zur Verwaltung von Projekten, Kategorien und Feldtypen.
+          <p className="text-lg text-gray-300">
+            Als Administrator verwalten Sie die Inhalte von JSDoIT Roadmap und sorgen dafür, dass alle Benutzer 
+            aktuelle und relevante Projektinformationen erhalten.
           </p>
 
-          <h2 className="text-2xl font-bold mt-8 mb-4">Zugriff auf das Admin-Dashboard</h2>
+          <div className="bg-yellow-900/30 p-6 rounded-lg my-6">
+            <h3 className="text-lg font-semibold text-yellow-300 mb-3">⚠️ Administrator-Bereich</h3>
+            <p>
+              Dieser Bereich ist nur für Administratoren zugänglich. Sie benötigen entsprechende Anmeldedaten, 
+              um auf diese Funktionen zuzugreifen.
+            </p>
+          </div>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">Zugang zum Admin-Bereich</h2>
 
           <p>
-            Um auf das Admin-Dashboard zuzugreifen:
+            Um administrative Aufgaben durchzuführen:
           </p>
 
           <ol className="list-decimal pl-6 my-4">
-            <li>Navigieren Sie zu <code>/admin</code> in Ihrem Browser</li>
-            <li>Melden Sie sich mit Ihren Admin-Anmeldedaten an:
-              <ul className="list-disc pl-6 my-2">
-                <li>E-Mail: admin@jsd.bs.ch</li>
-                <li>Passwort: admin123</li>
+            <li>Navigieren Sie zur Admin-Anmeldung über den entsprechenden Link</li>
+            <li>Melden Sie sich mit Ihren Administrator-Anmeldedaten an</li>
+            <li>Sie gelangen automatisch zum Admin-Dashboard</li>
+          </ol>
+
+          <h2 className="text-2xl font-bold mt-8 mb-4">Hauptaufgaben als Administrator</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
+            <div className="bg-blue-900/30 p-6 rounded-lg">
+              <h3 className="text-lg font-semibold text-blue-300 mb-3">📋 Projekt-Management</h3>
+              <ul className="list-disc pl-6 space-y-2">
+                <li>Neue Projekte hinzufügen</li>
+                <li>Bestehende Projekte bearbeiten</li>
+                <li>Projektdetails aktualisieren</li>
+                <li>Projekte archivieren oder löschen</li>
               </ul>
-            </li>
-          </ol>
+            </div>
 
-          <h2 className="text-2xl font-bold mt-8 mb-4">Überblick über das Admin-Dashboard</h2>
+            <div className="bg-green-900/30 p-6 rounded-lg">
+              <h3 className="text-lg font-semibold text-green-300 mb-3">🏷️ Kategorien verwalten</h3>
+              <ul className="list-disc pl-6 space-y-2">
+                <li>Neue Kategorien erstellen</li>
+                <li>Kategorie-Namen ändern</li>
+                <li>Farben und Symbole anpassen</li>
+                <li>Kategorien organisieren</li>
+              </ul>
+            </div>
+          </div>
 
+          <h2 className="text-2xl font-bold mt-8 mb-4">Projekt-Verwaltung</h2>
+
+          <h3 className="text-xl font-bold mt-6 mb-3">📝 Projekte hinzufügen</h3>
           <p>
-            Das Admin-Dashboard ist in drei Hauptbereiche unterteilt:
+            So erstellen Sie ein neues Projekt in der Roadmap:
           </p>
-
           <ol className="list-decimal pl-6 my-4">
-            <li><strong>Projekte</strong>: Verwaltung aller Projekte im System</li>
-            <li><strong>Kategorien</strong>: Verwaltung der Projektkategorien</li>
-            <li><strong>Feldtypen</strong>: Verwaltung der benutzerdefinierten Feldtypen</li>
+            <li><strong>Grunddaten erfassen</strong>: Titel, Beschreibung und Ziele definieren</li>
+            <li><strong>Zeitraum festlegen</strong>: Start- und Endquartale bestimmen</li>
+            <li><strong>Kategorie zuweisen</strong>: Passende Kategorie für die Filterung wählen</li>
+            <li><strong>Team benennen</strong>: Verantwortliche Personen und Mitwirkende hinzufügen</li>
+            <li><strong>Status setzen</strong>: Aktuellen Projektstand angeben</li>
           </ol>
 
+          <h3 className="text-xl font-bold mt-6 mb-3">✏️ Projekte bearbeiten</h3>
           <p>
-            Sie können zwischen diesen Bereichen über die Registerkarten am oberen Rand des Dashboards wechseln.
+            Bestehende Projekte können jederzeit angepasst werden:
           </p>
-
-          <h2 className="text-2xl font-bold mt-8 mb-4">Projekte verwalten</h2>
-
-          <h3 className="text-xl font-bold mt-6 mb-3">Projekte anzeigen</h3>
-
-          <p>
-            Die Registerkarte &quot;Projekte&quot; zeigt eine Tabelle aller Projekte im System, einschließlich:
-          </p>
-
           <ul className="list-disc pl-6 my-4">
-            <li>Titel</li>
-            <li>Kategorie</li>
-            <li>Zeitplan (Start- und Endquartal)</li>
-            <li>Status</li>
+            <li><strong>Status-Updates</strong>: Projektfortschritt regelmäßig aktualisieren</li>
+            <li><strong>Zeitplan-Änderungen</strong>: Start- oder Endtermine anpassen</li>
+            <li><strong>Team-Updates</strong>: Neue Mitarbeiter hinzufügen oder entfernen</li>
+            <li><strong>Inhaltliche Überarbeitung</strong>: Beschreibungen und Ziele aktualisieren</li>
           </ul>
 
-          <h3 className="text-xl font-bold mt-6 mb-3">Ein neues Projekt erstellen</h3>
+          <h2 className="text-2xl font-bold mt-8 mb-4">Kategorie-Management</h2>
 
           <p>
-            Um ein neues Projekt zu erstellen:
+            Kategorien helfen Benutzern dabei, relevante Projekte schnell zu finden:
           </p>
 
-          <ol className="list-decimal pl-6 my-4">
-            <li>Klicken Sie auf die Schaltfläche &quot;Neues Projekt&quot; in der oberen rechten Ecke</li>
-            <li>Füllen Sie das Projektformular mit den erforderlichen Informationen aus:
-              <ul className="list-disc pl-6 my-2">
-                <li>Titel</li>
-                <li>Kategorie</li>
-                <li>Start- und Endquartal</li>
-                <li>Beschreibung</li>
-                <li>Status</li>
-                <li>Teammitglieder</li>
-                <li>Benutzerdefinierte Felder</li>
-              </ul>
-            </li>
-            <li>Klicken Sie auf &quot;Projekt erstellen&quot;, um zu speichern</li>
-          </ol>
+          <div className="bg-purple-900/30 p-6 rounded-lg my-6">
+            <h3 className="text-lg font-semibold text-purple-300 mb-3">🎨 Kategorien gestalten</h3>
+            <ul className="list-disc pl-6 space-y-2">
+              <li><strong>Aussagekräftige Namen</strong>: Wählen Sie klare, verständliche Bezeichnungen</li>
+              <li><strong>Farb-Kodierung</strong>: Verwenden Sie konsistente Farben für bessere Orientierung</li>
+              <li><strong>Icons nutzen</strong>: Passende Symbole erleichtern die visuelle Erkennung</li>
+              <li><strong>Logische Gruppierung</strong>: Organisieren Sie Kategorien nach Bereichen oder Teams</li>
+            </ul>
+          </div>
 
-          <h3 className="text-xl font-bold mt-6 mb-3">Ein Projekt bearbeiten</h3>
+          <h2 className="text-2xl font-bold mt-8 mb-4">Best Practices</h2>
 
-          <p>
-            Um ein bestehendes Projekt zu bearbeiten:
-          </p>
+          <h3 className="text-xl font-bold mt-6 mb-3">📊 Datenqualität sicherstellen</h3>
+          <ul className="list-disc pl-6 my-4">
+            <li><strong>Regelmäßige Updates</strong>: Aktualisieren Sie Projektstatus mindestens monatlich</li>
+            <li><strong>Vollständige Informationen</strong>: Füllen Sie alle relevanten Felder aus</li>
+            <li><strong>Konsistente Terminologie</strong>: Verwenden Sie einheitliche Begriffe und Namen</li>
+            <li><strong>Zeitnahe Eingabe</strong>: Neue Projekte sollten zeitnah erfasst werden</li>
+          </ul>
 
-          <ol className="list-decimal pl-6 my-4">
-            <li>Suchen Sie das Projekt in der Tabelle</li>
-            <li>Klicken Sie auf die Schaltfläche &quot;Bearbeiten&quot; in der Spalte &quot;Aktionen&quot;</li>
-            <li>Aktualisieren Sie die Projektinformationen im Formular</li>
-            <li>Klicken Sie auf &quot;Projekt aktualisieren&quot;, um Änderungen zu speichern</li>
-          </ol>
+          <h3 className="text-xl font-bold mt-6 mb-3">👥 Benutzer-Erfahrung optimieren</h3>
+          <ul className="list-disc pl-6 my-4">
+            <li><strong>Verständliche Beschreibungen</strong>: Schreiben Sie für Ihr Publikum, nicht für Experten</li>
+            <li><strong>Relevante Details</strong>: Fügen Sie Informationen hinzu, die für Stakeholder wichtig sind</li>
+            <li><strong>Aktuelle Kontakte</strong>: Halten Sie Teammitglieder-Informationen aktuell</li>
+            <li><strong>Klare Status-Updates</strong>: Nutzen Sie aussagekräftige Status-Bezeichnungen</li>
+          </ul>
 
-          <h3 className="text-xl font-bold mt-6 mb-3">Ein Projekt löschen</h3>
+          <h2 className="text-2xl font-bold mt-8 mb-4">Häufige Administrationsaufgaben</h2>
 
-          <p>
-            Um ein Projekt zu löschen:
-          </p>
+          <div className="space-y-4">
+            <div className="bg-gray-800/50 p-4 rounded-lg">
+              <h3 className="font-bold text-blue-300 mb-2">Quartalswechsel</h3>
+              <p>Aktualisieren Sie Projektzeiträume und verschieben Sie abgeschlossene Projekte in die Archive-Kategorie.</p>
+            </div>
 
-          <ol className="list-decimal pl-6 my-4">
-            <li>Suchen Sie das Projekt in der Tabelle</li>
-            <li>Klicken Sie auf die Schaltfläche &quot;Löschen&quot; in der Spalte &quot;Aktionen&quot;</li>
-            <li>Bestätigen Sie die Löschung, indem Sie auf &quot;Bestätigen&quot; klicken, wenn Sie dazu aufgefordert werden</li>
-          </ol>
+            <div className="bg-gray-800/50 p-4 rounded-lg">
+              <h3 className="font-bold text-blue-300 mb-2">Neue Projekte einpflegen</h3>
+              <p>Sammeln Sie Projektinformationen von Teams und pflegen Sie diese zeitnah in die Roadmap ein.</p>
+            </div>
 
-          <h2 className="text-2xl font-bold mt-8 mb-4">Kategorien verwalten</h2>
+            <div className="bg-gray-800/50 p-4 rounded-lg">
+              <h3 className="font-bold text-blue-300 mb-2">Status-Updates koordinieren</h3>
+              <p>Erinnern Sie Projektverantwortliche an regelmäßige Status-Updates und pflegen Sie diese ein.</p>
+            </div>
+          </div>
 
-          <p>
-            Kategorien helfen dabei, Projekte in logische Gruppen zu organisieren. Jede Kategorie hat einen Namen, eine Farbe und ein Symbol.
-          </p>
+          <div className="bg-red-900/30 p-6 rounded-lg my-8">
+            <h3 className="text-lg font-semibold text-red-300 mb-3">⚠️ Wichtige Hinweise</h3>
+            <ul className="list-disc pl-6 space-y-2">
+              <li><strong>Datensicherung</strong>: Stellen Sie sicher, dass regelmäßige Backups erstellt werden</li>
+              <li><strong>Zugriffskontrolle</strong>: Teilen Sie Admin-Zugänge nur mit autorisierten Personen</li>
+              <li><strong>Änderungsprotokoll</strong>: Dokumentieren Sie wichtige Änderungen für Nachverfolgbarkeit</li>
+            </ul>
+          </div>
 
-          <h3 className="text-xl font-bold mt-6 mb-3">Eine neue Kategorie erstellen</h3>
+          <div className="bg-green-900/30 p-6 rounded-lg my-8">
+            <h3 className="text-lg font-semibold text-green-300 mb-3">🎯 Erfolgsmessung</h3>
+            <p className="mb-4">
+              Eine erfolgreiche Roadmap-Administration zeigt sich durch:
+            </p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>Regelmäßige Nutzung durch Stakeholder</li>
+              <li>Aktuelle und vollständige Projektinformationen</li>
+              <li>Positive Rückmeldungen von Benutzern</li>
+              <li>Effiziente Kommunikation über Projektfortschritte</li>
+            </ul>
+          </div>
 
-          <p>
-            Um eine neue Kategorie zu erstellen:
-          </p>
-
-          <ol className="list-decimal pl-6 my-4">
-            <li>Wechseln Sie zur Registerkarte &quot;Kategorien&quot;</li>
-            <li>Klicken Sie auf die Schaltfläche &quot;Neue Kategorie&quot;</li>
-            <li>Füllen Sie das Kategorieformular aus:
-              <ul className="list-disc pl-6 my-2">
-                <li>Name</li>
-                <li>Farbe (wählen Sie eine aus oder geben Sie einen Hex-Code ein)</li>
-                <li>Symbol (wählen Sie aus den verfügbaren Optionen)</li>
-              </ul>
-            </li>
-            <li>Klicken Sie auf &quot;Kategorie erstellen&quot;, um zu speichern</li>
-          </ol>
-
-          <h2 className="text-2xl font-bold mt-8 mb-4">Feldtypen verwalten</h2>
-
-          <p>
-            Mit Feldtypen können Sie benutzerdefinierte Felder für Projekte definieren, wie Technologien, Prozesse, Dienste oder Datentypen.
-          </p>
-
-          <h3 className="text-xl font-bold mt-6 mb-3">Einen neuen Feldtyp erstellen</h3>
-
-          <p>
-            Um einen neuen Feldtyp zu erstellen:
-          </p>
-
-          <ol className="list-decimal pl-6 my-4">
-            <li>Wechseln Sie zur Registerkarte &quot;Feldtypen&quot;</li>
-            <li>Klicken Sie auf die Schaltfläche &quot;Neues Feld&quot;</li>
-            <li>Füllen Sie das Feldtyp-Formular aus:
-              <ul className="list-disc pl-6 my-2">
-                <li>Name</li>
-                <li>Typ (PROCESS, TECHNOLOGY, SERVICE oder DATA)</li>
-                <li>Beschreibung</li>
-              </ul>
-            </li>
-            <li>Klicken Sie auf &quot;Feldtyp erstellen&quot;, um zu speichern</li>
-          </ol>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+            <Link href="/docs/funktionen" className="block p-4 bg-blue-600/20 border border-blue-500/30 rounded-lg hover:bg-blue-600/30 transition-colors">
+              <div className="font-semibold text-blue-300">📚 Funktionen erkunden</div>
+              <div className="text-sm text-gray-400">Lernen Sie alle Roadmap-Funktionen kennen</div>
+            </Link>
+            <Link href="/" className="block p-4 bg-green-600/20 border border-green-500/30 rounded-lg hover:bg-green-600/30 transition-colors">
+              <div className="font-semibold text-green-300">🚀 Zur Roadmap</div>
+              <div className="text-sm text-gray-400">Öffnen Sie die Hauptanwendung</div>
+            </Link>
+          </div>
         </div>
       </div>
     </DocsLayout>

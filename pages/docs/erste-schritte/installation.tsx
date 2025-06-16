@@ -6,188 +6,119 @@ const InstallationDocsPage: React.FC = () => {
     return (
         <DocsLayout>
             <div className="max-w-4xl mx-auto">
-                <h1 className="text-4xl font-bold mb-8">Installationsanleitung</h1>
+                <h1 className="text-4xl font-bold mb-8">🚀 So starten Sie mit JSDoIT Roadmap</h1>
 
                 <div className="prose prose-invert max-w-none">
-                    <p>
-                        Diese Anleitung führt Sie durch den Prozess der Einrichtung von Roadmap JSD in Ihrer lokalen Umgebung.
+                    <p className="text-lg text-gray-300">
+                        Eine einfache Anleitung, um schnell mit JSDoIT Roadmap zu beginnen und das Beste aus der Anwendung herauszuholen.
                     </p>
 
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Voraussetzungen</h2>
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Schritt 1: Zugang zur Roadmap</h2>
+
+                    <div className="bg-blue-900/30 p-6 rounded-lg my-6">
+                        <p className="mb-4">
+                            JSDoIT Roadmap ist direkt über Ihren Webbrowser verfügbar. Sie benötigen keine separate Installation.
+                        </p>
+                        <ul className="list-disc pl-6 space-y-2">
+                            <li>Öffnen Sie Ihren bevorzugten Webbrowser</li>
+                            <li>Navigieren Sie zur Roadmap-URL (wird von Ihrem Administrator bereitgestellt)</li>
+                            <li>Die Anwendung lädt automatisch und zeigt die aktuelle Roadmap an</li>
+                        </ul>
+                    </div>
+
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Schritt 2: Erste Orientierung</h2>
 
                     <p>
-                        Bevor Sie beginnen, stellen Sie sicher, dass Sie Folgendes installiert haben:
+                        Wenn Sie die Roadmap zum ersten Mal öffnen, sehen Sie:
                     </p>
 
                     <ul className="list-disc pl-6 my-4">
-                        <li>Node.js (v14 oder höher)</li>
-                        <li>npm oder yarn</li>
-                        <li>Git</li>
+                        <li><strong>Projektübersicht</strong>: Alle Projekte chronologisch angeordnet</li>
+                        <li><strong>Zeitachse</strong>: Quartale und Jahre zur Navigation</li>
+                        <li><strong>Filter</strong>: Kategorien zur gezielten Projektsuche</li>
+                        <li><strong>Suchfunktion</strong>: Schnelle Suche nach spezifischen Projekten</li>
                     </ul>
 
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Schritt 1: Repository klonen</h2>
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Schritt 3: Navigation lernen</h2>
 
+                    <h3 className="text-xl font-bold mt-6 mb-3">📅 Zeitnavigation</h3>
                     <p>
-                        Klonen Sie das Repository mit folgendem Befehl:
+                        Nutzen Sie die Jahres- und Quartalsnavigation, um verschiedene Zeiträume zu erkunden:
                     </p>
-
-                    <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto">
-                        <code>git clone https://github.com/FabianBoni/roadmap-jsd.git
-                            cd roadmap-jsd</code>
-                    </pre>
-
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Schritt 2: Abhängigkeiten installieren</h2>
-
-                    <p>
-                        Installieren Sie die erforderlichen Abhängigkeiten:
-                    </p>
-
-                    <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto">
-                        <code>npm install
-                            # oder
-                            yarn install</code>
-                    </pre>
-
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Schritt 3: Datenbank einrichten</h2>
-
-                    <p>
-                        Roadmap JSD verwendet Prisma mit einer Datenbank. Sie müssen Ihre Datenbankverbindung einrichten:
-                    </p>
-
-                    <ol className="list-decimal pl-6 my-4">
-                        <li>Erstellen Sie eine <code>.env</code>-Datei im Stammverzeichnis</li>
-                        <li>Fügen Sie Ihren Datenbankverbindungsstring hinzu:
-                            <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto mt-2">
-                                <code>DATABASE_URL=&quot;postgresql://benutzername:passwort@localhost:5432/roadmap_jsd&quot;</code>
-                            </pre>
-                        </li>
-                        <li>Führen Sie Prisma-Migrationen aus:
-                            <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto mt-2">
-                                <code>npx prisma migrate dev</code>
-                            </pre>
-                        </li>
-                    </ol>
-
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Schritt 4: Entwicklungsserver starten</h2>
-
-                    <p>
-                        Starten Sie den Entwicklungsserver:
-                    </p>
-
-                    <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto">
-                        <code>npm run dev
-                            # oder
-                            yarn dev</code>
-                    </pre>
-
-                    <p className="mt-4">
-                        Ihre Anwendung sollte jetzt unter <a href="http://localhost:3000" className="text-blue-400 hover:text-blue-300">http://localhost:3000</a> laufen.
-                    </p>
-
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Schritt 5: Admin-Zugang</h2>
-
-                    <p>
-                        Um auf das Admin-Dashboard zuzugreifen:
-                    </p>
-
-                    <ol className="list-decimal pl-6 my-4">
-                        <li>Navigieren Sie zu <a href="http://localhost:3000/admin" className="text-blue-400 hover:text-blue-300">http://localhost:3000/admin</a></li>
-                        <li>Melden Sie sich mit den Standard-Admin-Anmeldedaten an:
-                            <ul className="list-disc pl-6 my-2">
-                                <li>E-Mail: admin@jsd.bs.ch</li>
-                                <li>Passwort: admin123</li>
-                            </ul>
-                        </li>
-                    </ol>
-
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Nächste Schritte</h2>
-
-                    <p>
-                        Nach der Installation können Sie:
-                    </p>
-
                     <ul className="list-disc pl-6 my-4">
-                        <li>
-                            <Link href="/docs/erste-schritte" className="text-blue-400 hover:text-blue-300">
-                                Weitere erste Schritte
-                            </Link> durchgehen
-                        </li>
-                        <li>Die
-                            <Link href="/docs/funktionen" className="text-blue-400 hover:text-blue-300">
-                                Funktionen
-                            </Link> von Roadmap JSD erkunden
-                        </li>
-                        <li>Die
-                            <Link href="/docs/admin" className="text-blue-400 hover:text-blue-300">
-                                Admin-Anleitung
-                            </Link> für Administratoren lesen
-                        </li>
+                        <li>Klicken Sie auf ein Jahr, um zu diesem Zeitraum zu springen</li>
+                        <li>Verwenden Sie die Pfeiltasten für chronologische Navigation</li>
+                        <li>Der &quot;Heute&quot;-Button bringt Sie zurück zum aktuellen Zeitraum</li>
                     </ul>
 
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Fehlerbehebung</h2>
-
-                    <h3 className="text-xl font-bold mt-6 mb-3">Datenbankverbindungsprobleme</h3>
-
+                    <h3 className="text-xl font-bold mt-6 mb-3">🏷️ Filter verwenden</h3>
                     <p>
-                        Wenn Sie Probleme mit der Datenbankverbindung haben:
+                        Filtern Sie Projekte nach Ihren Interessen:
                     </p>
+                    <ul className="list-disc pl-6 my-4">
+                        <li>Wählen Sie Kategorien aus, die Sie interessieren</li>
+                        <li>Kombinieren Sie mehrere Filter für genauere Ergebnisse</li>
+                        <li>Nutzen Sie die Suchleiste für spezifische Begriffe</li>
+                    </ul>
 
-                    <ol className="list-decimal pl-6 my-4">
-                        <li>Überprüfen Sie, ob Ihre Datenbank läuft</li>
-                        <li>Stellen Sie sicher, dass die <code>DATABASE_URL</code> in der <code>.env</code>-Datei korrekt ist</li>
-                        <li>Führen Sie <code>npx prisma db push</code> aus, um die Datenbankschema zu aktualisieren</li>
-                    </ol>
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Schritt 4: Projekte erkunden</h2>
 
-                    <h3 className="text-xl font-bold mt-6 mb-3">Anwendungsfehler</h3>
-
-                    <p>
-                        Bei Anwendungsfehlern:
-                    </p>
-
-                    <ol className="list-decimal pl-6 my-4">
-                        <li>Überprüfen Sie die Konsolenausgabe auf Fehlermeldungen</li>
-                        <li>Überprüfen Sie die Browserkonsole auf Frontend-Fehler</li>
-                        <li>Stellen Sie sicher, dass alle Abhängigkeiten installiert sind (<code>npm install</code>)</li>
-                    </ol>
-
-                    <h3 className="text-xl font-bold mt-6 mb-3">Häufige Fehler</h3>
-
-                    <div className="bg-gray-800 p-4 rounded-md my-4">
-                        <p className="font-bold">Fehler: &quot;Prisma Client konnte nicht mit der Datenbank verbinden&quot;</p>
-                        <p className="mt-2">Lösung: Überprüfen Sie Ihre Datenbankverbindung und stellen Sie sicher, dass die Datenbank läuft.</p>
+                    <div className="bg-green-900/30 p-6 rounded-lg my-6">
+                        <h3 className="text-lg font-semibold text-green-300 mb-3">💡 Interaktion mit Projekten</h3>
+                        <ul className="list-disc pl-6 space-y-2">
+                            <li><strong>Überblick</strong>: Schweben Sie über ein Projekt für eine Kurzbeschreibung</li>
+                            <li><strong>Details</strong>: Klicken Sie auf ein Projekt für vollständige Informationen</li>
+                            <li><strong>Status</strong>: Farbcodes zeigen den aktuellen Projektstatus an</li>
+                            <li><strong>Team</strong>: Sehen Sie beteiligte Personen und Verantwortliche</li>
+                        </ul>
                     </div>
 
-                    <div className="bg-gray-800 p-4 rounded-md my-4">
-                        <p className="font-bold">Fehler: &quot;Module not found&quot;</p>
-                        <p className="mt-2">Lösung: Führen Sie <code>npm install</code> aus, um sicherzustellen, dass alle Abhängigkeiten installiert sind.</p>
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Schritt 5: Tipps für den Alltag</h2>
+
+                    <div className="bg-yellow-900/30 p-6 rounded-lg my-6">
+                        <h3 className="text-lg font-semibold text-yellow-300 mb-3">📌 Nützliche Funktionen</h3>
+                        <ul className="list-disc pl-6 space-y-2">
+                            <li><strong>Direktlinks</strong>: Jedes Projekt hat eine eindeutige URL, die Sie teilen können</li>
+                            <li><strong>Responsive Design</strong>: Die Roadmap funktioniert auf Desktop, Tablet und Smartphone</li>
+                            <li><strong>Echtzeit-Updates</strong>: Änderungen werden automatisch angezeigt</li>
+                            <li><strong>Keyboard-Navigation</strong>: Verwenden Sie Pfeiltasten zur schnellen Navigation</li>
+                        </ul>
                     </div>
 
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Produktionsbereitstellung</h2>
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Häufige Fragen</h2>
 
-                    <p>
-                        Für die Bereitstellung in einer Produktionsumgebung:
-                    </p>
+                    <div className="space-y-4">
+                        <div className="bg-gray-800/50 p-4 rounded-lg">
+                            <h3 className="font-bold text-blue-300 mb-2">Wie oft wird die Roadmap aktualisiert?</h3>
+                            <p>Die Roadmap wird kontinuierlich aktualisiert. Neue Projekte und Änderungen werden regelmäßig hinzugefügt.</p>
+                        </div>
 
-                    <ol className="list-decimal pl-6 my-4">
-                        <li>Erstellen Sie einen optimierten Build:
-                            <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto mt-2">
-                                <code>npm run build
-                                    # oder
-                                    yarn build</code>
-                            </pre>
-                        </li>
-                        <li>Starten Sie den Produktionsserver:
-                            <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto mt-2">
-                                <code>npm start
-                                    # oder
-                                    yarn start</code>
-                            </pre>
-                        </li>
-                    </ol>
+                        <div className="bg-gray-800/50 p-4 rounded-lg">
+                            <h3 className="font-bold text-blue-300 mb-2">Kann ich Projekte bearbeiten?</h3>
+                            <p>Als regulärer Benutzer können Sie Projekte anzeigen und durchsuchen. Für Änderungen wenden Sie sich an Ihren Administrator.</p>
+                        </div>
 
-                    <p className="mt-4">
-                        Für detailliertere Informationen zur Bereitstellung besuchen Sie die <a href="https://nextjs.org/docs/deployment" className="text-blue-400 hover:text-blue-300" target="_blank" rel="noopener noreferrer">Next.js-Bereitstellungsdokumentation</a>.
-                    </p>
+                        <div className="bg-gray-800/50 p-4 rounded-lg">
+                            <h3 className="font-bold text-blue-300 mb-2">Funktioniert die Roadmap offline?</h3>
+                            <p>Die Roadmap benötigt eine Internetverbindung für aktuelle Daten. Einige Inhalte können kurzzeitig im Browser zwischengespeichert werden.</p>
+                        </div>
+                    </div>
+
+                    <div className="bg-green-900/30 p-6 rounded-lg my-8">
+                        <h3 className="text-lg font-semibold text-green-300 mb-3">🎉 Fertig!</h3>
+                        <p className="mb-4">
+                            Sie sind jetzt bereit, JSDoIT Roadmap effektiv zu nutzen. Beginnen Sie mit der Erkundung der verfügbaren Projekte 
+                            und entdecken Sie, wie die Roadmap Ihnen bei der Projektplanung hilft.
+                        </p>
+                        <div className="flex flex-wrap gap-4">
+                            <Link href="/" className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-semibold transition-colors">
+                                🚀 Zur Roadmap
+                            </Link>
+                            <Link href="/docs/funktionen" className="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg font-semibold transition-colors">
+                                📚 Weitere Funktionen
+                            </Link>
+                        </div>
+                    </div>
                 </div>
             </div>
         </DocsLayout>

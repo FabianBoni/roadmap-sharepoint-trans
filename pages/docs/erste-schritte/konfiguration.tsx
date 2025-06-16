@@ -6,223 +6,142 @@ const KonfigurationDocsPage: React.FC = () => {
     return (
         <DocsLayout>
             <div className="max-w-4xl mx-auto">
-                <h1 className="text-4xl font-bold mb-8">Konfiguration von Roadmap JSD</h1>
+                <h1 className="text-4xl font-bold mb-8">⚙️ Roadmap personalisieren</h1>
 
                 <div className="prose prose-invert max-w-none">
+                    <p className="text-lg text-gray-300">
+                        Erfahren Sie, wie Sie JSDoIT Roadmap an Ihre Bedürfnisse anpassen und optimal nutzen können.
+                    </p>
+
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Browser-Einstellungen optimieren</h2>
+
+                    <div className="bg-blue-900/30 p-6 rounded-lg my-6">
+                        <h3 className="text-lg font-semibold text-blue-300 mb-3">🌐 Für die beste Nutzererfahrung</h3>
+                        <ul className="list-disc pl-6 space-y-2">
+                            <li><strong>Lesezeichen setzen</strong>: Speichern Sie die Roadmap-URL für schnellen Zugriff</li>
+                            <li><strong>Vollbildmodus</strong>: Drücken Sie F11 für eine größere Darstellung</li>
+                            <li><strong>Zoom anpassen</strong>: Verwenden Sie Strg + / Strg - für die optimale Schriftgröße</li>
+                            <li><strong>Browser aktuell halten</strong>: Nutzen Sie eine aktuelle Browser-Version</li>
+                        </ul>
+                    </div>
+
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Filter und Ansichten anpassen</h2>
+
+                    <h3 className="text-xl font-bold mt-6 mb-3">🏷️ Kategorie-Filter</h3>
                     <p>
-                        Nach der Installation von Roadmap JSD können Sie verschiedene Aspekte der Anwendung konfigurieren, um sie an Ihre Bedürfnisse anzupassen.
+                        Passen Sie die Filter an Ihre Arbeitsweise an:
                     </p>
-
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Umgebungsvariablen</h2>
-
-                    <p>
-                        Die Hauptkonfiguration erfolgt über Umgebungsvariablen in der <code>.env</code>-Datei im Stammverzeichnis des Projekts.
-                    </p>
-
-                    <h3 className="text-xl font-bold mt-6 mb-3">Datenbankkonfiguration</h3>
-
-                    <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto">
-                        <code>DATABASE_URL=&quot;postgresql://benutzername:passwort@localhost:5432/roadmap_jsd&quot;</code>
-                    </pre>
-
-                    <p className="mt-4">
-                        Diese Variable definiert die Verbindung zur Datenbank. Passen Sie sie entsprechend Ihrer Datenbankeinrichtung an.
-                    </p>
-
-                    <h3 className="text-xl font-bold mt-6 mb-3">Weitere Konfigurationsoptionen</h3>
-
-                    <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto">
-                        <code># Anwendungsport (Standard: 3000)
-                            PORT=3000
-
-                            # Umgebung (development, production)
-                            NODE_ENV=development
-
-                            # Secret für JWT-Token (für die Authentifizierung)
-                            JWT_SECRET=ihr_geheimes_token</code>
-                    </pre>
-
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Anpassung des Erscheinungsbilds</h2>
-
-                    <h3 className="text-xl font-bold mt-6 mb-3">Farben und Thema</h3>
-
-                    <p>
-                        Sie können das Erscheinungsbild der Anwendung anpassen, indem Sie die Tailwind-Konfiguration in der Datei <code>tailwind.config.js</code> ändern:
-                    </p>
-
-                    <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto">
-                        <code>{`module.exports = {
-  theme: {
-    extend: {
-      colors: {
-        primary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          // ... weitere Farbtöne
-          900: '#0c4a6e',
-        },
-        // Weitere benutzerdefinierte Farben
-      },
-    },
-  },
-  // Weitere Konfigurationen
-};`}</code>
-                    </pre>
-
-                    <h3 className="text-xl font-bold mt-6 mb-3">Logo und Branding</h3>
-
-                    <p>
-                        Um das Logo und Branding anzupassen:
-                    </p>
-
-                    <ol className="list-decimal pl-6 my-4">
-                        <li>Ersetzen Sie die Datei <code>public/logo.png</code> mit Ihrem eigenen Logo</li>
-                        <li>Aktualisieren Sie den Anwendungsnamen in der Datei <code>components/Header.tsx</code></li>
-                    </ol>
-
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Standarddaten</h2>
-
-                    <h3 className="text-xl font-bold mt-6 mb-3">Admin-Benutzer</h3>
-
-                    <p>
-                        Der Standard-Admin-Benutzer wird während der ersten Migration erstellt. Sie können die Anmeldedaten in der Datei <code>prisma/seed.ts</code> ändern:
-                    </p>
-
-                    <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto">
-                        <code>{`const adminUser = await prisma.user.create({
-  data: {
-    name: 'Admin',
-    email: 'admin@jsd.bs.ch',
-    password: await bcrypt.hash('admin123', 10),
-    role: 'ADMIN',
-  },
-});`}</code>
-                    </pre>
-
-                    <h3 className="text-xl font-bold mt-6 mb-3">Standardkategorien</h3>
-
-                    <p>
-                        Standardkategorien werden ebenfalls während der Seed-Phase erstellt. Sie können diese in der Datei <code>prisma/seed.ts</code> anpassen:
-                    </p>
-
-                    <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto">
-                        <code>{`const categories = await Promise.all([
-  prisma.category.create({
-    data: {
-      id: 'cat1',
-      name: 'Digital Workplace',
-      color: '#4299E1',
-      icon: 'ComputerIcon',
-    },
-  }),
-  // Weitere Kategorien
-]);`}</code>
-                    </pre>
-
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Erweiterte Konfiguration</h2>
-
-                    <h3 className="text-xl font-bold mt-6 mb-3">API-Endpunkte</h3>
-
-                    <p>
-                        Wenn Sie benutzerdefinierte API-Endpunkte hinzufügen möchten, erstellen Sie neue Dateien im Verzeichnis <code>pages/api/</code>:
-                    </p>
-
-                    <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto">
-                        <code>{`// pages/api/custom/endpoint.ts
-import { NextApiRequest, NextApiResponse } from 'next';
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  // Ihre benutzerdefinierte API-Logik hier
-}`}</code>
-                    </pre>
-
-                    <h3 className="text-xl font-bold mt-6 mb-3">Authentifizierung anpassen</h3>
-
-                    <p>
-                        Um die Authentifizierungslogik anzupassen, bearbeiten Sie die Dateien im Verzeichnis <code>pages/api/auth/</code>:
-                    </p>
-
                     <ul className="list-disc pl-6 my-4">
-                        <li><code>login.ts</code>: Anmeldelogik</li>
-                        <li><code>register.ts</code>: Registrierungslogik (falls implementiert)</li>
+                        <li><strong>Häufig genutzte Filter</strong>: Merken Sie sich Ihre wichtigsten Kategorien</li>
+                        <li><strong>Kombinationen</strong>: Nutzen Sie mehrere Filter gleichzeitig für präzise Ergebnisse</li>
+                        <li><strong>Filter zurücksetzen</strong>: Klicken Sie auf &quot;Alle Filter zurücksetzen&quot; für eine saubere Ansicht</li>
                     </ul>
 
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Produktionsbereitstellung</h2>
-
+                    <h3 className="text-xl font-bold mt-6 mb-3">📊 Anzeigeoptionen</h3>
                     <p>
-                        Für die Bereitstellung in einer Produktionsumgebung:
+                        Wählen Sie die für Sie passende Darstellung:
                     </p>
+                    <ul className="list-disc pl-6 my-4">
+                        <li><strong>Kompakte Ansicht</strong>: Mehr Projekte auf einen Blick</li>
+                        <li><strong>Detaillierte Ansicht</strong>: Ausführlichere Informationen pro Projekt</li>
+                        <li><strong>Gruppierte Ansicht</strong>: Projekte nach Kategorien sortiert</li>
+                    </ul>
 
-                    <ol className="list-decimal pl-6 my-4">
-                        <li>Setzen Sie <code>NODE_ENV=production</code> in Ihrer <code>.env</code>-Datei</li>
-                        <li>Erstellen Sie einen optimierten Build:
-                            <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto mt-2">
-                                <code>npm run build
-                                    # oder
-                                    yarn build</code>
-                            </pre>
-                        </li>
-                        <li>Starten Sie den Produktionsserver:
-                            <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto mt-2">
-                                <code>npm start
-                                    # oder
-                                    yarn start</code>
-                            </pre>
-                        </li>
-                    </ol>
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Arbeitsabläufe optimieren</h2>
+
+                    <div className="bg-green-900/30 p-6 rounded-lg my-6">
+                        <h3 className="text-lg font-semibold text-green-300 mb-3">💡 Produktivitäts-Tipps</h3>
+                        <ul className="list-disc pl-6 space-y-2">
+                            <li><strong>Regelmäßige Updates</strong>: Schauen Sie wöchentlich nach neuen Projekten</li>
+                            <li><strong>Direktlinks teilen</strong>: Versenden Sie Links zu spezifischen Projekten</li>
+                            <li><strong>Mobile Nutzung</strong>: Nutzen Sie die Roadmap auch unterwegs am Smartphone</li>
+                            <li><strong>Screenshots erstellen</strong>: Machen Sie Aufnahmen für Präsentationen</li>
+                        </ul>
+                    </div>
+
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Keyboard-Shortcuts</h2>
+
+                    <div className="bg-gray-800/50 p-6 rounded-lg my-6">
+                        <h3 className="text-lg font-semibold text-gray-300 mb-4">⌨️ Tastenkombinationen</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <div className="font-semibold text-blue-300">Navigation</div>
+                                <ul className="list-none space-y-1 text-sm">
+                                    <li><code className="bg-gray-700 px-2 py-1 rounded">←/→</code> Zeitperioden wechseln</li>
+                                    <li><code className="bg-gray-700 px-2 py-1 rounded">↑/↓</code> Projekte durchblättern</li>
+                                    <li><code className="bg-gray-700 px-2 py-1 rounded">Enter</code> Projekt öffnen</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <div className="font-semibold text-blue-300">Suche & Filter</div>
+                                <ul className="list-none space-y-1 text-sm">
+                                    <li><code className="bg-gray-700 px-2 py-1 rounded">Ctrl+F</code> Suche öffnen</li>
+                                    <li><code className="bg-gray-700 px-2 py-1 rounded">Esc</code> Filter schließen</li>
+                                    <li><code className="bg-gray-700 px-2 py-1 rounded">Ctrl+R</code> Filter zurücksetzen</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Mobile Nutzung</h2>
+
+                    <h3 className="text-xl font-bold mt-6 mb-3">📱 Smartphone & Tablet</h3>
+                    <p>
+                        JSDoIT Roadmap ist für mobile Geräte optimiert:
+                    </p>
+                    <ul className="list-disc pl-6 my-4">
+                        <li><strong>Touch-Navigation</strong>: Wischen Sie horizontal für Zeitnavigation</li>
+                        <li><strong>Pinch-to-Zoom</strong>: Zoomen Sie für bessere Lesbarkeit</li>
+                        <li><strong>Hochformat</strong>: Drehen Sie das Gerät für eine andere Ansicht</li>
+                        <li><strong>Home-Screen</strong>: Fügen Sie die Roadmap zu Ihrem Startbildschirm hinzu</li>
+                    </ul>
+
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Benachrichtigungen & Updates</h2>
+
+                    <div className="bg-yellow-900/30 p-6 rounded-lg my-6">
+                        <h3 className="text-lg font-semibold text-yellow-300 mb-3">🔔 Informiert bleiben</h3>
+                        <p className="mb-4">So verpassen Sie keine wichtigen Updates:</p>
+                        <ul className="list-disc pl-6 space-y-2">
+                            <li><strong>Browser-Lesezeichen</strong>: Regelmäßig die Roadmap besuchen</li>
+                            <li><strong>Team-Communication</strong>: Newsletter oder Team-Updates abonnieren</li>
+                            <li><strong>Change-Log</strong>: Achten Sie auf Hinweise zu neuen Funktionen</li>
+                        </ul>
+                    </div>
 
                     <h2 className="text-2xl font-bold mt-8 mb-4">Fehlerbehebung</h2>
 
-                    <h3 className="text-xl font-bold mt-6 mb-3">Datenbankverbindungsprobleme</h3>
+                    <div className="space-y-4">
+                        <div className="bg-gray-800/50 p-4 rounded-lg">
+                            <h3 className="font-bold text-blue-300 mb-2">Die Roadmap lädt nicht</h3>
+                            <p>Aktualisieren Sie die Seite (F5) oder leeren Sie den Browser-Cache (Strg + Shift + R).</p>
+                        </div>
 
-                    <p>
-                        Wenn Sie Probleme mit der Datenbankverbindung haben:
-                    </p>
+                        <div className="bg-gray-800/50 p-4 rounded-lg">
+                            <h3 className="font-bold text-blue-300 mb-2">Filter funktionieren nicht</h3>
+                            <p>Setzen Sie alle Filter zurück und versuchen Sie es erneut. Überprüfen Sie auch Ihre Internetverbindung.</p>
+                        </div>
 
-                    <ol className="list-decimal pl-6 my-4">
-                        <li>Überprüfen Sie, ob Ihre Datenbank läuft</li>
-                        <li>Stellen Sie sicher, dass die <code>DATABASE_URL</code> in der <code>.env</code>-Datei korrekt ist</li>
-                        <li>Führen Sie <code>npx prisma db push</code> aus, um die Datenbankschema zu aktualisieren</li>
-                    </ol>
+                        <div className="bg-gray-800/50 p-4 rounded-lg">
+                            <h3 className="font-bold text-blue-300 mb-2">Mobile Ansicht ist verzerrt</h3>
+                            <p>Rotieren Sie Ihr Gerät oder zoomen Sie heraus. Die Roadmap passt sich automatisch an die Bildschirmgröße an.</p>
+                        </div>
+                    </div>
 
-                    <h3 className="text-xl font-bold mt-6 mb-3">Anwendungsfehler</h3>
-
-                    <p>
-                        Bei Anwendungsfehlern:
-                    </p>
-
-                    <ol className="list-decimal pl-6 my-4">
-                        <li>Überprüfen Sie die Konsolenausgabe auf Fehlermeldungen</li>
-                        <li>Überprüfen Sie die Browserkonsole auf Frontend-Fehler</li>
-                        <li>Stellen Sie sicher, dass alle Abhängigkeiten installiert sind (<code>npm install</code>)</li>
-                    </ol>
-
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Nächste Schritte</h2>
-
-                    <p>
-                        Nach der Konfiguration können Sie:
-                    </p>
-
-                    <ul className="list-disc pl-6 my-4">
-                        <li>
-                            <Link href="/docs/funktionen" className="text-blue-400 hover:text-blue-300">
-                                Die Funktionen von Roadmap JSD erkunden
+                    <div className="bg-green-900/30 p-6 rounded-lg my-8">
+                        <h3 className="text-lg font-semibold text-green-300 mb-3">🚀 Sie sind bereit!</h3>
+                        <p className="mb-4">
+                            Mit diesen Anpassungen holen Sie das Beste aus JSDoIT Roadmap heraus. 
+                            Probieren Sie verschiedene Einstellungen aus und finden Sie Ihren optimalen Workflow.
+                        </p>
+                        <div className="flex flex-wrap gap-4">
+                            <Link href="/docs/funktionen/roadmap" className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-semibold transition-colors">
+                                📊 Roadmap-Funktionen
                             </Link>
-                        </li>
-                        <li>
-                            <Link href="/docs/admin" className="text-blue-400 hover:text-blue-300">
-                                Das Admin-Dashboard verwenden
+                            <Link href="/docs/funktionen/projekte" className="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg font-semibold transition-colors">
+                                📋 Projekt-Details
                             </Link>
-                        </li>
-                        <li>
-                            <Link href="/docs/api" className="text-blue-400 hover:text-blue-300">
-                                Die API-Referenz einsehen
-                            </Link>
-                        </li>
-                    </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
         </DocsLayout>

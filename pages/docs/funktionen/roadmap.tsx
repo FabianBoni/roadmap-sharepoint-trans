@@ -6,48 +6,54 @@ const RoadmapDocsPage: React.FC = () => {
     return (
         <DocsLayout>
             <div className="max-w-4xl mx-auto">
-                <h1 className="text-4xl font-bold mb-8">Roadmap-Visualisierung</h1>
+                <h1 className="text-4xl font-bold mb-8">🗺️ So verwenden Sie die Roadmap</h1>
 
                 <div className="prose prose-invert max-w-none">
                     <p>
-                        Die Roadmap-Visualisierung ist die zentrale Funktion von Roadmap JSD. Sie bietet eine übersichtliche, zeitbasierte Darstellung aller Projekte und ermöglicht es Benutzern, den Projektzeitplan auf einen Blick zu erfassen.
+                        Die Roadmap ist Ihre zentrale Anlaufstelle, um alle IT-Projekte des JSD auf einen Blick zu sehen. Hier erfahren Sie, wie Sie sie optimal nutzen.
                     </p>
 
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Hauptmerkmale der Roadmap</h2>
-
-                    <ul className="list-disc pl-6 my-4">
-                        <li><strong>Quartalsbasierte Zeitachse</strong>: Projekte werden auf einer Zeitachse angeordnet, die in Quartale unterteilt ist</li>
-                        <li><strong>Farbcodierte Projektkarten</strong>: Jedes Projekt wird als Karte dargestellt, deren Farbe der zugewiesenen Kategorie entspricht</li>
-                        <li><strong>Interaktive Elemente</strong>: Klicken auf Projektkarten zeigt detaillierte Informationen an</li>
-                        <li><strong>Filterung</strong>: Möglichkeit, Projekte nach Kategorien zu filtern</li>
-                    </ul>
-
-                    <h2 className="text-2xl font-bold mt-8 mb-4">Aufbau der Roadmap</h2>
-
-                    <h3 className="text-xl font-bold mt-6 mb-3">Zeitachse</h3>
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Überblick verschaffen</h2>
 
                     <p>
-                        Die horizontale Achse der Roadmap repräsentiert die Zeit, unterteilt in Quartale (Q1, Q2, Q3, Q4) und Jahre. Die Zeitachse beginnt mit dem frühesten Projektquartal und erstreckt sich bis zum spätesten Projektquartal.
-                    </p>
-
-                    <h3 className="text-xl font-bold mt-6 mb-3">Projektkarten</h3>
-
-                    <p>
-                        Jedes Projekt wird als Karte dargestellt, die folgende Informationen enthält:
+                        Wenn Sie die Roadmap öffnen, sehen Sie alle Projekte zeitlich angeordnet von links nach rechts:
                     </p>
 
                     <ul className="list-disc pl-6 my-4">
-                        <li>Projekttitel</li>
-                        <li>Kategorie (durch Farbe und ggf. Symbol dargestellt)</li>
-                        <li>Zeitraum (visuell durch die Breite und Position der Karte dargestellt)</li>
-                        <li>Status (optional durch ein Symbol oder Farbakzent dargestellt)</li>
+                        <li><strong>Zeitachse</strong>: Die obere Leiste zeigt Quartale und Jahre (Q1 2024, Q2 2024, etc.)</li>
+                        <li><strong>Projektkarten</strong>: Jedes Projekt erscheint als farbige Karte im entsprechenden Zeitraum</li>
+                        <li><strong>Farben</strong>: Verschiedene Farben zeigen verschiedene Projektbereiche (z.B. Digital Workplace, Infrastruktur)</li>
                     </ul>
 
-                    <h3 className="text-xl font-bold mt-6 mb-3">Seitenleiste</h3>
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Projekte finden</h2>
+
+                    <h3 className="text-xl font-bold mt-6 mb-3">📍 Nach Bereichen filtern</h3>
 
                     <p>
-                        Die Seitenleiste auf der linken Seite der Roadmap enthält:
+                        Auf der linken Seite finden Sie die Bereichsfilter:
                     </p>
+
+                    <ul className="list-disc pl-6 my-4">
+                        <li>Klicken Sie auf einen Bereich (z.B. &quot;Digital Workplace&quot;), um nur diese Projekte anzuzeigen</li>
+                        <li>Mehrere Bereiche können gleichzeitig ausgewählt werden</li>
+                        <li>Klicken Sie erneut auf einen Bereich, um den Filter zu entfernen</li>
+                        <li>Die Anzahl der Projekte wird neben jedem Bereich angezeigt</li>
+                    </ul>
+
+                    <h3 className="text-xl font-bold mt-6 mb-3">🔍 Projektdetails anzeigen</h3>
+
+                    <p>
+                        So erhalten Sie mehr Informationen zu einem Projekt:
+                    </p>
+
+                    <ul className="list-disc pl-6 my-4">
+                        <li><strong>Klicken Sie auf eine Projektkarte</strong> - eine Detailseite öffnet sich</li>
+                        <li><strong>Projekttitel</strong> - zeigt den Namen des Projekts</li>
+                        <li><strong>Zeitraum</strong> - die Breite der Karte zeigt die Projektdauer</li>
+                        <li><strong>Status-Symbol</strong> - zeigt ob das Projekt läuft, geplant oder abgeschlossen ist</li>
+                    </ul>
+
+                    <h2 className="text-2xl font-bold mt-8 mb-4">Navigation</h2>
 
                     <ul className="list-disc pl-6 my-4">
                         <li>Kategoriefilter mit Checkboxen zum Ein- und Ausblenden von Projekten</li>

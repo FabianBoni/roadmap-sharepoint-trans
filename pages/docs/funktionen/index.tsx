@@ -6,46 +6,48 @@ const FunktionenDocsPage: React.FC = () => {
   return (
     <DocsLayout>
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold mb-8">Funktionen</h1>
+        <h1 className="text-4xl font-bold mb-8">Funktionen der Roadmap</h1>
         
         <div className="prose prose-invert max-w-none">
           <p>
-            Roadmap JSD bietet eine Vielzahl von Funktionen zur Verwaltung und Visualisierung von Projekten auf einer Roadmap. Dieser Abschnitt gibt einen Überblick über die Hauptfunktionen der Anwendung.
+            Die Roadmap JSD bietet verschiedene Funktionen, um Ihnen einen optimalen Überblick über alle IT-Projekte zu verschaffen. Hier erfahren Sie, wie Sie alle Features effektiv nutzen.
           </p>
           
-          <h2 className="text-2xl font-bold mt-8 mb-4">Hauptfunktionen</h2>
+          <h2 className="text-2xl font-bold mt-8 mb-4">Hauptfunktionen für Benutzer</h2>
           
-          <h3 className="text-xl font-bold mt-6 mb-3">Roadmap-Visualisierung</h3>
+          <h3 className="text-xl font-bold mt-6 mb-3">🗺️ Roadmap-Ansicht</h3>
           
           <p>
-            Die Kernfunktion von Roadmap JSD ist die visuelle Darstellung von Projekten auf einem Zeitstrahl. Die Roadmap bietet:
+            Die Hauptansicht zeigt alle Projekte auf einer übersichtlichen Zeitachse:
           </p>
           
           <ul className="list-disc pl-6 my-4">
-            <li>Quartalsbasierte Zeitachse</li>
-            <li>Farbcodierte Projektkarten</li>
-            <li>Filterung nach Kategorien</li>
-            <li>Interaktive Projektdetails</li>
+            <li>Quartalweise Darstellung aller Projekte</li>
+            <li>Farbkodierung nach Projektbereichen</li>
+            <li>Schnelle Filterung nach Kategorien</li>
+            <li>Klickbare Projektkarten für Details</li>
+            <li>Statusanzeige für jeden Projektfortschritt</li>
           </ul>
           
           <p>
             <Link href="/docs/funktionen/roadmap" className="text-blue-400 hover:text-blue-300">
-              Mehr über die Roadmap-Visualisierung erfahren →
+              → Wie Sie die Roadmap-Ansicht verwenden
             </Link>
           </p>
           
-          <h3 className="text-xl font-bold mt-6 mb-3">Projektmanagement</h3>
+          <h3 className="text-xl font-bold mt-6 mb-3">📊 Projektinformationen</h3>
           
           <p>
-            Umfassende Funktionen zur Verwaltung von Projekten:
+            Erhalten Sie detaillierte Informationen zu jedem Projekt:
           </p>
           
           <ul className="list-disc pl-6 my-4">
-            <li>Erstellen, Bearbeiten und Löschen von Projekten</li>
-            <li>Zuweisung von Kategorien und Zeiträumen</li>
-            <li>Statusverfolgung (geplant, in Bearbeitung, abgeschlossen)</li>
-            <li>Verwaltung von Teammitgliedern</li>
-            <li>Benutzerdefinierte Felder für zusätzliche Informationen</li>
+            <li>Projektbeschreibung und Ziele</li>
+            <li>Verantwortliche Projektleitung</li>
+            <li>Aktueller Status und Fortschritt</li>
+            <li>Zeitplan und Meilensteine</li>
+            <li>Budget und Ressourceninformationen</li>
+            <li>Links zu weiteren Dokumenten</li>
           </ul>
           
           <p>
