@@ -136,13 +136,9 @@ const ProjectDetailPage: React.FC = () => {
       </div>
     );
   }
-
   if (!project) {
     return (
-      <div className="w-full min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center relative">
-        <div className="fixed top-4 right-4 z-50">
-          <JSDoITLoader size="small" persistent={true} className="opacity-80" />
-        </div>
+      <div className="w-full min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center">
         <p className="mb-4">Project not found</p>
         <Link href="/">
           <button className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition-colors">
@@ -153,11 +149,7 @@ const ProjectDetailPage: React.FC = () => {
     );
   }
   return (
-    <div className="w-full min-h-screen bg-gray-900 text-white relative">
-      {/* Persistent loader in top right corner */}
-      <div className="fixed top-4 right-4 z-50">
-        <JSDoITLoader size="small" persistent={true} className="opacity-80" />
-      </div>
+    <div className="w-full min-h-screen bg-gray-900 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header section */}
         <div className="mb-8">

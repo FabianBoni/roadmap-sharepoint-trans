@@ -34,7 +34,7 @@ const KonfigurationDocsPage: React.FC = () => {
                     <ul className="list-disc pl-6 my-4">
                         <li><strong>Häufig genutzte Filter</strong>: Merken Sie sich Ihre wichtigsten Kategorien</li>
                         <li><strong>Kombinationen</strong>: Nutzen Sie mehrere Filter gleichzeitig für präzise Ergebnisse</li>
-                        <li><strong>Filter zurücksetzen</strong>: Klicken Sie auf "Alle Filter zurücksetzen" für eine saubere Ansicht</li>
+                        <li><strong>Filter zurücksetzen</strong>: Klicken Sie auf &quot;Alle Filter zurücksetzen&quot; für eine saubere Ansicht</li>
                     </ul>
 
                     <h3 className="text-xl font-bold mt-6 mb-3">📊 Anzeigeoptionen</h3>
