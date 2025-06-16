@@ -1,14 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface JSDoITLoaderProps {
   size?: 'small' | 'medium' | 'large';
   className?: string;
+  minDuration?: number; // Mindestdauer in Millisekunden
+  persistent?: boolean; // Bleibt immer sichtbar
 }
 
 const JSDoITLoader: React.FC<JSDoITLoaderProps> = ({ 
   size = 'medium', 
-  className = '' 
+  className = '',
+  minDuration = 2000, // Standard: 2 Sekunden
+  persistent = false // Standard: nicht persistent
 }) => {
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    // Timer für Mindestanzeigedauer
+    const timer = setTimeout(() => {
+      if (!persistent) {
+        setIsVisible(false);
+      }
+    }, minDuration);
+
+    return () => clearTimeout(timer);
+  }, [minDuration, persistent]);
   const sizeConfig = {
     small: { fontSize: '2rem', width: '6ch' },
     medium: { fontSize: '4rem', width: '6ch' },
@@ -16,6 +32,11 @@ const JSDoITLoader: React.FC<JSDoITLoaderProps> = ({
   };
 
   const config = sizeConfig[size];
+
+  // Zeige den Loader nur an, wenn er sichtbar sein soll
+  if (!isVisible && !persistent) {
+    return null;
+  }
 
   return (
     <div className={`flex justify-center items-center ${className}`}>
@@ -25,8 +46,8 @@ const JSDoITLoader: React.FC<JSDoITLoaderProps> = ({
           fontSize: config.fontSize,
           width: config.width,
           animation: `
-            typing 3s steps(6) infinite,
-            blink 0.75s step-end infinite
+            typing 6s steps(6) infinite,
+            blink 1.5s step-end infinite
           `,
         }}
       >
@@ -38,8 +59,8 @@ const JSDoITLoader: React.FC<JSDoITLoaderProps> = ({
       <style dangerouslySetInnerHTML={{
         __html: `
           @keyframes typing {
-            0%, 90%, 100% { width: 0ch; }
-            10%, 80% { width: 6ch; }
+            0%, 85%, 100% { width: 0ch; }
+            15%, 75% { width: 6ch; }
           }
           @keyframes blink {
             50% { border-color: transparent; }

@@ -182,11 +182,10 @@ const AdminPage: React.FC = () => {
   const handleCancelEdit = () => {
     setEditingSetting(null);
     setNewSettingValue('');
-  };
-  if (loading) {
+  };  if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-white p-8 flex items-center justify-center">
-        <JSDoITLoader size="large" />
+        <JSDoITLoader size="large" minDuration={2000} />
       </div>
     );
   }
@@ -194,6 +193,9 @@ const AdminPage: React.FC = () => {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-900 text-white p-8 flex flex-col items-center justify-center">
+        <div className="fixed top-4 right-4 z-50">
+          <JSDoITLoader size="small" persistent={true} className="opacity-80" />
+        </div>
         <p className="text-red-500 mb-4">{error}</p>
         <button
           onClick={() => window.location.reload()}
@@ -206,7 +208,11 @@ const AdminPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8">
+    <div className="min-h-screen bg-gray-900 text-white p-8 relative">
+      {/* Persistent loader in top right corner */}
+      <div className="fixed top-4 right-4 z-50">
+        <JSDoITLoader size="small" persistent={true} className="opacity-80" />
+      </div>
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>

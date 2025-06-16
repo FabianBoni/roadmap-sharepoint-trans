@@ -22,15 +22,24 @@ const HomePage: React.FC = () => {
 
     fetchProjects();
   }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-        <JSDoITLoader size="large" />
+        <JSDoITLoader size="large" minDuration={2000} />
       </div>
     );
   }
 
-  return <Roadmap initialProjects={projects} />;
+  return (
+    <div className="relative">
+      {/* Persistent loader in top right corner */}
+      <div className="fixed top-4 right-4 z-50">
+        <JSDoITLoader size="small" persistent={true} className="opacity-80" />
+      </div>
+      <Roadmap initialProjects={projects} />
+    </div>
+  );
 };
 
 export default HomePage;
