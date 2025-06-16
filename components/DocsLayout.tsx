@@ -37,120 +37,62 @@ const DocsLayout: React.FC<DocsLayoutProps> = ({ children }) => {
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex">
         {/* Sidebar Navigation */}
         <div className="w-64 pr-8 border-r border-gray-700">
-          <nav className="space-y-6">
-            <div>
+          <nav className="space-y-6">            <div>
               <h3 className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-3">
                 Erste Schritte
               </h3>
-              <ul className="space-y-2">                <li>
-                  <Link href="/docs/erste-schritte">
-                    <span className={`block py-1 ${isActive('/docs/erste-schritte')}`}>
-                      Übersicht
-                    </span>
-                  </Link>
-                </li>
+              <ul className="space-y-2">
                 <li>
                   <Link href="/docs/erste-schritte/installation">
                     <span className={`block py-1 ${isActive('/docs/erste-schritte/installation')}`}>
-                      Installation
+                      Erste Schritte
                     </span>
                   </Link>
                 </li>
                 <li>
                   <Link href="/docs/erste-schritte/konfiguration">
                     <span className={`block py-1 ${isActive('/docs/erste-schritte/konfiguration')}`}>
-                      Konfiguration
+                      Personalisierung
                     </span>
                   </Link>
                 </li>
               </ul>
-            </div>
-
-            <div>
+            </div>            <div>
               <h3 className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-3">
                 Funktionen
               </h3>
-              <ul className="space-y-2">                <li>
-                  <Link href="/docs/funktionen">
-                    <span className={`block py-1 ${isActive('/docs/funktionen')}`}>
-                      Übersicht
+              <ul className="space-y-2">
+                <li>
+                  <Link href="/docs/funktionen/roadmap">
+                    <span className={`block py-1 ${isActive('/docs/funktionen/roadmap')}`}>
+                      Roadmap nutzen
                     </span>
                   </Link>
                 </li>
                 <li>
                   <Link href="/docs/funktionen/projekte">
                     <span className={`block py-1 ${isActive('/docs/funktionen/projekte')}`}>
-                      Projekte
+                      Projekte verstehen
                     </span>
                   </Link>
                 </li>
                 <li>
                   <Link href="/docs/funktionen/kategorien">
                     <span className={`block py-1 ${isActive('/docs/funktionen/kategorien')}`}>
-                      Kategorien
-                    </span>
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/docs/funktionen/feldtypen">
-                    <span className={`block py-1 ${isActive('/docs/funktionen/feldtypen')}`}>
-                      Feldtypen
+                      Filter verwenden
                     </span>
                   </Link>
                 </li>
               </ul>
-            </div>
-
-            <div>
+            </div>            <div>
               <h3 className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-3">
-                API-Referenz
+                Administration
               </h3>
-              <ul className="space-y-2">                <li>
-                  <Link href="/docs/api">
-                    <span className={`block py-1 ${isActive('/docs/api')}`}>
-                      Übersicht
-                    </span>
-                  </Link>
-                </li>
+              <ul className="space-y-2">
                 <li>
-                  <Link href="/docs/api/projekte">
-                    <span className={`block py-1 ${isActive('/docs/api/projekte')}`}>
-                      Projekte API
-                    </span>
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/docs/api/kategorien">
-                    <span className={`block py-1 ${isActive('/docs/api/kategorien')}`}>
-                      Kategorien API
-                    </span>
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/docs/api/feldtypen">
-                    <span className={`block py-1 ${isActive('/docs/api/feldtypen')}`}>
-                      Feldtypen API
-                    </span>
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-3">
-                Admin
-              </h3>
-              <ul className="space-y-2">                <li>
                   <Link href="/docs/admin">
                     <span className={`block py-1 ${isActive('/docs/admin')}`}>
-                      Übersicht
-                    </span>
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/docs/admin/dashboard">
-                    <span className={`block py-1 ${isActive('/docs/admin/dashboard')}`}>
-                      Dashboard
+                      Administrator-Leitfaden
                     </span>
                   </Link>
                 </li>

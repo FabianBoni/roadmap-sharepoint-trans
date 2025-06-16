@@ -20,18 +20,29 @@ const AdminDocsPage: React.FC = () => {
               Dieser Bereich ist nur für Administratoren zugänglich. Sie benötigen entsprechende Anmeldedaten, 
               um auf diese Funktionen zuzugreifen.
             </p>
+          </div>          <h2 className="text-2xl font-bold mt-8 mb-4">Zugang zum Admin-Bereich</h2>
+
+          <div className="bg-yellow-900/30 p-6 rounded-lg my-6">
+            <h3 className="text-lg font-semibold text-yellow-300 mb-3">⚠️ Administrator-Berechtigung erforderlich</h3>
+            <p className="mb-4">
+              Um administrative Aufgaben durchzuführen, müssen Sie vom Besitzer der Seite als Administrator hinzugefügt werden. 
+              Der Admin-Zugang kann nicht selbst beantragt oder erstellt werden.
+            </p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>Wenden Sie sich an den Seiten-Administrator oder IT-Verantwortlichen</li>
+              <li>Nach der Berechtigung erhalten Sie Zugang zum Admin-Dashboard</li>
+              <li>Der Zugang wird über Ihr Benutzerkonto gewährt</li>
+            </ul>
           </div>
 
-          <h2 className="text-2xl font-bold mt-8 mb-4">Zugang zum Admin-Bereich</h2>
-
           <p>
-            Um administrative Aufgaben durchzuführen:
+            Sobald Sie Administrator-Rechte haben:
           </p>
 
           <ol className="list-decimal pl-6 my-4">
-            <li>Navigieren Sie zur Admin-Anmeldung über den entsprechenden Link</li>
-            <li>Melden Sie sich mit Ihren Administrator-Anmeldedaten an</li>
-            <li>Sie gelangen automatisch zum Admin-Dashboard</li>
+            <li>Navigieren Sie zum Admin-Bereich über den entsprechenden Link</li>
+            <li>Ihre Berechtigung wird automatisch überprüft</li>
+            <li>Sie gelangen zum Admin-Dashboard mit allen Verwaltungsfunktionen</li>
           </ol>
 
           <h2 className="text-2xl font-bold mt-8 mb-4">Hauptaufgaben als Administrator</h2>
