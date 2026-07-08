@@ -165,6 +165,36 @@ const ALLOWED_LISTS = new Set([
   'Roadmap Project Links',
 ]);
 
+const decodeSharePointArg = (value: string): string => {
+  let decoded = value;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    /* ignore decode errors */
+  }
+  return decoded.replace(/''/g, "'");
+};
+
+const isAllowedRoadmapAttachmentPath = (serverRelativePathRaw: string): boolean => {
+  const decodedPath = decodeSharePointArg(serverRelativePathRaw).replace(/\\/g, '/').toLowerCase();
+
+  if (!decodedPath.includes('/attachments')) return false;
+
+  for (const title of ALLOWED_LISTS) {
+    const lower = title.toLowerCase();
+    const compact = lower.replace(/\s+/g, '');
+    if (
+      decodedPath.includes(`/lists/${lower}`) ||
+      decodedPath.includes(`/lists/${compact}`) ||
+      decodedPath.includes(`/lists/${lower.replace(/\s+/g, '%20')}`)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 // Allow /_api/contextinfo for digest retrieval
 function isAllowedPath(path: string) {
   // Normalize trailing slashes (except root) so /_api/contextinfo/ is treated like /_api/contextinfo
@@ -221,6 +251,23 @@ function isAllowedPath(path: string) {
   // Optional debug allowance to enumerate lists (avoids needing a specific list) ONLY when SP_PROXY_DEBUG enabled
   // @ts-ignore
   if (process.env.SP_PROXY_DEBUG === 'true' && cleaned === '/_api/web/lists') return true;
+
+  // Allow attachment operations by server-relative URL, but only inside whitelisted Roadmap list paths.
+  // Covers folder creation and chunked upload/download endpoints.
+  const folderByServerRelativeUrlMatch = cleaned.match(
+    /^\/\_api\/web\/GetFolderByServerRelativeUrl\('([^']+)'\)(?:\/Folders\/add\('([^']+)'\))?$/i
+  );
+  if (folderByServerRelativeUrlMatch?.[1]) {
+    return isAllowedRoadmapAttachmentPath(folderByServerRelativeUrlMatch[1]);
+  }
+
+  const fileByServerRelativeUrlMatch = cleaned.match(
+    /^\/\_api\/web\/GetFileByServerRelativeUrl\('([^']+)'\)(?:\/(?:\$value|StartUpload\([^)]*\)|ContinueUpload\([^)]*\)|FinishUpload\([^)]*\)))?$/i
+  );
+  if (fileByServerRelativeUrlMatch?.[1]) {
+    return isAllowedRoadmapAttachmentPath(fileByServerRelativeUrlMatch[1]);
+  }
+
   if (!cleaned.startsWith('/_api/web/lists')) return false;
   const match = cleaned.match(/getByTitle\('([^']+)'\)/);
   if (!match) return false;
