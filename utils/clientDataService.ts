@@ -4374,20 +4374,16 @@ class ClientDataService {
           ? crypto.randomUUID()
           : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-      const total = file.size;
-      const chunks = Math.ceil(total / chunkSize);
-      let offset = 0;
-
-      for (let index = 0; index < chunks; index += 1) {
-        const start = offset;
-        const end = Math.min(start + chunkSize, total);
-        const action = index === 0 ? 'start' : index === chunks - 1 ? 'finish' : 'continue';
-        const blob = file.slice(start, end);
+      const sendChunk = async (params: {
+        action: 'start' | 'continue' | 'finish';
+        startOffset: number;
+        blob: Blob;
+      }) => {
         const query =
           `?name=${encodeURIComponent(file.name)}` +
-          `&chunked=1&action=${action}` +
+          `&chunked=1&action=${params.action}` +
           `&uploadId=${encodeURIComponent(uploadId)}` +
-          `&offset=${start}`;
+          `&offset=${params.startOffset}`;
         const url = this.withClientInstanceQuery(
           `/api/attachments/${encodeURIComponent(projectId)}${query}`
         );
@@ -4395,7 +4391,7 @@ class ClientDataService {
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/octet-stream', Accept: 'application/json' },
-          body: blob,
+          body: params.blob,
           signal: opts?.signal,
         });
 
@@ -4407,6 +4403,28 @@ class ClientDataService {
             `Upload failed (${response.status})`;
           throw new Error(String(detail));
         }
+
+        return payload;
+      };
+
+      const total = file.size;
+      const chunks = Math.ceil(total / chunkSize);
+      let offset = 0;
+
+      if (chunks === 1) {
+        const blob = file.slice(0, total);
+        await sendChunk({ action: 'start', startOffset: 0, blob });
+        await sendChunk({ action: 'finish', startOffset: total, blob: new Blob([]) });
+        if (opts?.onProgress) opts.onProgress(100);
+        return;
+      }
+
+      for (let index = 0; index < chunks; index += 1) {
+        const start = offset;
+        const end = Math.min(start + chunkSize, total);
+        const action = index === 0 ? 'start' : index === chunks - 1 ? 'finish' : 'continue';
+        const blob = file.slice(start, end);
+        const payload = await sendChunk({ action, startOffset: start, blob });
 
         const nextOffsetRaw =
           payload && typeof payload === 'object' && 'nextOffset' in payload
