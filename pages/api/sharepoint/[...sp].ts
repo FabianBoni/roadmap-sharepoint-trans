@@ -198,7 +198,7 @@ const isAllowedRoadmapAttachmentPath = (serverRelativePathRaw: string): boolean 
 
 const isAllowedRoadmapDocumentLibraryPath = (serverRelativePathRaw: string): boolean => {
   const decodedPath = decodeSharePointArg(serverRelativePathRaw).replace(/\\/g, '/').toLowerCase();
-  return decodedPath.includes('/roadmap documents/');
+  return decodedPath.includes('/roadmap documents');
 };
 
 // Allow /_api/contextinfo for digest retrieval
