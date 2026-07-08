@@ -3,7 +3,6 @@ import { extname } from 'path';
 import { clientDataService } from '@/utils/clientDataService';
 import { requireUserSession } from '@/utils/apiAuth';
 import { isReadSessionAllowedForInstance } from '@/utils/instanceAccessServer';
-import { resolveSharePointSiteUrl } from '@/utils/sharepointEnv';
 import {
   getInstanceConfigFromRequest,
   INSTANCE_COOKIE_NAME,
@@ -14,15 +13,31 @@ import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : null;
 
-type AttachmentListItem = { FileName: string; ServerRelativeUrl: string };
+type LibraryFile = { FileName: string; ServerRelativeUrl: string };
 
-const findAttachmentByName = (payload: unknown, name: string): AttachmentListItem | null => {
-  if (!Array.isArray(payload)) return null;
+const findFileByName = (payload: unknown, name: string): LibraryFile | null => {
   const expected = String(name).toLowerCase();
-  for (const entry of payload) {
+  const candidates = Array.isArray(payload)
+    ? payload
+    : Array.isArray(asRecord(payload)?.value)
+      ? (asRecord(payload)?.value as unknown[])
+      : Array.isArray(
+            asRecord(payload)?.d &&
+              asRecord(payload)?.d &&
+              (asRecord(payload)?.d as Record<string, unknown>).results
+          )
+        ? ((asRecord(payload)?.d as Record<string, unknown>).results as unknown[])
+        : [];
+
+  for (const entry of candidates) {
     const rec = asRecord(entry);
     if (!rec) continue;
-    const fileName = typeof rec.FileName === 'string' ? rec.FileName : '';
+    const fileName =
+      typeof rec.FileName === 'string'
+        ? rec.FileName
+        : typeof rec.Name === 'string'
+          ? rec.Name
+          : '';
     const serverRelativeUrl =
       typeof rec.ServerRelativeUrl === 'string' ? rec.ServerRelativeUrl : '';
     if (!fileName || !serverRelativeUrl) continue;
@@ -76,15 +91,12 @@ const shouldPreferExtensionMime = (
 
   if (normalizedCurrent === normalizedExtension) return false;
   if (GENERIC_CONTENT_TYPES.has(normalizedCurrent)) return true;
-
   if (normalizedExtension.startsWith('image/') && !normalizedCurrent.startsWith('image/')) {
     return true;
   }
-
   if (normalizedExtension === 'application/pdf' && normalizedCurrent !== 'application/pdf') {
     return true;
   }
-
   return false;
 };
 
@@ -157,22 +169,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    let listTitle = 'Roadmap Projects';
-    try {
-      listTitle = await clientDataService.withInstance(instance.slug, () =>
-        clientDataService.resolveListTitle('Roadmap Projects')
-      );
-    } catch (err) {
-      console.warn('[attachments:download] failed to resolve list title', err);
-    }
-    const encodedTitle = encodeURIComponent(listTitle);
-
     const baseUrl =
       (process.env.INTERNAL_API_BASE_URL || '').replace(/\/$/, '') ||
       `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}`;
-    const basePath = `/api/sharepoint/_api/web/lists/getByTitle('${encodedTitle}')/items(${encodeURIComponent(
-      id
-    )})/AttachmentFiles/getByFileName('${encodeURIComponent(name).replace(/'/g, "''")}')/$value`;
+
     const withSlug = (rawUrl: string) => {
       try {
         const urlObj = new URL(rawUrl);
@@ -184,6 +184,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           : `${rawUrl}?${INSTANCE_QUERY_PARAM}=${encodeURIComponent(instance!.slug)}`;
       }
     };
+
     const attachHeaders = (headers: HeadersInit = {}) => {
       const h = new Headers(headers);
       h.set('x-roadmap-instance', instance!.slug);
@@ -203,50 +204,80 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return h;
     };
 
-    const apiBase = withSlug(baseUrl + basePath);
-    let response = await fetch(apiBase, {
-      headers: attachHeaders({
-        Accept: '*/*',
-        Cookie: typeof req.headers.cookie === 'string' ? req.headers.cookie : '',
-      }),
+    const libraryTitle = await clientDataService.withInstance(instance.slug, () =>
+      clientDataService.resolveListTitle('Roadmap Documents')
+    );
+
+    const encodedTitle = encodeURIComponent(libraryTitle);
+    const listInfoUrl = `${baseUrl}/api/sharepoint/_api/web/lists/getByTitle('${encodedTitle}')?$select=RootFolder/ServerRelativeUrl&$expand=RootFolder`;
+    const rootResp = await fetch(withSlug(listInfoUrl), {
+      headers: attachHeaders({ Accept: 'application/json;odata=nometadata' }),
     });
-
-    if (!response.ok) {
-      const detail = await response.text();
-      // Fallback for legacy farms / encoding issues: resolve ServerRelativeUrl then download by it
-      try {
-        const listUrl = withSlug(
-          `${baseUrl}/api/attachments/${encodeURIComponent(id)}?${INSTANCE_QUERY_PARAM}=${encodeURIComponent(
-            instance.slug
-          )}`
-        );
-        const listResp = await fetch(listUrl, {
-          headers: attachHeaders({ Accept: 'application/json' }),
-        });
-        const listJson = await listResp.json().catch(() => null);
-        const match = findAttachmentByName(listJson, name);
-        if (match?.ServerRelativeUrl) {
-          const encodedServerRelative = encodeURI(String(match.ServerRelativeUrl)).replace(
-            /'/g,
-            "''"
-          );
-          const altPath = `${baseUrl}/api/sharepoint/_api/web/GetFileByServerRelativeUrl('${encodedServerRelative}')/$value`;
-          response = await fetch(withSlug(altPath), {
-            headers: attachHeaders({
-              Accept: '*/*',
-              Cookie: typeof req.headers.cookie === 'string' ? req.headers.cookie : '',
-            }),
-          });
-        }
-      } catch {
-        /* ignore fallback errors */
-      }
-
-      if (!response.ok) {
-        return res.status(response.status).json({ error: 'download-failed', detail });
-      }
+    const rootText = await rootResp.text();
+    if (!rootResp.ok) {
+      return res.status(rootResp.status).json({ error: 'download-failed', detail: rootText });
     }
-    let contentType = response.headers.get('content-type') || '';
+    const rootPayload = (() => {
+      try {
+        return JSON.parse(rootText);
+      } catch {
+        return rootText;
+      }
+    })();
+    const rootFolderUrl =
+      (asRecord(rootPayload)?.RootFolder as Record<string, unknown> | undefined)
+        ?.ServerRelativeUrl ||
+      ((asRecord(rootPayload)?.d as Record<string, unknown> | undefined)?.RootFolder &&
+        (asRecord((asRecord(rootPayload)?.d as Record<string, unknown> | undefined)?.RootFolder)
+          ?.ServerRelativeUrl as string | undefined));
+
+    if (!rootFolderUrl || typeof rootFolderUrl !== 'string') {
+      return res.status(500).json({ error: 'download-failed', detail: 'library-root-missing' });
+    }
+
+    const fileFolderUrl = `${rootFolderUrl.replace(/\/$/, '')}/${encodeURIComponent(String(id))}`;
+    const listUrl = withSlug(
+      `${baseUrl}/api/sharepoint/_api/web/GetFolderByServerRelativeUrl('${encodeURI(
+        fileFolderUrl
+      ).replace(/'/g, "''")}')/Files?$select=Name,ServerRelativeUrl`
+    );
+
+    const listResp = await fetch(listUrl, {
+      headers: attachHeaders({ Accept: 'application/json;odata=nometadata' }),
+    });
+    const listText = await listResp.text();
+    if (!listResp.ok) {
+      return res.status(listResp.status).json({ error: 'download-failed', detail: listText });
+    }
+
+    let listPayload: unknown;
+    try {
+      listPayload = JSON.parse(listText);
+    } catch {
+      listPayload = listText;
+    }
+
+    const match = findFileByName(listPayload, name);
+    if (!match?.ServerRelativeUrl) {
+      return res.status(404).json({ error: 'download-failed', detail: 'file-not-found' });
+    }
+
+    const encodedServerRelative = encodeURI(String(match.ServerRelativeUrl)).replace(/'/g, "''");
+    const fileResp = await fetch(
+      withSlug(
+        `${baseUrl}/api/sharepoint/_api/web/GetFileByServerRelativeUrl('${encodedServerRelative}')/$value`
+      ),
+      {
+        headers: attachHeaders({ Accept: '*/*' }),
+      }
+    );
+
+    if (!fileResp.ok) {
+      const detail = await fileResp.text();
+      return res.status(fileResp.status).json({ error: 'download-failed', detail });
+    }
+
+    let contentType = fileResp.headers.get('content-type') || '';
     const ext = extname(name).toLowerCase();
     const extensionMime = ext ? mimeByExtension[ext] : undefined;
 
@@ -257,76 +288,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const contentDisposition = buildContentDisposition(name, isInlinePreviewType(contentType));
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-
-    const sniff = buffer
-      .toString('utf8', 0, Math.min(buffer.length, 256))
-      .replace(/^\uFEFF/, '')
-      .trimStart();
-    const looksLikeHtml = /^<!doctype\s+html|^<html\b|^<head\b|^<body\b|^<script\b|^<\?xml\b/i.test(
-      sniff
-    );
-    const normalizedContentType = normalizeContentType(contentType);
-    const looksLikeValidPdf =
-      normalizedContentType === 'application/pdf' &&
-      buffer.subarray(0, 4).toString('ascii') === '%PDF';
-    const looksLikeValidOfficeBinary =
-      /officedocument|msword|vnd\.ms-excel|vnd\.ms-powerpoint/i.test(normalizedContentType) &&
-      buffer.length > 0;
-    const isDerivedImage =
-      /^(image\/)i?/i.test(contentType) || /\.(jpe?g|png|gif|bmp|svg|webp)$/i.test(name);
-    const ctIsOctet = /application\/octet-stream/i.test(contentType) || !contentType;
-
-    // Some SharePoint farms/proxies respond with HTML/error payloads or empty buffers while still
-    // reporting a document MIME type. In that case, redirect the browser to the direct SharePoint
-    // URL as a best-effort fallback.
-    if (
-      looksLikeHtml ||
-      buffer.length === 0 ||
-      (normalizedContentType === 'application/pdf' && !looksLikeValidPdf) ||
-      (!looksLikeValidOfficeBinary && /msword|officedocument|excel|powerpoint/i.test(contentType))
-    ) {
-      try {
-        const listUrl = withSlug(
-          `${baseUrl}/api/attachments/${encodeURIComponent(id)}?${INSTANCE_QUERY_PARAM}=${encodeURIComponent(
-            instance.slug
-          )}`
-        );
-        const listResp = await fetch(listUrl, {
-          headers: attachHeaders({ Accept: 'application/json' }),
-        });
-        const listJson = await listResp.json().catch(() => null);
-        const match = findAttachmentByName(listJson, name);
-        if (match?.ServerRelativeUrl) {
-          const spSite = resolveSharePointSiteUrl(instance);
-          const spOrigin = new URL(spSite).origin;
-          const serverRel = String(match.ServerRelativeUrl);
-          const direct = new URL(serverRel, spOrigin).toString();
-          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-          res.setHeader('Location', direct);
-          return res.status(302).end();
-        }
-      } catch {
-        /* ignore redirect fallback */
-      }
-      // If redirect fallback fails, return the text snippet for debugging instead of a broken document.
-      return res.status(502).json({ error: 'download-invalid-binary', snippet: sniff });
-    }
-    res.status(response.status);
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', contentDisposition);
-    const length = String(buffer.byteLength);
-    const etag = response.headers.get('etag');
-    const lastModified = response.headers.get('last-modified');
-    if (length) res.setHeader('Content-Length', length);
-    if (etag) res.setHeader('ETag', etag);
-    if (lastModified) res.setHeader('Last-Modified', lastModified);
-    res.end(buffer);
-    return;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'download error';
+
+    const contentLength = fileResp.headers.get('content-length');
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+
+    const body = Buffer.from(await fileResp.arrayBuffer());
+    return res.status(200).send(body);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'download failed';
     return res.status(500).json({ error: message });
   }
 }

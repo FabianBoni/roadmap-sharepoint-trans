@@ -30,12 +30,12 @@ async function readRawBody(req: NextApiRequest): Promise<Uint8Array> {
       }
     });
     req.on('end', () => {
-      const total = chunks.reduce((n, c) => n + c.length, 0);
+      const total = chunks.reduce((sum, part) => sum + part.length, 0);
       const merged = new Uint8Array(total);
       let offset = 0;
-      for (const c of chunks) {
-        merged.set(c, offset);
-        offset += c.length;
+      for (const part of chunks) {
+        merged.set(part, offset);
+        offset += part.length;
       }
       resolve(merged);
     });
@@ -69,28 +69,32 @@ const getNested = (value: unknown, path: string[]): unknown => {
   return current;
 };
 
-type AttachmentFile = { FileName: string; ServerRelativeUrl: string };
+type LibraryFile = { FileName: string; ServerRelativeUrl: string };
 
-const coerceAttachmentFile = (value: unknown): AttachmentFile | null => {
+const coerceFileItem = (value: unknown): LibraryFile | null => {
   const rec = asRecord(value);
   if (!rec) return null;
-  const fileName = typeof rec.FileName === 'string' ? rec.FileName : null;
+  const fileName =
+    typeof rec.FileName === 'string'
+      ? rec.FileName
+      : typeof rec.Name === 'string'
+        ? rec.Name
+        : null;
   const serverRelativeUrl =
     typeof rec.ServerRelativeUrl === 'string' ? rec.ServerRelativeUrl : null;
   if (!fileName || !serverRelativeUrl) return null;
   return { FileName: fileName, ServerRelativeUrl: serverRelativeUrl };
 };
 
-const extractAttachmentArray = (payload: unknown): AttachmentFile[] => {
+const extractFileArray = (payload: unknown): LibraryFile[] => {
   const direct = asRecord(payload);
-  const value = direct?.value;
-  if (Array.isArray(value)) {
-    return value.map(coerceAttachmentFile).filter((v): v is AttachmentFile => Boolean(v));
+  if (Array.isArray(direct?.value)) {
+    return direct.value.map(coerceFileItem).filter((item): item is LibraryFile => Boolean(item));
   }
 
   const results = getNested(payload, ['d', 'results']);
   if (Array.isArray(results)) {
-    return results.map(coerceAttachmentFile).filter((v): v is AttachmentFile => Boolean(v));
+    return results.map(coerceFileItem).filter((item): item is LibraryFile => Boolean(item));
   }
 
   return [];
@@ -145,21 +149,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const baseUrl =
       (process.env.INTERNAL_API_BASE_URL || '').replace(/\/$/, '') ||
       `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}`;
-    let listTitle = 'Roadmap Projects';
-    try {
-      listTitle = await clientDataService.withInstance(instance.slug, () =>
-        clientDataService.resolveListTitle('Roadmap Projects')
-      );
-    } catch (err) {
-      console.warn('[api/attachments] failed to resolve list title', err);
-    }
-    const encodedTitle = encodeURIComponent(listTitle);
-    const basePath = `/api/sharepoint/_api/web/lists/getByTitle('${encodedTitle}')/items(${encodeURIComponent(
-      id
-    )})/AttachmentFiles`;
-    const base = `${baseUrl}${basePath}`;
-
-    const listInfoUrl = `${baseUrl}/api/sharepoint/_api/web/lists/getByTitle('${encodedTitle}')?$select=RootFolder/ServerRelativeUrl&$expand=RootFolder`;
 
     const withSlug = (rawUrl: string) => {
       try {
@@ -192,6 +181,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return h;
     };
 
+    const resolveStorageTitle = async (): Promise<string> => {
+      return await clientDataService.withInstance(instance.slug, () =>
+        clientDataService.resolveListTitle('Roadmap Documents')
+      );
+    };
+
+    const storageTitle = await resolveStorageTitle();
+    const encodedTitle = encodeURIComponent(storageTitle);
+    const listInfoUrl = `${baseUrl}/api/sharepoint/_api/web/lists/getByTitle('${encodedTitle}')?$select=RootFolder/ServerRelativeUrl&$expand=RootFolder`;
+
     const getRootFolderUrl = async (): Promise<string> => {
       const url = withSlug(listInfoUrl);
       const r = await fetch(url, {
@@ -209,12 +208,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return String(rootUrl);
     };
 
-    const ensureAttachmentFolder = async (rootFolderUrl: string) => {
-      const parent = `${rootFolderUrl.replace(/\/$/, '')}/Attachments`;
+    const getProjectFolderUrl = (rootFolderUrl: string): string =>
+      `${rootFolderUrl.replace(/\/$/, '')}/${encodeURIComponent(String(id))}`;
+
+    const ensureProjectFolder = async (rootFolderUrl: string) => {
+      const parent = rootFolderUrl.replace(/\/$/, '');
       const url = withSlug(
-        `${baseUrl}/api/sharepoint/_api/web/GetFolderByServerRelativeUrl('${encodeServerRelativeUrl(
-          parent
-        )}')/Folders/add('${encodeURIComponent(id)}')`
+        `${baseUrl}/api/sharepoint/_api/web/GetFolderByServerRelativeUrl('${encodeServerRelativeUrl(parent)}')/Folders/add('${encodeURIComponent(
+          String(id)
+        )}')`
       );
       const r = await fetch(url, {
         method: 'POST',
@@ -229,12 +231,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     };
 
-    const ensureAttachmentFile = async (rootFolderUrl: string, fileName: string) => {
-      const itemFolder = `${rootFolderUrl.replace(/\/$/, '')}/Attachments/${id}`;
+    const fileUrlFor = (rootFolderUrl: string, fileName: string): string => {
+      const folderUrl = getProjectFolderUrl(rootFolderUrl);
+      return `${folderUrl}/${fileName}`;
+    };
+
+    const ensureEmptyFile = async (fileUrl: string) => {
       const addUrl = withSlug(
         `${baseUrl}/api/sharepoint/_api/web/GetFolderByServerRelativeUrl('${encodeServerRelativeUrl(
-          itemFolder
-        )}')/Files/add(url='${encodeURIComponent(fileName).replace(/'/g, "''")}',overwrite=true)`
+          fileUrl.slice(0, fileUrl.lastIndexOf('/'))
+        )}')/Files/add(url='${encodeURIComponent(fileUrl.slice(fileUrl.lastIndexOf('/') + 1)).replace(/'/g, "''")}',overwrite=true)`
       );
       const r = await fetch(addUrl, {
         method: 'POST',
@@ -244,17 +250,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }),
         body: new Uint8Array(0),
       });
-      if (r.ok) return;
-      const body = await r.text();
-      if (/already exists|bereits vorhanden|duplicate|same name/i.test(body)) return;
-      throw new Error(`attachment-file-init-failed:${r.status}:${body}`);
+      if (!r.ok && r.status !== 409) {
+        const body = await r.text();
+        if (!/already exists|bereits vorhanden|duplicate|same name/i.test(body)) {
+          throw new Error(`attachment-file-init-failed:${r.status}:${body}`);
+        }
+      }
     };
 
-    const cleanupAttachmentFile = async (fileName: string) => {
-      const deleteUrl = withSlug(
-        base + `/getByFileName('${encodeURIComponent(fileName).replace(/'/g, "''")}')`
+    const deleteFile = async (rootFolderUrl: string, fileName: string) => {
+      const fileUrl = fileUrlFor(rootFolderUrl, fileName);
+      const url = withSlug(
+        `${baseUrl}/api/sharepoint/_api/web/GetFileByServerRelativeUrl('${encodeServerRelativeUrl(fileUrl)}')`
       );
-      await fetch(deleteUrl, {
+      const r = await fetch(url, {
         method: 'POST',
         headers: attachHeaders({
           Accept: 'application/json;odata=nometadata',
@@ -262,14 +271,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'X-HTTP-Method': 'DELETE',
           'IF-MATCH': '*',
         }),
-      }).catch(() => undefined);
+      });
+      if (!r.ok) {
+        const body = await r.text();
+        throw new Error(`sp-delete-failed:${r.status}:${body}`);
+      }
     };
 
     if (req.method === 'GET') {
-      const baseListUrl = withSlug(base + '?$select=FileName,ServerRelativeUrl');
+      const rootFolderUrl = await getRootFolderUrl();
+      const folderUrl = getProjectFolderUrl(rootFolderUrl);
+      const listUrl = withSlug(
+        `${baseUrl}/api/sharepoint/_api/web/GetFolderByServerRelativeUrl('${encodeServerRelativeUrl(
+          folderUrl
+        )}')/Files?$select=Name,ServerRelativeUrl`
+      );
 
       const tryFetch = async (accept: string) => {
-        const r = await fetch(baseListUrl, {
+        const r = await fetch(listUrl, {
           headers: attachHeaders({ Accept: accept }),
         });
         const txt = await r.text();
@@ -278,32 +297,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return { r, txt, ct, payload };
       };
 
-      // 1) nometadata
       let attempt = await tryFetch('application/json;odata=nometadata');
       if (!attempt.r.ok && shouldRetryAsLegacy(attempt.r.status, String(attempt.txt || ''))) {
-        // 2) verbose JSON
         attempt = await tryFetch('application/json;odata=verbose');
       }
       if (!attempt.r.ok && shouldRetryAsLegacy(attempt.r.status, String(attempt.txt || ''))) {
-        // 3) Atom XML
-        const atomUrl = baseListUrl;
-        const atomResp = await fetch(atomUrl, {
+        const atomResp = await fetch(listUrl, {
           headers: attachHeaders({ Accept: 'application/atom+xml' }),
         });
         const atomText = await atomResp.text();
         if (!atomResp.ok) {
           return res.status(atomResp.status).json({ error: 'sp-error', payload: atomText });
         }
-        // Minimal Atom parser for attachments
         try {
           const entries = atomText.match(/<entry[\s\S]*?<\/entry>/gi) || [];
           const items = entries
             .map((entry) => {
               const fileNameMatch = entry.match(/<d:FileName[^>]*>([\s\S]*?)<\/d:FileName>/i);
+              const nameMatch = entry.match(/<d:Name[^>]*>([\s\S]*?)<\/d:Name>/i);
               const urlMatch = entry.match(
                 /<d:ServerRelativeUrl[^>]*>([\s\S]*?)<\/d:ServerRelativeUrl>/i
               );
-              const FileName = fileNameMatch?.[1]?.trim() || '';
+              const FileName = fileNameMatch?.[1]?.trim() || nameMatch?.[1]?.trim() || '';
               const ServerRelativeUrl = urlMatch?.[1]?.trim() || '';
               return FileName && ServerRelativeUrl ? { FileName, ServerRelativeUrl } : null;
             })
@@ -315,14 +330,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       if (!attempt.r.ok) {
+        if (attempt.r.status === 404) return res.status(200).json([]);
         return res.status(attempt.r.status).json({ error: 'sp-error', payload: attempt.payload });
       }
-      const attachments = extractAttachmentArray(attempt.payload);
-      return res.status(200).json(Array.isArray(attachments) ? attachments : []);
+
+      const files = extractFileArray(attempt.payload);
+      return res.status(200).json(files);
     }
 
     if (req.method === 'POST') {
       if (!name) return res.status(400).json({ error: 'Missing name' });
+
+      const rootFolderUrl = await getRootFolderUrl();
+      await ensureProjectFolder(rootFolderUrl);
+      const projectFolderUrl = getProjectFolderUrl(rootFolderUrl);
+      const fileUrl = fileUrlFor(rootFolderUrl, name);
+      const encodedFileUrl = encodeServerRelativeUrl(fileUrl);
+      const filePath = `${baseUrl}/api/sharepoint/_api/web/GetFileByServerRelativeUrl('${encodedFileUrl}')`;
+      const folderPath = `${baseUrl}/api/sharepoint/_api/web/GetFolderByServerRelativeUrl('${encodeServerRelativeUrl(
+        projectFolderUrl
+      )}')`;
+
       const isChunked = String(req.query.chunked || '').toLowerCase() === '1';
       if (isChunked) {
         const actionRaw = req.query.action;
@@ -337,32 +365,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         const binary = await readRawBody(req);
-        let rootFolderUrl = '';
-        try {
-          rootFolderUrl = await getRootFolderUrl();
-          await ensureAttachmentFolder(rootFolderUrl);
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : 'attachment-folder-error';
-          return res.status(500).json({ error: msg });
+        if (action === 'start') {
+          try {
+            await ensureEmptyFile(fileUrl);
+          } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : 'attachment-file-init-error';
+            return res.status(500).json({ error: msg });
+          }
         }
-
-        const fileUrl = `${rootFolderUrl.replace(/\/$/, '')}/Attachments/${id}/${name}`;
-        const encodedFileUrl = encodeServerRelativeUrl(fileUrl);
-        const apiBase = `${baseUrl}/api/sharepoint/_api/web/GetFileByServerRelativeUrl('${encodedFileUrl}')`;
 
         let spEndpoint = '';
         if (action === 'start') {
-          try {
-            await ensureAttachmentFile(rootFolderUrl, name);
-          } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : 'attachment-file-init-error';
-            return res.status(500).json({ error: msg });
-          }
-          spEndpoint = `${apiBase}/StartUpload(uploadId=guid'${uploadId}')`;
+          spEndpoint = `${filePath}/StartUpload(uploadId=guid'${uploadId}')`;
         } else if (action === 'continue') {
-          spEndpoint = `${apiBase}/ContinueUpload(uploadId=guid'${uploadId}',fileOffset=${offset})`;
+          spEndpoint = `${filePath}/ContinueUpload(uploadId=guid'${uploadId}',fileOffset=${offset})`;
         } else if (action === 'finish') {
-          spEndpoint = `${apiBase}/FinishUpload(uploadId=guid'${uploadId}',fileOffset=${offset})`;
+          spEndpoint = `${filePath}/FinishUpload(uploadId=guid'${uploadId}',fileOffset=${offset})`;
         } else {
           return res.status(400).json({ error: 'Invalid chunked action' });
         }
@@ -380,9 +398,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
         const bodyText = await r.text();
         if (!r.ok) {
-          if (action === 'start') {
-            await cleanupAttachmentFile(name);
-          }
           return res.status(r.status).json({ error: 'sp-upload-failed', body: bodyText });
         }
 
@@ -398,10 +413,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const binary = await readRawBody(req);
-      const url = withSlug(
-        base + `/add(FileName='${encodeURIComponent(name).replace(/'/g, "''")}')`
+      const addUrl = withSlug(
+        `${folderPath}/Files/add(url='${encodeURIComponent(name).replace(/'/g, "''")}',overwrite=true)`
       );
-      const r = await fetch(url, {
+      const r = await fetch(addUrl, {
         method: 'POST',
         headers: attachHeaders({
           Accept: 'application/json;odata=nometadata',
@@ -412,36 +427,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           binary.byteOffset + binary.byteLength
         ) as ArrayBuffer,
       });
-      const ok = r.ok;
       const body = await r.text();
-      if (!ok) return res.status(r.status).json({ error: 'sp-upload-failed', body });
+      if (!r.ok) return res.status(r.status).json({ error: 'sp-upload-failed', body });
       return res.status(200).json({ ok: true });
     }
 
     if (req.method === 'DELETE') {
       if (!name) return res.status(400).json({ error: 'Missing name' });
-      const url = withSlug(
-        base + `/getByFileName('${encodeURIComponent(name).replace(/'/g, "''")}')`
-      );
-      const r = await fetch(url, {
-        method: 'POST',
-        headers: attachHeaders({
-          Accept: 'application/json;odata=nometadata',
-          'Content-Type': 'application/json;odata=verbose',
-          'X-HTTP-Method': 'DELETE',
-          'IF-MATCH': '*',
-        }),
-      });
-      const ok = r.ok;
-      const body = await r.text();
-      if (!ok) return res.status(r.status).json({ error: 'sp-delete-failed', body });
+      const rootFolderUrl = await getRootFolderUrl();
+      await deleteFile(rootFolderUrl, name);
       return res.status(200).json({ ok: true });
     }
 
     res.setHeader('Allow', 'GET,POST,DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : 'attachments error';
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'attachments error';
     return res.status(500).json({ error: message });
   }
 }

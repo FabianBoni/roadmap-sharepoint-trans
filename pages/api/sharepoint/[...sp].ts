@@ -156,6 +156,7 @@ const applyNoCacheHeaders = (res: NextApiResponse) => {
 // Whitelisted lists for safety
 const ALLOWED_LISTS = new Set([
   'Roadmap Projects',
+  'Roadmap Documents',
   'Roadmap Categories',
   'Roadmap Settings',
   'Roadmap FieldTypes',
@@ -193,6 +194,11 @@ const isAllowedRoadmapAttachmentPath = (serverRelativePathRaw: string): boolean 
   }
 
   return false;
+};
+
+const isAllowedRoadmapDocumentLibraryPath = (serverRelativePathRaw: string): boolean => {
+  const decodedPath = decodeSharePointArg(serverRelativePathRaw).replace(/\\/g, '/').toLowerCase();
+  return decodedPath.includes('/roadmap documents/');
 };
 
 // Allow /_api/contextinfo for digest retrieval
@@ -258,21 +264,30 @@ function isAllowedPath(path: string) {
     /^\/\_api\/web\/GetFolderByServerRelativeUrl\('([^']+)'\)(?:\/Folders\/add\('([^']+)'\))?$/i
   );
   if (folderByServerRelativeUrlMatch?.[1]) {
-    return isAllowedRoadmapAttachmentPath(folderByServerRelativeUrlMatch[1]);
+    return (
+      isAllowedRoadmapAttachmentPath(folderByServerRelativeUrlMatch[1]) ||
+      isAllowedRoadmapDocumentLibraryPath(folderByServerRelativeUrlMatch[1])
+    );
   }
 
   const folderFilesAddMatch = cleaned.match(
     /^\/\_api\/web\/GetFolderByServerRelativeUrl\('([^']+)'\)\/Files\/add\(url='([^']+)',overwrite=true\)$/i
   );
   if (folderFilesAddMatch?.[1]) {
-    return isAllowedRoadmapAttachmentPath(folderFilesAddMatch[1]);
+    return (
+      isAllowedRoadmapAttachmentPath(folderFilesAddMatch[1]) ||
+      isAllowedRoadmapDocumentLibraryPath(folderFilesAddMatch[1])
+    );
   }
 
   const fileByServerRelativeUrlMatch = cleaned.match(
     /^\/\_api\/web\/GetFileByServerRelativeUrl\('([^']+)'\)(?:\/(?:\$value|StartUpload\([^)]*\)|ContinueUpload\([^)]*\)|FinishUpload\([^)]*\)))?$/i
   );
   if (fileByServerRelativeUrlMatch?.[1]) {
-    return isAllowedRoadmapAttachmentPath(fileByServerRelativeUrlMatch[1]);
+    return (
+      isAllowedRoadmapAttachmentPath(fileByServerRelativeUrlMatch[1]) ||
+      isAllowedRoadmapDocumentLibraryPath(fileByServerRelativeUrlMatch[1])
+    );
   }
 
   if (!cleaned.startsWith('/_api/web/lists')) return false;
