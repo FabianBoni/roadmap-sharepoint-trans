@@ -616,7 +616,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           payload: any,
           statusCode: number
         ): { status: number; snippet: string } | null => {
-          if (statusCode >= 400) {
+          if (statusCode === 401 || statusCode === 403) {
             return {
               status: statusCode,
               snippet: summarizePayload(payload) || `http ${statusCode}`,
@@ -809,6 +809,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               method,
               ntlmEligible: Boolean(canUseNtlmFallback),
               ntlmEnabled: ntlmFallbackEnabled,
+            });
+          }
+
+          if (writeAttempt.status.statusCode >= 400) {
+            return res.status(writeAttempt.status.statusCode).json({
+              error: 'SharePoint write failed',
+              snippet:
+                summarizePayload(writeAttempt.payload) || `http ${writeAttempt.status.statusCode}`,
+              instance: instance.slug,
+              targetUrl,
+              method,
             });
           }
 
