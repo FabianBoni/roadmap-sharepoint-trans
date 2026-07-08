@@ -229,9 +229,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     };
 
-    const ensureAttachmentFile = async (fileName: string) => {
+    const ensureAttachmentFile = async (rootFolderUrl: string, fileName: string) => {
+      const itemFolder = `${rootFolderUrl.replace(/\/$/, '')}/Attachments/${id}`;
       const addUrl = withSlug(
-        base + `/add(FileName='${encodeURIComponent(fileName).replace(/'/g, "''")}')`
+        `${baseUrl}/api/sharepoint/_api/web/GetFolderByServerRelativeUrl('${encodeServerRelativeUrl(
+          itemFolder
+        )}')/Files/add(url='${encodeURIComponent(fileName).replace(/'/g, "''")}',overwrite=true)`
       );
       const r = await fetch(addUrl, {
         method: 'POST',
@@ -245,6 +248,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const body = await r.text();
       if (/already exists|bereits vorhanden|duplicate|same name/i.test(body)) return;
       throw new Error(`attachment-file-init-failed:${r.status}:${body}`);
+    };
+
+    const cleanupAttachmentFile = async (fileName: string) => {
+      const deleteUrl = withSlug(
+        base + `/getByFileName('${encodeURIComponent(fileName).replace(/'/g, "''")}')`
+      );
+      await fetch(deleteUrl, {
+        method: 'POST',
+        headers: attachHeaders({
+          Accept: 'application/json;odata=nometadata',
+          'Content-Type': 'application/json;odata=verbose',
+          'X-HTTP-Method': 'DELETE',
+          'IF-MATCH': '*',
+        }),
+      }).catch(() => undefined);
     };
 
     if (req.method === 'GET') {
@@ -335,7 +353,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         let spEndpoint = '';
         if (action === 'start') {
           try {
-            await ensureAttachmentFile(name);
+            await ensureAttachmentFile(rootFolderUrl, name);
           } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : 'attachment-file-init-error';
             return res.status(500).json({ error: msg });
@@ -362,6 +380,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
         const bodyText = await r.text();
         if (!r.ok) {
+          if (action === 'start') {
+            await cleanupAttachmentFile(name);
+          }
           return res.status(r.status).json({ error: 'sp-upload-failed', body: bodyText });
         }
 

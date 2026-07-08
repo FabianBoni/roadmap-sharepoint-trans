@@ -261,6 +261,13 @@ function isAllowedPath(path: string) {
     return isAllowedRoadmapAttachmentPath(folderByServerRelativeUrlMatch[1]);
   }
 
+  const folderFilesAddMatch = cleaned.match(
+    /^\/\_api\/web\/GetFolderByServerRelativeUrl\('([^']+)'\)\/Files\/add\(url='([^']+)',overwrite=true\)$/i
+  );
+  if (folderFilesAddMatch?.[1]) {
+    return isAllowedRoadmapAttachmentPath(folderFilesAddMatch[1]);
+  }
+
   const fileByServerRelativeUrlMatch = cleaned.match(
     /^\/\_api\/web\/GetFileByServerRelativeUrl\('([^']+)'\)(?:\/(?:\$value|StartUpload\([^)]*\)|ContinueUpload\([^)]*\)|FinishUpload\([^)]*\)))?$/i
   );
