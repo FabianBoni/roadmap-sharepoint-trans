@@ -267,13 +267,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const looksLikeHtml = /^<!doctype\s+html|^<html\b|^<head\b|^<body\b|^<script\b|^<\?xml\b/i.test(
       sniff
     );
+    const normalizedContentType = normalizeContentType(contentType);
+    const looksLikeValidPdf =
+      normalizedContentType === 'application/pdf' &&
+      buffer.subarray(0, 4).toString('ascii') === '%PDF';
+    const looksLikeValidOfficeBinary =
+      /officedocument|msword|vnd\.ms-excel|vnd\.ms-powerpoint/i.test(normalizedContentType) &&
+      buffer.length > 0;
     const isDerivedImage =
       /^(image\/)i?/i.test(contentType) || /\.(jpe?g|png|gif|bmp|svg|webp)$/i.test(name);
     const ctIsOctet = /application\/octet-stream/i.test(contentType) || !contentType;
 
-    // Some SharePoint farms/proxies respond with HTML (login/error) but with octet-stream.
-    // In that case, redirect the browser to the direct SharePoint URL as a best-effort fallback.
-    if ((ctIsOctet || isDerivedImage) && looksLikeHtml) {
+    // Some SharePoint farms/proxies respond with HTML/error payloads or empty buffers while still
+    // reporting a document MIME type. In that case, redirect the browser to the direct SharePoint
+    // URL as a best-effort fallback.
+    if (
+      looksLikeHtml ||
+      buffer.length === 0 ||
+      (normalizedContentType === 'application/pdf' && !looksLikeValidPdf) ||
+      (!looksLikeValidOfficeBinary && /msword|officedocument|excel|powerpoint/i.test(contentType))
+    ) {
       try {
         const listUrl = withSlug(
           `${baseUrl}/api/attachments/${encodeURIComponent(id)}?${INSTANCE_QUERY_PARAM}=${encodeURIComponent(
@@ -297,7 +310,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } catch {
         /* ignore redirect fallback */
       }
-      // If redirect fallback fails, return the text snippet for debugging instead of a broken image.
+      // If redirect fallback fails, return the text snippet for debugging instead of a broken document.
       return res.status(502).json({ error: 'download-invalid-binary', snippet: sniff });
     }
     res.status(response.status);
