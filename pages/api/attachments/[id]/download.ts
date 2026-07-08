@@ -15,7 +15,13 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 
 type LibraryFile = { FileName: string; ServerRelativeUrl: string };
 
-const findFileByName = (payload: unknown, name: string): LibraryFile | null => {
+const buildServerRelativeUrl = (folderUrl: string, fileName: string): string => {
+  const normalizedFolder = folderUrl.replace(/\/$/, '');
+  const encodedName = encodeURIComponent(fileName).replace(/%2F/g, '/');
+  return `${normalizedFolder}/${encodedName}`;
+};
+
+const findFileByName = (payload: unknown, name: string, folderUrl: string): LibraryFile | null => {
   const expected = String(name).toLowerCase();
   const candidates = Array.isArray(payload)
     ? payload
@@ -38,8 +44,14 @@ const findFileByName = (payload: unknown, name: string): LibraryFile | null => {
         : typeof rec.Name === 'string'
           ? rec.Name
           : '';
+    const serverRelativeUrlRaw =
+      typeof rec.ServerRelativeUrl === 'string'
+        ? rec.ServerRelativeUrl
+        : typeof asRecord(rec.ServerRelativePath)?.DecodedUrl === 'string'
+          ? String(asRecord(rec.ServerRelativePath)?.DecodedUrl)
+          : '';
     const serverRelativeUrl =
-      typeof rec.ServerRelativeUrl === 'string' ? rec.ServerRelativeUrl : '';
+      serverRelativeUrlRaw || (fileName ? buildServerRelativeUrl(folderUrl, fileName) : '');
     if (!fileName || !serverRelativeUrl) continue;
     if (fileName.toLowerCase() === expected)
       return { FileName: fileName, ServerRelativeUrl: serverRelativeUrl };
@@ -257,7 +269,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       listPayload = listText;
     }
 
-    const match = findFileByName(listPayload, name);
+    const match = findFileByName(listPayload, name, fileFolderUrl);
     if (!match?.ServerRelativeUrl) {
       return res.status(404).json({ error: 'download-failed', detail: 'file-not-found' });
     }

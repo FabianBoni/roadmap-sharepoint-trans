@@ -71,7 +71,13 @@ const getNested = (value: unknown, path: string[]): unknown => {
 
 type LibraryFile = { FileName: string; ServerRelativeUrl: string };
 
-const coerceFileItem = (value: unknown): LibraryFile | null => {
+const buildServerRelativeUrl = (folderUrl: string, fileName: string): string => {
+  const normalizedFolder = folderUrl.replace(/\/$/, '');
+  const encodedName = encodeURIComponent(fileName).replace(/%2F/g, '/');
+  return `${normalizedFolder}/${encodedName}`;
+};
+
+const coerceFileItem = (value: unknown, folderUrl: string): LibraryFile | null => {
   const rec = asRecord(value);
   if (!rec) return null;
   const fileName =
@@ -80,21 +86,35 @@ const coerceFileItem = (value: unknown): LibraryFile | null => {
       : typeof rec.Name === 'string'
         ? rec.Name
         : null;
+  const serverRelativeUrlRaw =
+    typeof rec.ServerRelativeUrl === 'string'
+      ? rec.ServerRelativeUrl
+      : typeof getNested(rec, ['ServerRelativePath', 'DecodedUrl']) === 'string'
+        ? String(getNested(rec, ['ServerRelativePath', 'DecodedUrl']))
+        : null;
   const serverRelativeUrl =
-    typeof rec.ServerRelativeUrl === 'string' ? rec.ServerRelativeUrl : null;
+    serverRelativeUrlRaw && serverRelativeUrlRaw.trim().length > 0
+      ? serverRelativeUrlRaw
+      : fileName
+        ? buildServerRelativeUrl(folderUrl, fileName)
+        : null;
   if (!fileName || !serverRelativeUrl) return null;
   return { FileName: fileName, ServerRelativeUrl: serverRelativeUrl };
 };
 
-const extractFileArray = (payload: unknown): LibraryFile[] => {
+const extractFileArray = (payload: unknown, folderUrl: string): LibraryFile[] => {
   const direct = asRecord(payload);
   if (Array.isArray(direct?.value)) {
-    return direct.value.map(coerceFileItem).filter((item): item is LibraryFile => Boolean(item));
+    return direct.value
+      .map((item) => coerceFileItem(item, folderUrl))
+      .filter((item): item is LibraryFile => Boolean(item));
   }
 
   const results = getNested(payload, ['d', 'results']);
   if (Array.isArray(results)) {
-    return results.map(coerceFileItem).filter((item): item is LibraryFile => Boolean(item));
+    return results
+      .map((item) => coerceFileItem(item, folderUrl))
+      .filter((item): item is LibraryFile => Boolean(item));
   }
 
   return [];
@@ -334,7 +354,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(attempt.r.status).json({ error: 'sp-error', payload: attempt.payload });
       }
 
-      const files = extractFileArray(attempt.payload);
+      const files = extractFileArray(attempt.payload, folderUrl);
       return res.status(200).json(files);
     }
 
@@ -391,10 +411,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             Accept: 'application/json;odata=nometadata',
             'Content-Type': 'application/octet-stream',
           }),
-          body: binary.buffer.slice(
-            binary.byteOffset,
-            binary.byteOffset + binary.byteLength
-          ) as ArrayBuffer,
+          body: binary,
         });
         const bodyText = await r.text();
         if (!r.ok) {
@@ -422,10 +439,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           Accept: 'application/json;odata=nometadata',
           'Content-Type': 'application/octet-stream',
         }),
-        body: binary.buffer.slice(
-          binary.byteOffset,
-          binary.byteOffset + binary.byteLength
-        ) as ArrayBuffer,
+        body: binary,
       });
       const body = await r.text();
       if (!r.ok) return res.status(r.status).json({ error: 'sp-upload-failed', body });

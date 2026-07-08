@@ -4412,11 +4412,7 @@ class ClientDataService {
       let offset = 0;
 
       if (chunks === 1) {
-        const blob = file.slice(0, total);
-        await sendChunk({ action: 'start', startOffset: 0, blob: new Blob([]) });
-        if (opts?.onProgress) opts.onProgress(50);
-        await sendChunk({ action: 'finish', startOffset: 0, blob });
-        if (opts?.onProgress) opts.onProgress(100);
+        await directUpload();
         return;
       }
 
