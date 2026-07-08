@@ -4310,7 +4310,7 @@ class ClientDataService {
     file: File,
     opts?: { onProgress?: (pct: number) => void; signal?: AbortSignal }
   ): Promise<{ ok: boolean; error?: string; aborted?: boolean }> {
-    const maxSize = 25 * 1024 * 1024; // 25MB (SharePoint list-item attachments limit in this app)
+    const maxSize = 1024 * 1024 * 1024; // 1GB
     const allowed = [
       /\.pdf$/i,
       /\.docx?$/i,
@@ -4322,7 +4322,7 @@ class ClientDataService {
       /\.csv$/i,
       /\.zip$/i,
     ];
-    if (file.size > maxSize) return { ok: false, error: 'Datei ist zu groß (max. 25MB)' };
+    if (file.size > maxSize) return { ok: false, error: 'Datei ist zu groß (max. 1GB)' };
     if (!allowed.some((rx) => rx.test(file.name)))
       return { ok: false, error: 'Dateityp nicht erlaubt' };
 

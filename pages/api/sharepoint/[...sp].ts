@@ -11,8 +11,8 @@ import { sharePointHttpsAgent, sharePointDispatcher } from '@/utils/httpsAgent';
 export const config = {
   api: {
     bodyParser: {
-      // Attachment uploads are capped at 25MB in clientDataService.
-      // Keep proxy payload limit above that to avoid 413 from Next.js.
+      // Attachments are uploaded chunked from the client.
+      // Keep proxy payload limit above the chunk size to avoid 413 from Next.js.
       sizeLimit: '30mb',
     },
   },

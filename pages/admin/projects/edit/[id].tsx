@@ -295,7 +295,7 @@ const EditProjectPage: FC = () => {
         <h2 className="text-lg font-semibold text-white sm:text-xl">Anhänge verwalten</h2>
         <p className="text-sm text-slate-300">
           Laden Sie Dateien hoch oder entfernen Sie bestehende Dokumente. Unterstützte Formate: PDF,
-          Office, Bilder, ZIP (max. 25&nbsp;MB je Datei).
+          Office, Bilder, ZIP (max. 1&nbsp;GB je Datei).
         </p>
       </header>
 
