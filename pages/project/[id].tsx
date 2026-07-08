@@ -458,7 +458,7 @@ const ProjectDetailPage: FC<{ accessDenied?: boolean }> = ({ accessDenied }) => 
                     <li key={attachment.ServerRelativeUrl} className="ds-project-attachment-item">
                       <div className="ds-project-attachment-label">
                         <FiExternalLink className="ds-icon-sm" aria-hidden="true" />
-                        <span className="truncate">{attachment.FileName}</span>
+                        <span className="ds-project-attachment-name">{attachment.FileName}</span>
                       </div>
                       <a
                         href={buildAttachmentDownloadUrl(String(id), attachment.FileName)}

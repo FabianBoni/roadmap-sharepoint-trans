@@ -2138,14 +2138,30 @@ html[data-theme='light'] .ds-roadmap-shell .roadmap-project-label {
 
 .ds-project-attachment-label {
   display: flex;
+  flex: 1 1 auto;
   min-width: 0;
   align-items: center;
   gap: 9px;
   color: var(--ds-text-default);
 }
 
+.ds-project-attachment-name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ds-project-attachment-label svg {
+  flex: 0 0 auto;
   color: var(--ds-accent-strong);
+}
+
+.ds-project-attachment-item .ds-project-inline-link {
+  flex: 0 0 auto;
+  margin-top: 0;
+  margin-left: auto;
 }
 
 .ds-project-phase-card {

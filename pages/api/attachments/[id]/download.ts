@@ -304,7 +304,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', contentDisposition);
-    const length = response.headers.get('content-length');
+    const length = String(buffer.byteLength);
     const etag = response.headers.get('etag');
     const lastModified = response.headers.get('last-modified');
     if (length) res.setHeader('Content-Length', length);

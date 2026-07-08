@@ -4326,10 +4326,10 @@ class ClientDataService {
     if (!allowed.some((rx) => rx.test(file.name)))
       return { ok: false, error: 'Dateityp nicht erlaubt' };
 
-    const url = this.withClientInstanceQuery(
-      `/api/attachments/${encodeURIComponent(projectId)}?name=${encodeURIComponent(file.name)}`
-    );
-    try {
+    const directUpload = async () => {
+      const url = this.withClientInstanceQuery(
+        `/api/attachments/${encodeURIComponent(projectId)}?name=${encodeURIComponent(file.name)}`
+      );
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', url, true);
@@ -4365,6 +4365,70 @@ class ClientDataService {
         };
         xhr.send(file);
       });
+    };
+
+    const chunkedUpload = async () => {
+      const chunkSize = 512 * 1024; // Keep chunks below common reverse-proxy body limits.
+      const uploadId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      const total = file.size;
+      const chunks = Math.ceil(total / chunkSize);
+      let offset = 0;
+
+      for (let index = 0; index < chunks; index += 1) {
+        const start = offset;
+        const end = Math.min(start + chunkSize, total);
+        const action = index === 0 ? 'start' : index === chunks - 1 ? 'finish' : 'continue';
+        const blob = file.slice(start, end);
+        const query =
+          `?name=${encodeURIComponent(file.name)}` +
+          `&chunked=1&action=${action}` +
+          `&uploadId=${encodeURIComponent(uploadId)}` +
+          `&offset=${start}`;
+        const url = this.withClientInstanceQuery(
+          `/api/attachments/${encodeURIComponent(projectId)}${query}`
+        );
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream', Accept: 'application/json' },
+          body: blob,
+          signal: opts?.signal,
+        });
+
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          const detail =
+            (payload && typeof payload === 'object' && 'body' in payload && payload.body) ||
+            (payload && typeof payload === 'object' && 'error' in payload && payload.error) ||
+            `Upload failed (${response.status})`;
+          throw new Error(String(detail));
+        }
+
+        const nextOffsetRaw =
+          payload && typeof payload === 'object' && 'nextOffset' in payload
+            ? (payload as { nextOffset?: unknown }).nextOffset
+            : undefined;
+        const nextOffset =
+          typeof nextOffsetRaw === 'number' && Number.isFinite(nextOffsetRaw) ? nextOffsetRaw : end;
+        offset = Math.max(end, nextOffset);
+
+        if (opts?.onProgress) {
+          opts.onProgress(Math.min(100, Math.round((offset / total) * 100)));
+        }
+      }
+    };
+
+    try {
+      // Keep very small files on the simple endpoint and route larger payloads through chunk upload.
+      if (file.size <= 256 * 1024) {
+        await directUpload();
+      } else {
+        await chunkedUpload();
+      }
       return { ok: true };
     } catch (e: any) {
       if (e?.name === 'AbortError')
