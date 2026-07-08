@@ -431,7 +431,17 @@ jobs:
       - name: Install dependencies
         run: |
           set -euo pipefail
-          yarn install --frozen-lockfile
+          # Force full dependency install even if NODE_ENV is set globally on runner.
+          export YARN_PRODUCTION=false
+          yarn install --frozen-lockfile --production=false --check-files
+
+      - name: Verify runtime modules are present
+        run: |
+          set -euo pipefail
+
+          test -d node_modules || { echo "[FAIL] node_modules missing after install" >&2; exit 1; }
+
+          node -e "const mods=['next','react','react-dom','@roadmap/entra-sso','@prisma/client','undici']; for (const m of mods){ try { require.resolve(m); console.log('[OK] module found:', m); } catch (e) { console.error('[FAIL] missing module:', m); process.exit(1); } }"
 
       - name: Prepare Prisma database
         env:
