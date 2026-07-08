@@ -317,12 +317,10 @@ jobs:
           node -p "process.versions.node"
           node -e "require('async_hooks'); console.log('async_hooks module available')"
 
-      - name: Pin Yarn Classic (1.22.22)
+      - name: Verify npm runtime
         run: |
           set -euo pipefail
-          corepack enable
-          corepack prepare yarn@1.22.22 --activate
-          yarn --version
+          npm --version
 
       - name: Install Linux prerequisites (RHEL)
         run: |
@@ -381,10 +379,10 @@ jobs:
           echo "Disk space before:"
           df -h .
 
-      - name: Clean Yarn cache
+      - name: Clean npm cache
         run: |
           set -euo pipefail
-          yarn cache clean || true
+          npm cache verify || true
 
       - name: Free up disk space (caches, logs, artifacts)
         run: |
@@ -430,8 +428,7 @@ jobs:
         run: |
           set -euo pipefail
           # Force full dependency install even if NODE_ENV is set globally on runner.
-          export YARN_PRODUCTION=false
-          yarn install --frozen-lockfile --production=false --check-files
+          npm ci --include=dev
 
       - name: Verify runtime modules are present
         run: |
@@ -515,7 +512,7 @@ jobs:
           NODE_ENV: production
         run: |
           set -euo pipefail
-          yarn build
+          npm run build
 
       - name: Verify Next.js build output exists
         run: |
