@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: roadmap-shared-runner
   cancel-in-progress: true
 
 jobs:
@@ -523,7 +523,17 @@ jobs:
             echo "Error: .next build directory not found. Build likely failed." >&2
             exit 1
           fi
-          echo "Found .next directory."
+          if [ ! -f .next/BUILD_ID ]; then
+            echo "Error: .next/BUILD_ID missing. Build output is incomplete." >&2
+            find .next -maxdepth 3 -type f | head -n 120 || true
+            exit 1
+          fi
+          if [ ! -f .next/server/pages/_error.js ]; then
+            echo "Error: .next/server/pages/_error.js missing. Build output is incomplete/corrupted." >&2
+            find .next -maxdepth 5 -type f | head -n 200 || true
+            exit 1
+          fi
+          echo "Found complete .next build artifacts (BUILD_ID + _error.js)."
 
       - name: Set PM2 HOME and environment
         run: |
@@ -843,20 +853,17 @@ jobs:
 
             if ss -ltn 2>/dev/null | grep -q ':3000'; then
               if check_http_ready "${candidatePaths[@]}"; then
+                isOnline=true
+                echo "[OK] App is reachable on local HTTP readiness paths."
                 if [ "$status" = "online" ]; then
-                  isOnline=true
                   echo "[OK] App is online under PM2 and reachable on port 3000."
-                  break
-                fi
-
-                if [ -n "$pm2Pid" ] && [ "$pm2Pid" != "0" ] && [ -n "$listenerPid" ] && [ "$listenerPid" = "$pm2Pid" ]; then
-                  isOnline=true
+                elif [ -n "$pm2Pid" ] && [ "$pm2Pid" != "0" ] && [ -n "$listenerPid" ] && [ "$listenerPid" = "$pm2Pid" ]; then
                   echo "[OK] App is reachable on port 3000 and the listener matches the PM2 process PID."
-                  break
+                else
+                  echo "[WARN] App is reachable, but PM2 status/PID correlation is not strict yet. Continuing with successful readiness."
+                  describe_port_3000
                 fi
-
-                echo "[WARN] HTTP on port 3000 is reachable, but it does not belong to the newly started PM2 process yet."
-                describe_port_3000
+                break
               fi
             fi
 

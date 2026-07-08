@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: branch-build-shared-runner
+  group: roadmap-shared-runner
   cancel-in-progress: true
 
 jobs:
