@@ -7,6 +7,17 @@ import { getPrimaryCredentials } from '@/utils/userCredentials';
 import { getInstanceConfigFromRequest, INSTANCE_QUERY_PARAM } from '@/utils/instanceConfig';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { sharePointHttpsAgent, sharePointDispatcher } from '@/utils/httpsAgent';
+
+export const config = {
+  api: {
+    bodyParser: {
+      // Attachment uploads are capped at 25MB in clientDataService.
+      // Keep proxy payload limit above that to avoid 413 from Next.js.
+      sizeLimit: '30mb',
+    },
+  },
+};
+
 // Fallback constructors for insecure TLS retry when allowed
 // @ts-ignore builtin without node types in some build envs
 const https = require('https');
