@@ -15,7 +15,7 @@ export const config = {
   },
 };
 
-async function readRawBody(req: NextApiRequest): Promise<Uint8Array> {
+async function readRawBody(req: NextApiRequest): Promise<ArrayBuffer> {
   const chunks: Uint8Array[] = [];
   return await new Promise((resolve, reject) => {
     req.on('data', (chunk: unknown) => {
@@ -37,7 +37,7 @@ async function readRawBody(req: NextApiRequest): Promise<Uint8Array> {
         merged.set(part, offset);
         offset += part.length;
       }
-      resolve(merged);
+      resolve(merged.buffer.slice(merged.byteOffset, merged.byteOffset + merged.byteLength));
     });
     req.on('error', reject);
   });
