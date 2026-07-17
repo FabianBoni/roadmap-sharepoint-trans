@@ -197,6 +197,7 @@ jobs:
           ENTRA_CLIENT_ID: ${{ secrets.ENTRA_CLIENT_ID }}
           ENTRA_CLIENT_SECRET: ${{ secrets.ENTRA_CLIENT_SECRET }}
           ENTRA_REDIRECT_URI: ${{ secrets.ENTRA_REDIRECT_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
           PUBLIC_PROJECTS_API_KEYS: ${{ secrets.PUBLIC_PROJECTS_API_KEYS }}
           ROADMAP_API_KEY: ${{ secrets.ROADMAP_API_KEY }}
           SP_KERBEROS_SERVICE_USER: ${{ secrets.SP_KERBEROS_SERVICE_USER }}
@@ -221,7 +222,7 @@ jobs:
           # Next.js/dotenv will take the last assignment, so duplicates can silently flip values.
           # We treat the explicitly injected secrets below as the source of truth.
           tmpEnvFile="$(mktemp)"
-          grep -v -E '^(ENTRA_[A-Z0-9_]+=|PUBLIC_PROJECTS_API_KEYS=|ROADMAP_API_KEY=|SP_USERNAME=|SP_PASSWORD=|SP_KERBEROS_SERVICE_USER=|SP_KERBEROS_SERVICE_PASSWORD=|# Microsoft Entra ID SSO injected from GitHub Actions secrets|# Public projects API keys injected from GH Actions|# SharePoint auth injected from GH Actions)' .env > "$tmpEnvFile" || true
+          grep -v -E '^(ENTRA_[A-Z0-9_]+=|JWT_SECRET=|PUBLIC_PROJECTS_API_KEYS=|ROADMAP_API_KEY=|SP_USERNAME=|SP_PASSWORD=|SP_KERBEROS_SERVICE_USER=|SP_KERBEROS_SERVICE_PASSWORD=|# Microsoft Entra ID SSO injected from GitHub Actions secrets|# JWT session secret injected from GitHub Actions|# Public projects API keys injected from GH Actions|# SharePoint auth injected from GH Actions)' .env > "$tmpEnvFile" || true
           mv "$tmpEnvFile" .env
 
           entraLines="$(env | grep -E '^ENTRA_[A-Z0-9_]+=' || true)"
@@ -261,6 +262,26 @@ jobs:
             escaped="${escaped//$'\n'/\\n}"
             printf '%s="%s"\n' "$key" "$escaped" >> .env
           }
+
+          if [ -z "${JWT_SECRET:-}" ]; then
+            echo "[FAIL] GitHub Actions secret JWT_SECRET is missing." >&2
+            echo "[FAIL] Add a repository or environment secret named JWT_SECRET (at least 32 random characters)." >&2
+            exit 1
+          fi
+          if [ "${#JWT_SECRET}" -lt 32 ]; then
+            echo "[FAIL] GitHub Actions secret JWT_SECRET must contain at least 32 characters." >&2
+            exit 1
+          fi
+          case "$JWT_SECRET" in
+            roadmap-secret-change-in-production|your-secure-random-string-here-minimum-32-characters)
+              echo "[FAIL] GitHub Actions secret JWT_SECRET contains a known placeholder value." >&2
+              exit 1
+              ;;
+          esac
+
+          printf "\n# JWT session secret injected from GitHub Actions\n" >> .env
+          write_quoted_env_value "JWT_SECRET" "$JWT_SECRET"
+          echo "Effective JWT_SECRET in generated .env: <set and validated>"
 
           # Runtime kerberos proxy and NTLM fallback both read SP_KERBEROS_SERVICE_* directly.
           serviceUserSource="missing"

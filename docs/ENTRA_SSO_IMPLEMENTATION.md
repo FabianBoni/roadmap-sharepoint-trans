@@ -520,6 +520,12 @@ Wichtige Details aus den Workflows:
 - Dadurch gibt es keine stillen Doppeldefinitionen in `.env`.
 - `deploy.yml` nutzt `ENTRA_REDIRECT_URI`.
 - `branch-build.yml` nutzt `TEST_ENTRA_REDIRECT_URI`.
+- Beide Workflows erwarten zusaetzlich das GitHub Actions Secret `JWT_SECRET`, entfernen einen
+  eventuell im allgemeinen `env`-Secret enthaltenen Wert und schreiben ausschliesslich das
+  explizite Secret in die Laufzeit-`.env`.
+- `JWT_SECRET` muss mindestens 32 Zeichen lang sein und darf keinem bekannten Placeholder
+  entsprechen. Fehlt es oder ist es ungueltig, bricht das Deployment vor Build und PM2-Neustart
+  ab, ohne den Wert zu protokollieren.
 
 Das ist wichtig, weil die Redirect-URI in Reverse-Proxy-Setups schnell die haeufigste Fehlerquelle ist.
 
