@@ -6,6 +6,7 @@ import { FiCheckCircle, FiLock, FiLogIn, FiRefreshCw, FiShield } from 'react-ico
 import JSDoITLoader from '@/components/JSDoITLoader';
 import SiteHeader from '@/components/SiteHeader';
 import { buildInstanceAwareUrl, hasValidAdminSession, persistAdminSession } from '@/utils/auth';
+import { normalizeLocalReturnUrl } from '@/utils/sessionSecurity';
 
 const AdminLogin: React.FC = () => {
   const router = useRouter();
@@ -17,16 +18,10 @@ const AdminLogin: React.FC = () => {
     allowlistConfigured: boolean;
   }>({ enabled: false, allowlistConfigured: false });
 
-  const normalizeReturnUrl = (value: unknown, fallback = '/admin') => {
-    const raw = typeof value === 'string' ? value.trim() : '';
-    if (!raw) return fallback;
-    if (!raw.startsWith('/')) return fallback;
-    if (raw.startsWith('//')) return fallback;
-    const [pathOnly] = raw.split('?', 1);
-    return pathOnly || fallback;
-  };
-
-  const returnUrl = normalizeReturnUrl(router.query.returnUrl, '/admin');
+  const returnUrl = normalizeLocalReturnUrl(
+    typeof router.query.returnUrl === 'string' ? router.query.returnUrl : null,
+    '/admin'
+  );
   const autoEntraSso =
     String(process.env.NEXT_PUBLIC_ENTRA_AUTO_LOGIN || '').toLowerCase() === 'true' ||
     String(router.query.autoSso || '') === '1';
@@ -160,7 +155,7 @@ const AdminLogin: React.FC = () => {
       }
 
       type EntraPopupMessage =
-        | { type: 'AUTH_SUCCESS'; token: string; username?: string }
+        | { type: 'AUTH_SUCCESS'; username?: string }
         | { type: 'AUTH_ERROR'; error?: string }
         | { type: string; [key: string]: unknown };
 
@@ -171,8 +166,8 @@ const AdminLogin: React.FC = () => {
 
         const msg = data as EntraPopupMessage;
 
-        if (msg.type === 'AUTH_SUCCESS' && typeof msg.token === 'string') {
-          persistAdminSession(msg.token, String(msg.username || 'Microsoft SSO'));
+        if (msg.type === 'AUTH_SUCCESS') {
+          persistAdminSession(null, String(msg.username || 'Microsoft SSO'));
           setStatus('Anmeldung erfolgreich. Weiterleitung …');
           window.removeEventListener('message', onMessage);
           try {

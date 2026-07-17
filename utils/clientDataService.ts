@@ -9,7 +9,7 @@ import {
   TeamMember,
 } from '@/types';
 import { SHAREPOINT_LIST_DEFINITIONS } from '@/utils/sharePointLists';
-import { buildInstanceAwareUrl, getAdminSessionToken } from '@/utils/auth';
+import { buildInstanceAwareUrl } from '@/utils/auth';
 import { INSTANCE_COOKIE_NAME, INSTANCE_QUERY_PARAM } from '@/utils/instanceConfig';
 import { prefixBasePath } from '@/utils/nextBasePath';
 
@@ -4162,15 +4162,11 @@ class ClientDataService {
 
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams({ query: trimmedQuery });
-        const token = getAdminSessionToken();
-        if (!token) {
-          return [];
-        }
         const response = await fetch(
           buildInstanceAwareUrl(`/api/sharepoint-user-search?${params}`),
           {
             credentials: 'same-origin',
-            headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            headers: { Accept: 'application/json' },
           }
         );
 
@@ -4291,7 +4287,7 @@ class ClientDataService {
   // ATTACHMENTS
   async listAttachments(
     projectId: string
-  ): Promise<Array<{ FileName: string; ServerRelativeUrl: string }>> {
+  ): Promise<Array<{ DocumentId: string; FileName: string; ServerRelativeUrl: string }>> {
     try {
       const url = this.withClientInstanceQuery(`/api/attachments/${encodeURIComponent(projectId)}`);
       const r = await this.spFetch(url, {
@@ -4310,7 +4306,7 @@ class ClientDataService {
     file: File,
     opts?: { onProgress?: (pct: number) => void; signal?: AbortSignal }
   ): Promise<{ ok: boolean; error?: string; aborted?: boolean }> {
-    const maxSize = 1024 * 1024 * 1024; // 1GB
+    const maxSize = 100 * 1024 * 1024;
     const allowed = [
       /\.pdf$/i,
       /\.docx?$/i,
@@ -4322,13 +4318,14 @@ class ClientDataService {
       /\.csv$/i,
       /\.zip$/i,
     ];
-    if (file.size > maxSize) return { ok: false, error: 'Datei ist zu groß (max. 1GB)' };
+    if (file.size > maxSize) return { ok: false, error: 'Datei ist zu groß (max. 100 MB)' };
+    if (file.size <= 0) return { ok: false, error: 'Leere Dateien sind nicht erlaubt' };
     if (!allowed.some((rx) => rx.test(file.name)))
       return { ok: false, error: 'Dateityp nicht erlaubt' };
 
     const directUpload = async () => {
       const url = this.withClientInstanceQuery(
-        `/api/attachments/${encodeURIComponent(projectId)}?name=${encodeURIComponent(file.name)}`
+        `/api/attachments/${encodeURIComponent(projectId)}?name=${encodeURIComponent(file.name)}&totalSize=${file.size}`
       );
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -4372,7 +4369,11 @@ class ClientDataService {
       const uploadId =
         typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
           ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+              const random = Math.floor(Math.random() * 16);
+              const value = character === 'x' ? random : (random & 0x3) | 0x8;
+              return value.toString(16);
+            });
 
       const sendChunk = async (params: {
         action: 'start' | 'continue' | 'finish';
@@ -4383,7 +4384,8 @@ class ClientDataService {
           `?name=${encodeURIComponent(file.name)}` +
           `&chunked=1&action=${params.action}` +
           `&uploadId=${encodeURIComponent(uploadId)}` +
-          `&offset=${params.startOffset}`;
+          `&offset=${params.startOffset}` +
+          `&totalSize=${file.size}`;
         const url = this.withClientInstanceQuery(
           `/api/attachments/${encodeURIComponent(projectId)}${query}`
         );
@@ -4452,9 +4454,9 @@ class ClientDataService {
     }
   }
 
-  async deleteAttachment(projectId: string, fileName: string): Promise<boolean> {
+  async deleteAttachment(projectId: string, documentId: string): Promise<boolean> {
     const url = this.withClientInstanceQuery(
-      `/api/attachments/${encodeURIComponent(projectId)}?name=${encodeURIComponent(fileName)}`
+      `/api/attachments/${encodeURIComponent(projectId)}?documentId=${encodeURIComponent(documentId)}`
     );
     try {
       const r = await this.spFetch(url, { method: 'DELETE' });

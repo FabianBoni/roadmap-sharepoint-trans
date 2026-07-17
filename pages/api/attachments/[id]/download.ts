@@ -9,9 +9,21 @@ import {
   INSTANCE_QUERY_PARAM,
 } from '@/utils/instanceConfig';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
+import {
+  AttachmentValidationError,
+  toAttachmentDocument,
+  validateDocumentId,
+  validateProjectId,
+} from '@/utils/attachmentDocuments';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : null;
+
+const shouldRetryAsLegacy = (status: number, bodyText: string): boolean =>
+  status === 400 ||
+  /InvalidClientQuery|Invalid argument|OData\s+version|unsupported/i.test(bodyText);
 
 type LibraryFile = { FileName: string; ServerRelativeUrl: string };
 
@@ -21,8 +33,11 @@ const buildServerRelativeUrl = (folderUrl: string, fileName: string): string => 
   return `${normalizedFolder}/${encodedName}`;
 };
 
-const findFileByName = (payload: unknown, name: string, folderUrl: string): LibraryFile | null => {
-  const expected = String(name).toLowerCase();
+const findFileByDocumentId = (
+  payload: unknown,
+  documentId: string,
+  folderUrl: string
+): (LibraryFile & { OriginalFileName: string }) | null => {
   const candidates = Array.isArray(payload)
     ? payload
     : Array.isArray(asRecord(payload)?.value)
@@ -53,8 +68,14 @@ const findFileByName = (payload: unknown, name: string, folderUrl: string): Libr
     const serverRelativeUrl =
       serverRelativeUrlRaw || (fileName ? buildServerRelativeUrl(folderUrl, fileName) : '');
     if (!fileName || !serverRelativeUrl) continue;
-    if (fileName.toLowerCase() === expected)
-      return { FileName: fileName, ServerRelativeUrl: serverRelativeUrl };
+    const document = toAttachmentDocument(fileName, serverRelativeUrl);
+    if (document.DocumentId === documentId) {
+      return {
+        FileName: fileName,
+        ServerRelativeUrl: serverRelativeUrl,
+        OriginalFileName: document.FileName,
+      };
+    }
   }
   return null;
 };
@@ -115,7 +136,7 @@ const shouldPreferExtensionMime = (
 const isInlinePreviewType = (contentType: string): boolean => {
   const normalized = normalizeContentType(contentType);
   return (
-    normalized.startsWith('image/') ||
+    (normalized.startsWith('image/') && normalized !== 'image/svg+xml') ||
     normalized === 'application/pdf' ||
     normalized === 'text/plain' ||
     normalized === 'text/csv'
@@ -123,8 +144,15 @@ const isInlinePreviewType = (contentType: string): boolean => {
 };
 
 const buildContentDisposition = (fileName: string, inline: boolean): string => {
-  const escaped = fileName.replace(/"/g, '');
-  return `${inline ? 'inline' : 'attachment'}; filename="${escaped}"`;
+  const fallback = fileName
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7e]/g, '_')
+    .replace(/["\\;]/g, '_');
+  const encoded = encodeURIComponent(fileName).replace(
+    /['()*]/g,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+  return `${inline ? 'inline' : 'attachment'}; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 };
 
 export const config = {
@@ -146,11 +174,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { id } = req.query as { id?: string };
-  const name = req.query.name as string | undefined;
-
-  if (!id || Array.isArray(id) || !name) {
-    return res.status(400).json({ error: 'Invalid request' });
+  let projectId: string;
+  let documentId: string;
+  try {
+    projectId = validateProjectId(req.query.id);
+    documentId = validateDocumentId(req.query.documentId ?? req.query.name);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid request';
+    return res.status(400).json({ error: message });
   }
 
   try {
@@ -181,6 +212,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: 'Forbidden' });
     }
 
+    const project = await clientDataService.withRequestHeaders(forwardedHeaders, () =>
+      clientDataService.withInstance(instance!.slug, () =>
+        clientDataService.getProjectById(projectId)
+      )
+    );
+    if (!project || String(project.id) !== projectId) {
+      return res.status(404).json({ error: 'Project not found in this roadmap instance' });
+    }
+
     const baseUrl =
       (process.env.INTERNAL_API_BASE_URL || '').replace(/\/$/, '') ||
       `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}`;
@@ -200,6 +240,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const attachHeaders = (headers: HeadersInit = {}) => {
       const h = new Headers(headers);
       h.set('x-roadmap-instance', instance!.slug);
+      if (forwardedHeaders.authorization) h.set('authorization', forwardedHeaders.authorization);
+      if (forwardedHeaders.cookie) h.set('cookie', forwardedHeaders.cookie);
+      try {
+        h.set('origin', new URL(baseUrl).origin);
+      } catch {
+        /* baseUrl was already validated by URL construction below */
+      }
       const cookieValue = `${INSTANCE_COOKIE_NAME}=${instance!.slug}`;
       const existingCookie = h.get('cookie');
       if (existingCookie) {
@@ -247,17 +294,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'download-failed', detail: 'library-root-missing' });
     }
 
-    const fileFolderUrl = `${rootFolderUrl.replace(/\/$/, '')}/${encodeURIComponent(String(id))}`;
+    const fileFolderUrl = `${rootFolderUrl.replace(/\/$/, '')}/${encodeURIComponent(projectId)}`;
     const listUrl = withSlug(
       `${baseUrl}/api/sharepoint/_api/web/GetFolderByServerRelativeUrl('${encodeURI(
         fileFolderUrl
       ).replace(/'/g, "''")}')/Files?$select=Name,ServerRelativeUrl`
     );
 
-    const listResp = await fetch(listUrl, {
+    let listResp = await fetch(listUrl, {
       headers: attachHeaders({ Accept: 'application/json;odata=nometadata' }),
     });
-    const listText = await listResp.text();
+    let listText = await listResp.text();
+    if (!listResp.ok && shouldRetryAsLegacy(listResp.status, listText)) {
+      listResp = await fetch(listUrl, {
+        headers: attachHeaders({ Accept: 'application/json;odata=verbose' }),
+      });
+      listText = await listResp.text();
+    }
     if (!listResp.ok) {
       return res.status(listResp.status).json({ error: 'download-failed', detail: listText });
     }
@@ -269,7 +322,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       listPayload = listText;
     }
 
-    const match = findFileByName(listPayload, name, fileFolderUrl);
+    const match = findFileByDocumentId(listPayload, documentId, fileFolderUrl);
     if (!match?.ServerRelativeUrl) {
       return res.status(404).json({ error: 'download-failed', detail: 'file-not-found' });
     }
@@ -280,7 +333,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         `${baseUrl}/api/sharepoint/_api/web/GetFileByServerRelativeUrl('${encodedServerRelative}')/$value`
       ),
       {
-        headers: attachHeaders({ Accept: '*/*' }),
+        headers: attachHeaders({
+          Accept: '*/*',
+          ...(typeof req.headers.range === 'string' ? { Range: req.headers.range } : {}),
+        }),
       }
     );
 
@@ -290,7 +346,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     let contentType = fileResp.headers.get('content-type') || '';
-    const ext = extname(name).toLowerCase();
+    const ext = extname(match.OriginalFileName).toLowerCase();
     const extensionMime = ext ? mimeByExtension[ext] : undefined;
 
     if (shouldPreferExtensionMime(contentType, extensionMime)) {
@@ -299,16 +355,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       contentType = 'application/octet-stream';
     }
 
-    const contentDisposition = buildContentDisposition(name, isInlinePreviewType(contentType));
+    const contentDisposition = buildContentDisposition(
+      match.OriginalFileName,
+      isInlinePreviewType(contentType)
+    );
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', contentDisposition);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, no-store');
+    if (isInlinePreviewType(contentType)) {
+      res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+    }
 
     const contentLength = fileResp.headers.get('content-length');
     if (contentLength) res.setHeader('Content-Length', contentLength);
+    const contentRange = fileResp.headers.get('content-range');
+    if (contentRange) res.setHeader('Content-Range', contentRange);
+    const acceptRanges = fileResp.headers.get('accept-ranges');
+    if (acceptRanges) res.setHeader('Accept-Ranges', acceptRanges);
 
-    const body = Buffer.from(await fileResp.arrayBuffer());
-    return res.status(200).send(body);
+    res.status(fileResp.status);
+    if (!fileResp.body) return res.end();
+    await pipeline(Readable.fromWeb(fileResp.body as Parameters<typeof Readable.fromWeb>[0]), res);
+    return;
   } catch (error: unknown) {
+    if (error instanceof AttachmentValidationError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     const message = error instanceof Error ? error.message : 'download failed';
     return res.status(500).json({ error: message });
   }

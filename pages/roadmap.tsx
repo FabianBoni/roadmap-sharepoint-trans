@@ -9,7 +9,7 @@ import { clientDataService } from '@/utils/clientDataService';
 import { extractAdminSessionFromHeaders } from '@/utils/apiAuth';
 import { isReadSessionAllowedForInstance } from '@/utils/instanceAccessServer';
 import { INSTANCE_QUERY_PARAM, setInstanceCookieHeader } from '@/utils/instanceConfig';
-import { ADMIN_SESSION_CHANGED_EVENT, getAdminSessionToken } from '@/utils/auth';
+import { ADMIN_SESSION_CHANGED_EVENT, getAdminSessionState } from '@/utils/auth';
 import {
   resolveFirstAllowedInstanceForAdminSession,
   resolveInstanceForAdminSession,
@@ -118,8 +118,12 @@ const RoadmapPage: React.FC<RoadmapPageProps> = ({
   }, [accessDenied, categories, projectOrderByCategory, projects, resolvedInstanceSlug]);
 
   useEffect(() => {
-    const updateFeedbackLink = () => setShowFeedbackLink(Boolean(getAdminSessionToken()));
-    updateFeedbackLink();
+    const updateFeedbackLink = () => {
+      void getAdminSessionState(true).then((session) =>
+        setShowFeedbackLink(Boolean(session?.authenticated))
+      );
+    };
+    void updateFeedbackLink();
     window.addEventListener(ADMIN_SESSION_CHANGED_EVENT, updateFeedbackLink);
     return () => window.removeEventListener(ADMIN_SESSION_CHANGED_EVENT, updateFeedbackLink);
   }, []);

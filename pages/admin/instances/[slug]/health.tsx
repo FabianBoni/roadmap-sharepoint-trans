@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from 'react';
 import AdminSubpageLayout from '@/components/AdminSubpageLayout';
 import withSuperAdminAuth from '@/components/withSuperAdminAuth';
 import type { RoadmapInstanceSummary } from '@/types/roadmapInstance';
-import { getAdminSessionToken } from '@/utils/auth';
 
 const formatTimestamp = (iso?: string | null) => {
   if (!iso) return '—';
@@ -58,10 +57,8 @@ const InstanceHealthPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const token = getAdminSessionToken();
-      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
       const resp = await fetch(`/api/instances/${encodeURIComponent(slugValue)}`, {
-        headers,
+        credentials: 'same-origin',
       });
       if (!resp.ok) {
         const payload = await resp.json().catch(() => null);
@@ -81,10 +78,8 @@ const InstanceHealthPage = () => {
     setAccessLoading(true);
     setAccessError(null);
     try {
-      const token = getAdminSessionToken();
-      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
       const resp = await fetch(`/api/instances/${encodeURIComponent(slugValue)}/access`, {
-        headers,
+        credentials: 'same-origin',
       });
       if (!resp.ok) {
         const payload = await resp.json().catch(() => null);
@@ -138,9 +133,7 @@ const InstanceHealthPage = () => {
     setAccessSaving(true);
     setAccessError(null);
     try {
-      const token = getAdminSessionToken();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers.Authorization = `Bearer ${token}`;
       const resp = await fetch(`/api/instances/${encodeURIComponent(slug)}/access`, {
         method: 'PUT',
         headers,
@@ -168,11 +161,9 @@ const InstanceHealthPage = () => {
     setRefreshing(true);
     setError(null);
     try {
-      const token = getAdminSessionToken();
-      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
       const resp = await fetch(`/api/instances/${encodeURIComponent(slug)}/health`, {
         method: 'POST',
-        headers,
+        credentials: 'same-origin',
       });
       if (!resp.ok) {
         const payload = await resp.json().catch(() => null);
@@ -225,9 +216,7 @@ const InstanceHealthPage = () => {
     setBulkBusy(true);
     setError(null);
     try {
-      const token = getAdminSessionToken();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers.Authorization = `Bearer ${token}`;
       const resp = await fetch(`/api/instances/${encodeURIComponent(slug)}/health-ignore`, {
         method: 'POST',
         headers,
@@ -260,11 +249,9 @@ const InstanceHealthPage = () => {
     setIgnoreBusy((prev) => ({ ...prev, [busyKey]: true }));
     setError(null);
     try {
-      const token = getAdminSessionToken();
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-      if (token) headers.Authorization = `Bearer ${token}`;
       const resp = await fetch(`/api/instances/${encodeURIComponent(slug)}/health-ignore`, {
         method: 'POST',
         headers,

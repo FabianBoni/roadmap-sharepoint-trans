@@ -7,14 +7,15 @@ import { getPrimaryCredentials } from '@/utils/userCredentials';
 import { getInstanceConfigFromRequest, INSTANCE_QUERY_PARAM } from '@/utils/instanceConfig';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { sharePointHttpsAgent, sharePointDispatcher } from '@/utils/httpsAgent';
+import { requireUserSession } from '@/utils/apiAuth';
+import { isAdminSessionAllowedForInstance } from '@/utils/instanceAccessServer';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 
 export const config = {
   api: {
-    bodyParser: {
-      // Attachments are uploaded chunked from the client.
-      // Keep proxy payload limit above the chunk size to avoid 413 from Next.js.
-      sizeLimit: '30mb',
-    },
+    // The proxy must preserve binary attachment chunks byte-for-byte.
+    bodyParser: false,
   },
 };
 
@@ -202,7 +203,7 @@ const isAllowedRoadmapDocumentLibraryPath = (serverRelativePathRaw: string): boo
 };
 
 // Allow /_api/contextinfo for digest retrieval
-function isAllowedPath(path: string) {
+export function isAllowedPath(path: string) {
   // Normalize trailing slashes (except root) so /_api/contextinfo/ is treated like /_api/contextinfo
   const cleaned = path.endsWith('/') ? path.replace(/\/+$/, '') : path;
   if (cleaned === '/_api/contextinfo') return true;
@@ -261,7 +262,7 @@ function isAllowedPath(path: string) {
   // Allow attachment operations by server-relative URL, but only inside whitelisted Roadmap list paths.
   // Covers folder creation and chunked upload/download endpoints.
   const folderByServerRelativeUrlMatch = cleaned.match(
-    /^\/\_api\/web\/GetFolderByServerRelativeUrl\('([^']+)'\)(?:\/Folders\/add\('([^']+)'\))?$/i
+    /^\/\_api\/web\/GetFolderByServerRelativeUrl\('([^']+)'\)(?:(?:\/Folders\/add\('([^']+)'\))|\/Files)?$/i
   );
   if (folderByServerRelativeUrlMatch?.[1]) {
     return (
@@ -271,7 +272,7 @@ function isAllowedPath(path: string) {
   }
 
   const folderFilesAddMatch = cleaned.match(
-    /^\/\_api\/web\/GetFolderByServerRelativeUrl\('([^']+)'\)\/Files\/add\(url='([^']+)',overwrite=true\)$/i
+    /^\/\_api\/web\/GetFolderByServerRelativeUrl\('([^']+)'\)\/Files\/add\(url='([^']+)',overwrite=(?:true|false)\)$/i
   );
   if (folderFilesAddMatch?.[1]) {
     return (
@@ -281,7 +282,7 @@ function isAllowedPath(path: string) {
   }
 
   const fileByServerRelativeUrlMatch = cleaned.match(
-    /^\/\_api\/web\/GetFileByServerRelativeUrl\('([^']+)'\)(?:\/(?:\$value|StartUpload\([^)]*\)|ContinueUpload\([^)]*\)|FinishUpload\([^)]*\)))?$/i
+    /^\/\_api\/web\/GetFileByServerRelativeUrl\('([^']+)'\)(?:\/(?:\$value|ListItemAllFields|StartUpload\([^)]*\)|ContinueUpload\([^)]*\)|FinishUpload\([^)]*\)))?$/i
   );
   if (fileByServerRelativeUrlMatch?.[1]) {
     return (
@@ -367,16 +368,25 @@ const bufferToArrayBuffer = (buf: Buffer): ArrayBuffer => {
   return copy.buffer;
 };
 
-async function readRawBodyBuffer(req: NextApiRequest): Promise<Buffer> {
+export async function readRawBodyBuffer(req: NextApiRequest, maxBytes: number): Promise<Buffer> {
   const chunks: Buffer[] = [];
+  let total = 0;
   for await (const chunk of req as any as AsyncIterable<unknown>) {
+    let buffer: Buffer;
     if (typeof chunk === 'string') {
-      chunks.push(Buffer.from(chunk));
+      buffer = Buffer.from(chunk);
     } else if (chunk instanceof Uint8Array) {
-      chunks.push(Buffer.from(chunk));
+      buffer = Buffer.from(chunk);
     } else if (chunk) {
-      chunks.push(Buffer.from(chunk as ArrayBufferLike));
+      buffer = Buffer.from(chunk as ArrayBufferLike);
+    } else {
+      continue;
     }
+    total += buffer.byteLength;
+    if (total > maxBytes) {
+      throw new Error('sharepoint-proxy-body-too-large');
+    }
+    chunks.push(buffer);
   }
   return Buffer.concat(chunks as unknown as readonly Uint8Array[]);
 }
@@ -417,6 +427,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
   if (!instance) {
     return res.status(404).json({ error: 'No roadmap instance configured for this request' });
+  }
+
+  const requestMethod = String(req.method || 'GET').toUpperCase();
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(requestMethod)) {
+    try {
+      const session = requireUserSession(req);
+      const allowed = await isAdminSessionAllowedForInstance({
+        session,
+        instance,
+        requestHeaders: {
+          authorization:
+            typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined,
+          cookie: typeof req.headers.cookie === 'string' ? req.headers.cookie : undefined,
+        },
+      });
+      if (!allowed) return res.status(403).json({ error: 'Forbidden' });
+    } catch {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
   }
 
   res.setHeader('X-Roadmap-Instance', instance.slug);
@@ -464,6 +493,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'Path not allowed' });
   }
 
+  let rawRequestBody: Buffer | null = null;
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(requestMethod)) {
+    const configuredLimit = Number.parseInt(String(process.env.SP_PROXY_MAX_BODY_BYTES || ''), 10);
+    const maxBodyBytes =
+      Number.isSafeInteger(configuredLimit) && configuredLimit > 0
+        ? configuredLimit
+        : 30 * 1024 * 1024;
+    try {
+      rawRequestBody = await readRawBodyBuffer(req, maxBodyBytes);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'sharepoint-proxy-body-too-large') {
+        return res.status(413).json({ error: 'SharePoint proxy payload is too large' });
+      }
+      throw error;
+    }
+  }
+
   applyNoCacheHeaders(res);
 
   try {
@@ -492,6 +538,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .map((v) => (Array.isArray(v) ? v[0] : v))
       .find((v) => typeof v === 'string' && v.trim()) as string | undefined;
 
+    if (strategy === 'delegated' && process.env.SP_TRUST_DELEGATED_PROXY !== 'true') {
+      return res.status(503).json({
+        error: 'Delegated authentication is disabled',
+        detail:
+          'Set SP_TRUST_DELEGATED_PROXY=true only when a trusted reverse proxy strips client-supplied identity headers and injects authenticated identity.',
+        instance: instance.slug,
+      });
+    }
     if (strategy === 'delegated' && !delegatedUser) {
       return res.status(401).json({
         error: 'Delegated identity missing',
@@ -743,9 +797,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (ifMatch) hdrs.push('-H', `IF-MATCH: ${ifMatch}`);
 
         // Body handling (support binary uploads)
-        let bodyBuffer: Buffer | null = null;
+        let bodyBuffer: Buffer | null = rawRequestBody;
         let bodyString: string | null = null;
-        if (req.body !== undefined && req.body !== null) {
+        if (!bodyBuffer && req.body !== undefined && req.body !== null) {
           if (Buffer.isBuffer(req.body)) {
             bodyBuffer = req.body as Buffer;
           } else if (typeof req.body === 'string') {
@@ -1321,19 +1375,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (strategy === 'delegated') {
       const incomingAuthorization =
         typeof req.headers.authorization === 'string' ? req.headers.authorization : '';
-      const incomingCookie = typeof req.headers.cookie === 'string' ? req.headers.cookie : '';
-      if (!incomingAuthorization && !incomingCookie) {
+      if (!/^Negotiate\s+\S+/i.test(incomingAuthorization)) {
         return res.status(401).json({
           error: 'Delegated auth material missing',
           detail:
-            'No Authorization/Cookie header to forward. Ensure reverse proxy forwards delegated user auth to Node.',
+            'A trusted reverse proxy must forward a Negotiate Authorization header. Application cookies are never forwarded to SharePoint.',
           instance: instance.slug,
           delegatedUser: delegatedUser || null,
         });
       }
       authHeaders = {
-        ...(incomingAuthorization ? { Authorization: incomingAuthorization } : {}),
-        ...(incomingCookie ? { Cookie: incomingCookie } : {}),
+        Authorization: incomingAuthorization,
       };
       res.setHeader('x-sp-proxy-mode', 'delegated');
     } else {
@@ -1345,10 +1397,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const method = req.method || 'GET';
     const isWrite = ['POST', 'PATCH', 'MERGE', 'PUT', 'DELETE'].includes(method);
-    let rawBodyBuffer: Buffer | null = null;
-    if (isWrite && typeof req.body === 'undefined') {
-      rawBodyBuffer = await readRawBodyBuffer(req);
-    }
     const prepareRequestBody = (rawBuffer?: Buffer | null): BodyInit | undefined => {
       if (!isWrite) return undefined;
       if (rawBuffer && rawBuffer.length) return bufferToArrayBuffer(rawBuffer);
@@ -1375,7 +1423,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return undefined;
       }
     };
-    const preparedBody = prepareRequestBody(rawBodyBuffer);
+    const preparedBody = prepareRequestBody(rawRequestBody);
     // Forward client's Accept when possible to preserve expected payload shape (nometadata vs verbose)
     const clientAccept = req.headers['accept'];
     const wantsBinary =
@@ -1397,6 +1445,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           : 'application/json;odata=verbose',
       ...authHeaders,
     };
+    if (typeof req.headers.range === 'string' && req.headers.range.trim()) {
+      headers.Range = req.headers.range;
+    }
 
     if (isWrite && apiPath !== '/_api/contextinfo') {
       try {
@@ -1499,6 +1550,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const ct = spResp.headers.get('content-type') || '';
     const msts = spResp.headers.get('microsoftsharepointteamservices');
+    const disposition = spResp.headers.get('content-disposition');
+    const forceBinaryResponse =
+      wantsBinary || Boolean(disposition) || /\/\$value(?:$|\?)/i.test(apiPath);
+    if (spResp.ok && forceBinaryResponse) {
+      const length = spResp.headers.get('content-length');
+      const contentRange = spResp.headers.get('content-range');
+      const acceptRanges = spResp.headers.get('accept-ranges');
+      if (msts) res.setHeader('microsoftsharepointteamservices', msts);
+      if (ct) res.setHeader('Content-Type', ct);
+      if (disposition) res.setHeader('Content-Disposition', disposition);
+      if (length) res.setHeader('Content-Length', length);
+      if (contentRange) res.setHeader('Content-Range', contentRange);
+      if (acceptRanges) res.setHeader('Accept-Ranges', acceptRanges);
+      res.status(spResp.status);
+      if (!spResp.body) return res.end();
+      await pipeline(Readable.fromWeb(spResp.body as any), res);
+      return;
+    }
     const buffer = Buffer.from(await spResp.arrayBuffer());
     if (msts) res.setHeader('microsoftsharepointteamservices', msts);
     if (spResp.status === 401 || spResp.status === 403) {
@@ -1518,13 +1587,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const isJson = /application\/json|text\/json/i.test(ct);
     const isXml = /application\/atom\+xml|text\/xml|application\/xml/i.test(ct);
     const isText = /^text\//i.test(ct) && !isXml && !isJson;
-    const forceBinaryResponse =
-      wantsBinary ||
-      Boolean(spResp.headers.get('content-disposition')) ||
-      /\/\$value(?:$|\?)/i.test(apiPath);
-
     if (forceBinaryResponse || (!isJson && !isXml && !isText)) {
-      const disposition = spResp.headers.get('content-disposition');
       const length = spResp.headers.get('content-length');
       if (ct) res.setHeader('Content-Type', ct);
       if (disposition) res.setHeader('Content-Disposition', disposition);

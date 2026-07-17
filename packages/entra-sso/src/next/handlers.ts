@@ -5,6 +5,7 @@ import {
   fetchGraphMe,
   generatePkcePair,
   generateRandomBase64Url,
+  validateEntraIdToken,
   type EntraUserProfile,
 } from '../core/index';
 import { buildSetCookie, parseCookies, shouldUseSecureCookies } from './cookies';
@@ -19,17 +20,30 @@ function escapeHtml(input: string): string {
     .replace(/'/g, '&#039;');
 }
 
+function normalizeLocalReturnUrl(input: unknown, fallback: string): string {
+  const raw = typeof input === 'string' ? input.trim() : '';
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return fallback;
+  try {
+    const decoded = decodeURIComponent(raw);
+    if (decoded.startsWith('//') || decoded.includes('\\')) return fallback;
+    const base = new URL('https://roadmap.invalid');
+    const parsed = new URL(raw, base);
+    return parsed.origin === base.origin
+      ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+      : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function renderPopupResultHtml(args: {
   ok: boolean;
-  token?: string;
   username?: string;
   error?: string;
   origin: string;
 }) {
   const payload = args.ok
-    ? `({ type: 'AUTH_SUCCESS', token: '${escapeHtml(args.token || '')}', username: '${escapeHtml(
-        args.username || ''
-      )}' })`
+    ? `({ type: 'AUTH_SUCCESS', username: '${escapeHtml(args.username || '')}' })`
     : `({ type: 'AUTH_ERROR', error: '${escapeHtml(args.error || 'SSO fehlgeschlagen')}' })`;
 
   return `<!DOCTYPE html>
@@ -105,10 +119,10 @@ export function createEntraLoginHandler(config: {
       return;
     }
 
-    const returnUrlRaw =
-      typeof req.query.returnUrl === 'string' && req.query.returnUrl.trim()
-        ? req.query.returnUrl.trim()
-        : config.defaultReturnUrl || '/admin';
+    const returnUrlRaw = normalizeLocalReturnUrl(
+      req.query.returnUrl,
+      config.defaultReturnUrl || '/admin'
+    );
     const popup = String(req.query.popup || '') === '1';
 
     const state = generateRandomBase64Url(32);
@@ -152,7 +166,12 @@ export function createEntraCallbackHandler(config: {
   callbackPath?: string;
   resolveUser?: (accessToken: string) => Promise<EntraUserProfile>;
   isAllowed: (profile: EntraUserProfile) => boolean;
-  issueAppToken: (profile: EntraUserProfile) => { token: string; username: string };
+  issueAppToken: (profile: EntraUserProfile) => {
+    token: string;
+    username: string;
+    maxAgeSeconds: number;
+  };
+  appTokenCookieName?: string;
   onErrorRedirect?: (args: { returnUrl: string; error: string }) => string;
 }): (req: NextApiRequest, res: NextApiResponse) => Promise<void> {
   const cookies = defaultCookieNames(config.cookiePrefix);
@@ -204,7 +223,7 @@ export function createEntraCallbackHandler(config: {
     ];
 
     const popup = cookieValues[cookies.popup] === '1';
-    const returnUrl = cookieValues[cookies.returnUrl] || '/admin';
+    const returnUrl = normalizeLocalReturnUrl(cookieValues[cookies.returnUrl], '/admin');
 
     const error = typeof req.query.error === 'string' ? req.query.error : '';
     const errorDesc =
@@ -228,9 +247,17 @@ export function createEntraCallbackHandler(config: {
     const state = typeof req.query.state === 'string' ? req.query.state : null;
 
     const expectedState = cookieValues[cookies.state] || null;
+    const expectedNonce = cookieValues[cookies.nonce] || null;
     const verifier = cookieValues[cookies.verifier] || null;
 
-    if (!code || !state || !expectedState || state !== expectedState || !verifier) {
+    if (
+      !code ||
+      !state ||
+      !expectedState ||
+      state !== expectedState ||
+      !expectedNonce ||
+      !verifier
+    ) {
       res.setHeader('Set-Cookie', clearCookies);
       const msg = 'Ungültiger Login-Callback (state/code)';
       if (popup) {
@@ -264,6 +291,15 @@ export function createEntraCallbackHandler(config: {
       if (!tokens.accessToken) {
         throw new Error('Kein access_token erhalten (prüfe Scope User.Read)');
       }
+      if (!tokens.idToken) {
+        throw new Error('Kein id_token erhalten');
+      }
+      await validateEntraIdToken({
+        idToken: tokens.idToken,
+        tenantId: config.tenantId,
+        clientId: config.clientId,
+        nonce: expectedNonce,
+      });
 
       const resolveUser = config.resolveUser || fetchGraphMe;
       const me = await resolveUser(tokens.accessToken);
@@ -274,14 +310,21 @@ export function createEntraCallbackHandler(config: {
 
       const issued = config.issueAppToken(me);
 
-      res.setHeader('Set-Cookie', clearCookies);
+      res.setHeader('Set-Cookie', [
+        ...clearCookies,
+        buildSetCookie(config.appTokenCookieName || 'roadmap-admin-token', issued.token, {
+          maxAgeSeconds: issued.maxAgeSeconds,
+          httpOnly: true,
+          sameSite: 'Lax',
+          secure,
+        }),
+      ]);
 
       if (popup) {
         res.setHeader('Content-Type', 'text/html');
         res.status(200).send(
           renderPopupResultHtml({
             ok: true,
-            token: issued.token,
             username: issued.username,
             origin,
           })
@@ -289,10 +332,7 @@ export function createEntraCallbackHandler(config: {
         return;
       }
 
-      const target = `${returnUrl}#token=${encodeURIComponent(issued.token)}&username=${encodeURIComponent(
-        issued.username
-      )}`;
-      res.redirect(302, target);
+      res.redirect(302, returnUrl);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'SSO fehlgeschlagen';
       res.setHeader('Set-Cookie', clearCookies);

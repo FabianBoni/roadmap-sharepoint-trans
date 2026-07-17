@@ -15,6 +15,7 @@
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md,mjs}\"",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md,mjs}\"",
     "security:audit": "npm audit --audit-level=moderate",
+    "test:security": "tsx --test tests/security/*.test.ts",
     "pre-commit": "lint-staged",
     "pm2:restart": "pm2 startOrRestart ecosystem.config.js --only roadmap-app --update-env",
     "pm2:stop": "pm2 delete roadmap-app",
@@ -70,6 +71,7 @@
     "prettier": "^3.4.2",
     "prisma": "^5.20.0",
     "tailwindcss": "3.4.9",
+    "tsx": "^4.23.1",
     "typescript": "5.9.2"
   },
   "lint-staged": {

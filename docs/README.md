@@ -5,6 +5,8 @@ This project uses environment variables for SharePoint auth, app config, and dep
 Additional auth documentation:
 
 - `docs/ENTRA_SSO_IMPLEMENTATION.md`: end-to-end description of the Entra SSO flow in this repo and how to reproduce it in other repos.
+- `docs/SSO_SECURITY_AUDIT_REPORT.md`: audit findings, implemented remediations, verification evidence, and the NTLM/Kerberos boundary.
+- `docs/DOCUMENT_STORAGE_IMPLEMENTATION.md`: project-scoped SharePoint document storage, upload validation, permissions, and deployment checks.
 
 ## Files & Git Hygiene
 

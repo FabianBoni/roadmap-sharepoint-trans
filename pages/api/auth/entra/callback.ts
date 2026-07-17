@@ -4,6 +4,7 @@ import {
   exchangeCodeForTokens,
   fetchGraphMe,
   fetchGraphMyGroupDisplayNames,
+  validateEntraIdToken,
 } from '@roadmap/entra-sso/core';
 import {
   buildSetCookie,
@@ -13,31 +14,29 @@ import {
   type EntraRedirectEnv,
 } from '@roadmap/entra-sso/next';
 import { isEntraUserAllowed } from '@/utils/entraSso';
+import {
+  getJwtSecret,
+  getSessionTtlSeconds,
+  normalizeLocalReturnUrl,
+} from '@/utils/sessionSecurity';
 
 function entraSsoEnabled(): boolean {
-  return Boolean(
-    process.env.ENTRA_TENANT_ID && process.env.ENTRA_CLIENT_ID && process.env.ENTRA_CLIENT_SECRET
-  );
+  try {
+    getJwtSecret();
+    return Boolean(
+      process.env.ENTRA_TENANT_ID && process.env.ENTRA_CLIENT_ID && process.env.ENTRA_CLIENT_SECRET
+    );
+  } catch {
+    return false;
+  }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'roadmap-secret-change-in-production';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
-
 const COOKIE_STATE = 'entra_state';
+const COOKIE_NONCE = 'entra_nonce';
 const COOKIE_VERIFIER = 'entra_pkce_verifier';
 const COOKIE_RETURN_URL = 'entra_return_url';
 const COOKIE_POPUP = 'entra_popup';
 const COOKIE_ADMIN_TOKEN = 'roadmap-admin-token';
-const ADMIN_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24;
-
-function normalizeReturnUrl(input: string | undefined | null, fallback = '/admin'): string {
-  const raw = typeof input === 'string' ? input.trim() : '';
-  if (!raw) return fallback;
-  if (!raw.startsWith('/')) return fallback;
-  if (raw.startsWith('//')) return fallback;
-  const [pathOnly] = raw.split('?', 1);
-  return pathOnly || fallback;
-}
 
 function escapeHtml(input: string): string {
   return input
@@ -48,32 +47,9 @@ function escapeHtml(input: string): string {
     .replace(/'/g, '&#039;');
 }
 
-function parseJwtPayload(token?: string): Record<string, unknown> | null {
-  if (!token || typeof token !== 'string') return null;
-  const parts = token.split('.');
-  if (parts.length < 2) return null;
-  try {
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
-    const json = Buffer.from(padded, 'base64').toString('utf8');
-    const parsed = JSON.parse(json);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    return parsed as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-function renderPopupResultHtml(args: {
-  ok: boolean;
-  token?: string;
-  username?: string;
-  error?: string;
-}) {
+function renderPopupResultHtml(args: { ok: boolean; username?: string; error?: string }) {
   const payload = args.ok
-    ? `({ type: 'AUTH_SUCCESS', token: '${escapeHtml(args.token || '')}', username: '${escapeHtml(
-        args.username || ''
-      )}' })`
+    ? `({ type: 'AUTH_SUCCESS', username: '${escapeHtml(args.username || '')}' })`
     : `({ type: 'AUTH_ERROR', error: '${escapeHtml(args.error || 'SSO fehlgeschlagen')}' })`;
 
   return `<!DOCTYPE html>
@@ -113,6 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const clearCookies = [
     buildSetCookie(COOKIE_STATE, '', { maxAgeSeconds: 0, httpOnly: true, sameSite: 'Lax', secure }),
+    buildSetCookie(COOKIE_NONCE, '', { maxAgeSeconds: 0, httpOnly: true, sameSite: 'Lax', secure }),
     buildSetCookie(COOKIE_VERIFIER, '', {
       maxAgeSeconds: 0,
       httpOnly: true,
@@ -134,7 +111,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   ];
 
   const popup = cookies[COOKIE_POPUP] === '1';
-  const returnUrl = normalizeReturnUrl(cookies[COOKIE_RETURN_URL], '/admin');
+  const returnUrl = normalizeLocalReturnUrl(cookies[COOKIE_RETURN_URL], '/admin');
 
   const error = typeof req.query.error === 'string' ? req.query.error : '';
   const errorDesc =
@@ -155,9 +132,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const state = typeof req.query.state === 'string' ? req.query.state : null;
 
   const expectedState = cookies[COOKIE_STATE] || null;
+  const expectedNonce = cookies[COOKIE_NONCE] || null;
   const verifier = cookies[COOKIE_VERIFIER] || null;
 
-  if (!code || !state || !expectedState || state !== expectedState || !verifier) {
+  if (!code || !state || !expectedState || state !== expectedState || !expectedNonce || !verifier) {
     res.setHeader('Set-Cookie', clearCookies);
     const msg = 'Ungültiger Login-Callback (state/code)';
     if (popup) {
@@ -186,7 +164,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       codeVerifier: verifier,
     });
 
-    const idTokenClaims = parseJwtPayload(tokens.idToken);
+    if (!tokens.idToken) {
+      throw new Error('Kein id_token erhalten');
+    }
+    const idTokenClaims = await validateEntraIdToken({
+      idToken: tokens.idToken,
+      tenantId,
+      clientId,
+      nonce: expectedNonce,
+    });
 
     if (!tokens.accessToken) {
       throw new Error('Kein access_token erhalten (prüfe Scope User.Read)');
@@ -244,15 +230,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           department: resolvedDepartment,
         },
       },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
+      getJwtSecret(),
+      { expiresIn: getSessionTtlSeconds() }
     );
 
     res.setHeader('Set-Cookie', [
       ...clearCookies,
       buildSetCookie(COOKIE_ADMIN_TOKEN, appToken, {
-        maxAgeSeconds: ADMIN_TOKEN_MAX_AGE_SECONDS,
-        httpOnly: false,
+        maxAgeSeconds: getSessionTtlSeconds(),
+        httpOnly: true,
         sameSite: 'Lax',
         secure,
       }),
@@ -260,9 +246,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (popup) {
       res.setHeader('Content-Type', 'text/html');
-      return res
-        .status(200)
-        .send(renderPopupResultHtml({ ok: true, token: appToken, username: displayName }));
+      return res.status(200).send(renderPopupResultHtml({ ok: true, username: displayName }));
     }
 
     // Non-popup: the admin JWT is already set as a cookie, so return with a normal redirect.

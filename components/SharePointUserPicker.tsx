@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import JSDoITLoader from '@/components/JSDoITLoader';
-import { buildInstanceAwareUrl, getAdminSessionToken } from '@/utils/auth';
+import { buildInstanceAwareUrl } from '@/utils/auth';
 
 export type SharePointUserOption = {
   key: string;
@@ -61,13 +61,9 @@ const SharePointUserPicker: React.FC<SharePointUserPickerProps> = ({
         setError(null);
         const params = new URLSearchParams({ query: query.trim() });
         if (instanceSlug) params.set('roadmapInstance', instanceSlug);
-        const token = getAdminSessionToken();
-        if (!token) {
-          throw new Error('Admin-Session fehlt');
-        }
         const resp = await fetch(buildInstanceAwareUrl(`/api/sharepoint-user-search?${params}`), {
           credentials: 'same-origin',
-          headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+          headers: { Accept: 'application/json' },
         });
         const payload = await resp.json().catch(() => null);
         if (!resp.ok) {

@@ -1,0 +1,57 @@
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { buildSetCookie, shouldUseSecureCookies } from '@roadmap/entra-sso/next';
+import { resolveNextBasePath } from '@/utils/entraSso';
+
+const COOKIE_ADMIN_TOKEN = 'roadmap-admin-token';
+
+function getPostLogoutRedirectUri(): string {
+  const configured = String(process.env.ENTRA_POST_LOGOUT_REDIRECT_URI || '').trim();
+  if (configured) {
+    const parsed = new URL(configured);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error('ENTRA_POST_LOGOUT_REDIRECT_URI must use http or https');
+    }
+    return parsed.toString();
+  }
+
+  const callback = new URL(String(process.env.ENTRA_REDIRECT_URI || ''));
+  return `${callback.origin}${resolveNextBasePath()}/admin/login`;
+}
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    res.setHeader('Allow', ['GET', 'POST']);
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const secure = shouldUseSecureCookies(req);
+  res.setHeader(
+    'Set-Cookie',
+    buildSetCookie(COOKIE_ADMIN_TOKEN, '', {
+      maxAgeSeconds: 0,
+      httpOnly: true,
+      sameSite: 'Lax',
+      secure,
+    })
+  );
+  res.setHeader('Cache-Control', 'no-store');
+
+  try {
+    const postLogoutRedirectUri = getPostLogoutRedirectUri();
+    if (String(req.query.local || '') === '1') {
+      return res.redirect(302, postLogoutRedirectUri);
+    }
+
+    const tenantId = String(process.env.ENTRA_TENANT_ID || '').trim();
+    if (!tenantId) return res.redirect(302, postLogoutRedirectUri);
+
+    const url = new URL(
+      `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/logout`
+    );
+    url.searchParams.set('post_logout_redirect_uri', postLogoutRedirectUri);
+    return res.redirect(302, url.toString());
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid logout configuration';
+    return res.status(500).json({ error: message });
+  }
+}

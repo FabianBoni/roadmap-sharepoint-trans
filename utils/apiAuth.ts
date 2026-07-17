@@ -1,7 +1,6 @@
 import type { NextApiRequest } from 'next';
 import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'roadmap-secret-change-in-production';
+import { getJwtSecret, isSafeCookieRequest } from '@/utils/sessionSecurity';
 
 export interface AdminSessionPayload {
   username?: string;
@@ -62,13 +61,17 @@ export function extractAdminSessionFromHeaders(headers: {
   const finalToken = token || cookieToken;
   if (!finalToken) return null;
   try {
-    return jwt.verify(finalToken, JWT_SECRET) as AdminSessionPayload;
+    return jwt.verify(finalToken, getJwtSecret()) as AdminSessionPayload;
   } catch {
     return null;
   }
 }
 
 export function extractAdminSession(req: NextApiRequest): AdminSessionPayload | null {
+  const hasBearer =
+    typeof req.headers.authorization === 'string' &&
+    req.headers.authorization.toLowerCase().startsWith('bearer ');
+  if (!hasBearer && !isSafeCookieRequest(req)) return null;
   return extractAdminSessionFromHeaders({
     authorization: req.headers.authorization,
     cookie: req.headers.cookie,

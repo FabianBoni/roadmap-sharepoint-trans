@@ -117,6 +117,11 @@ export const SHAREPOINT_LIST_DEFINITIONS: SharePointListDefinition[] = [
     description: 'Project document library for roadmap attachments',
     fields: [
       {
+        name: 'DocumentId',
+        schemaXml:
+          '<Field DisplayName="DocumentId" Name="DocumentId" Type="Text" MaxLength="36" Indexed="TRUE" />',
+      },
+      {
         name: 'ProjectId',
         schemaXml: '<Field DisplayName="ProjectId" Name="ProjectId" Type="Text" MaxLength="120" />',
       },
@@ -134,6 +139,16 @@ export const SHAREPOINT_LIST_DEFINITIONS: SharePointListDefinition[] = [
         name: 'UploadedAt',
         schemaXml:
           '<Field DisplayName="UploadedAt" Name="UploadedAt" Type="DateTime" Format="DateTime" />',
+      },
+      {
+        name: 'UploadedByOid',
+        schemaXml:
+          '<Field DisplayName="UploadedByOid" Name="UploadedByOid" Type="Text" MaxLength="120" />',
+      },
+      {
+        name: 'UploadedByName',
+        schemaXml:
+          '<Field DisplayName="UploadedByName" Name="UploadedByName" Type="Text" MaxLength="255" />',
       },
     ],
   },

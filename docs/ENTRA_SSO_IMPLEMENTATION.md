@@ -83,7 +83,12 @@ Die Route liefert unter anderem:
 - die berechnete Redirect-URI
 - ob `ENTRA_REDIRECT_URI` gesetzt ist und plausibel auf `/api/auth/entra/callback` zeigt
 
-Das wird im Frontend genutzt, um SSO-Buttons nur dann anzuzeigen, wenn die Konfiguration vollstaendig ist.
+Ausserdem liefert sie derzeit fest `allowlistConfigured: true`. Das bedeutet nicht, dass eine
+echte Allowlist konfiguriert ist; die lokale Zulassungsregel ist offen (siehe oben). Die Route gibt
+keine Secrets aus.
+
+Das Ergebnis wird im Frontend genutzt, um SSO-Buttons nur dann anzuzeigen, wenn die
+Grundkonfiguration vollstaendig ist.
 
 ### 2. Login starten
 
@@ -133,7 +138,7 @@ Nach dem Login kommt Microsoft Entra auf [`pages/api/auth/entra/callback.ts`](..
 Die Route:
 
 1. liest die zuvor gesetzten Cookies
-2. validiert `state`, `code` und den PKCE `verifier`
+2. verlangt `code`, `state`, den passenden `entra_state`-Cookie und den PKCE-Verifier
 3. tauscht den Authorization Code gegen Tokens ueber den `/token` Endpoint
 4. liest das Profil des angemeldeten Benutzers ueber Graph `/me`
 5. versucht zusaetzlich Gruppennamen ueber Graph `me/transitiveMemberOf` zu laden
@@ -144,6 +149,10 @@ Wichtig dabei:
 
 - Der Graph-Gruppenabruf ist **best effort**. Wenn die Tenant-Berechtigungen fehlen, scheitert der Login **nicht**.
 - Die eigentliche Freigabe entscheidet **nicht** ueber eine fest verdrahtete Allowlist, sondern spaeter ueber die Repo-spezifische Rechtepruefung.
+- `entra_nonce` wird verlangt, in konstanter Zeit mit der validierten `nonce`-Claim verglichen und
+  anschliessend in Erfolgs- wie Fehlerfaellen geloescht.
+- Das ID-Token wird mit Microsofts OpenID-Metadaten und automatisch rotierenden JWKS validiert.
+  Geprueft werden Signatur, Algorithmus (`RS256`), Issuer, Audience, Zeitclaims und `nonce`.
 
 ### 4. App-eigenes JWT erzeugen
 
@@ -166,31 +175,44 @@ Wichtige Designentscheidung dieses Repos:
 
 Das trennt Login-Identitaet sauber von den eigentlichen Fachrechten.
 
+Signiert wird mit `JWT_SECRET`. Fehlt die Variable, ist sie kuerzer als 32 Zeichen oder enthaelt sie
+einen bekannten Platzhalter, verweigert die Authentifizierung den Betrieb. Die JWT-Laufzeit kommt
+aus `JWT_EXPIRES_IN` und betraegt standardmaessig `24h`. Es werden keine Entra-Tokens in das App-JWT
+aufgenommen.
+
 ### 5. Rueckgabe an den Browser
 
 Danach gibt es zwei Pfade:
 
-- Popup-Flow: Der Callback sendet per `window.opener.postMessage(...)` eine `AUTH_SUCCESS` oder `AUTH_ERROR` Nachricht an das Hauptfenster.
+- Popup-Flow: Der Callback setzt das Session-Cookie und sendet per
+  `window.opener.postMessage(...)` nur eine `AUTH_SUCCESS`- oder `AUTH_ERROR`-Nachricht an das
+  Hauptfenster. Das JWT wird nicht an JavaScript uebergeben.
 - Redirect-Flow: Der Callback setzt das Cookie `roadmap-admin-token` und leitet zur `returnUrl` weiter.
 
 Zusatzinfo:
 
-- Das Cookie `roadmap-admin-token` ist in diesem Repo **nicht `HttpOnly`**.
-- Grund: Das Frontend liest und persistiert das Token aktiv in `sessionStorage` und haengt es als Bearer Token an interne Requests.
+- Das Cookie `roadmap-admin-token` ist `HttpOnly` und kann nicht von Frontend-JavaScript gelesen
+  werden. Das JWT wird nicht mehr in `sessionStorage` gespeichert.
+- Das Cookie hat `Path=/`, `SameSite=Lax`, bei HTTPS/Produktion `Secure`; seine Laufzeit wird aus
+  derselben validierten `JWT_EXPIRES_IN`-Konfiguration wie die JWT-Ablaufzeit berechnet.
+- Die temporaeren Cookies fuer `state`, PKCE-Verifier, Ruecksprungziel und Popup-Modus leben zehn
+  Minuten. `state` und Verifier sind `HttpOnly`, Ruecksprungziel und Popup-Flag nicht.
 
-Wenn du das in einem neuen Repo nachbaust, ist das ein bewusster Architekturpunkt:
-
-- Wenn der Client das Token nicht selbst lesen muss, ist `HttpOnly` in der Regel die bessere Wahl.
-- Wenn du explizit Bearer-Header aus dem Browser senden willst, brauchst du ein client-lesbares Token oder eine andere Session-Strategie.
+Schreibende Requests mit Cookie-Session werden zentral ueber ihren `Origin` gegen die erwartete
+Proxy-Origin geprueft. Das ergaenzt `SameSite=Lax` um einen CSRF-Schutz.
 
 ### 6. Client-Session persistieren
 
 [`utils/auth.ts`](../utils/auth.ts) kapselt die Browser-Seite:
 
-- `persistAdminSession(token, username)` speichert das Token in `sessionStorage` und im Cookie.
-- `getAdminSessionToken()` liefert das aktuelle Token.
+- `persistAdminSession(...)` speichert nur noch nicht-sensitive Anzeigeinformationen; das JWT bleibt
+  ausschliesslich im serverseitig gesetzten `HttpOnly`-Cookie.
 - `hasValidAdminSession()` ruft [`pages/api/auth/check-admin-session.ts`](../pages/api/auth/check-admin-session.ts) auf.
 - `buildInstanceAwareUrl()` haengt den aktuellen `roadmapInstance` Kontext an API-Requests an.
+
+Die Session wird ausschliesslich serverseitig verifiziert. Die Session-Statusantwort wird
+clientseitig fuer 1,5 Sekunden gecached. Es gibt keinen Refresh-Token-Flow: Nach Ablauf des App-JWT
+ist eine neue Anmeldung noetig.
 
 Der letzte Punkt ist in diesem Repo wichtig, weil Rechte nicht nur benutzerbezogen, sondern auch **instanzbezogen** sind.
 
@@ -202,6 +224,12 @@ Der letzte Punkt ist in diesem Repo wichtig, weil Rechte nicht nur benutzerbezog
 - oder Cookie `roadmap-admin-token`
 
 Der zentrale Extractor ist `extractAdminSession()`.
+
+Er prueft Signatur und Ablaufzeit mit `jwt.verify(..., JWT_SECRET)`. Ein Bearer-Token hat Vorrang
+vor dem Cookie. Eine fehlende, ungueltige oder abgelaufene Session ergibt `null`; die aufrufende
+Route entscheidet daraus ueber 401/403. `check-admin-session` liefert bei fehlendem Token konkret
+HTTP 403, bei gueltigem Token HTTP 200 mit `authenticated`, `isAdmin`, `isSuperAdmin`, Benutzer,
+Department und Gruppen.
 
 Viele API-Routen verwenden **nicht** `requireAdminSession()`, sondern `requireUserSession()`. Beispiel:
 
@@ -220,6 +248,11 @@ Die wichtigsten Regeln:
 - Instanz-Adminrechte koennen ueber direkte Benutzerfreigaben in der Instanz-Metadatenstruktur kommen.
 - Fuer Leserechte koennen auch Department-Zuordnungen relevant sein.
 - Als weitere Absicherung prueft das Repo SharePoint-Gruppen wie `admin-<instanceSlug>`.
+
+Token-Gruppen allein vergeben bei einer Admin-Pruefung keine Instanz-Adminrechte, weil sie bis zur
+naechsten Anmeldung veraltet sein koennen. Fuer Adminzugriff wird die Mitgliedschaft deshalb live
+ueber direkte Instanzfreigaben bzw. SharePoint-Gruppen aufgeloest. Bei reinem Lesezugriff duerfen
+Token-Gruppen und Department-Zuordnungen dagegen als Zugriffssignal dienen.
 
 Das bedeutet fuer den Nachbau:
 
@@ -285,6 +318,195 @@ Graph-Rechte in Entra:
 - Fuer Gruppennamen ist zusaetzlich eine passende Gruppen-Leseberechtigung noetig, typischerweise `GroupMember.Read.All` mit Admin Consent.
 - Fehlt die Gruppen-Leseberechtigung, bleibt der Login trotzdem funktionsfaehig.
 
+Die Anwendung fordert beim Authorize-Aufruf nur `openid profile email User.Read` an. Eine fuer den
+Gruppenabruf erforderliche zusaetzliche delegierte Berechtigung muss daher in der App-Registrierung
+vorab genehmigt sein; sie wird nicht explizit als Scope in dieser Login-URL angefordert.
+
+## Logout und Session-Ende
+
+`logout()` in [`utils/auth.ts`](../utils/auth.ts) navigiert zur serverseitigen Logout-Route. Diese
+loescht das `HttpOnly`-App-Cookie und leitet anschliessend zum tenant-spezifischen Microsoft-
+Logout-Endpunkt weiter. Danach geht es zur konfigurierten `ENTRA_POST_LOGOUT_REDIRECT_URI` oder zur
+lokalen Login-Seite zurueck. Mit `?local=1` kann bewusst nur die lokale App-Session beendet werden.
+
+Es gibt in diesem Repo keine Refresh-Token-Speicherung, keine serverseitige Session-Datenbank und
+keine Token-Revocation-Liste. Eine bereits ausgestellte App-Session endet durch Logout im Browser,
+durch Ablauf des JWT oder durch Wechsel von `JWT_SECRET`; nachtraegliche Rechteaenderungen wirken
+bei den live aufgeloesten DB-/SharePoint-Rechten bereits beim naechsten Request.
+
+## Auditierte Sicherheits- und Implementierungsgrenzen
+
+> **Status:** Die nachfolgend erklaerten sieben Befunde waren der Ausgangszustand des Audits und
+> wurden im Code geschlossen. Der vollstaendige Nachweis, die geaenderten Dateien, Tests und
+> verbleibenden Restrisiken stehen in
+> [`SSO_SECURITY_AUDIT_REPORT.md`](./SSO_SECURITY_AUDIT_REPORT.md). Die Erklaerungen bleiben als
+> Entwicklerreferenz erhalten und beschreiben unter **Was bedeutet das?** jeweils den Zustand vor
+> der Behebung.
+
+Die folgenden Punkte beschreiben den aktuellen Code, nicht automatisch einen bereits erfolgten
+Angriff. Einige sind konkrete Sicherheitsrisiken, andere vor allem inkonsistentes oder fuer Benutzer
+ueberraschendes Verhalten. Die Erklaerungen richten sich bewusst an Applikationsentwickler.
+
+### 1. Der Entra-`nonce` wird nicht validiert und nicht geloescht
+
+**Was bedeutet das?** Beim Start der Anmeldung erzeugt die Anwendung eine einmalige Zufallszahl
+(`nonce`), legt sie im Cookie `entra_nonce` ab und sendet sie an Entra. Entra schreibt diesen Wert in
+das ID-Token. Der Callback liest den Cookie aktuell jedoch nicht und vergleicht ihn nicht mit der
+`nonce`-Claim des ID-Tokens. Der Cookie wird nach dem Callback ebenfalls nicht geloescht.
+
+**Warum ist das ein Risiko?** Der `nonce` soll ein ID-Token eindeutig mit genau dem Login-Vorgang
+verbinden, den dieser Browser begonnen hat. Ohne Vergleich fehlt diese Schutzschicht gegen das
+Wiederverwenden oder Unterschieben eines ID-Tokens aus einem anderen Login-Vorgang. `state` und
+PKCE sind bereits vorhanden und schuetzen andere Teile des Flows, ersetzen die ID-Token-`nonce`
+aber nicht. Der nicht geloeschte Cookie ist zusaetzlich irrefuehrender Altzustand und bleibt ueber
+den abgeschlossenen Vorgang hinaus im Browser.
+
+**Wie beheben?** In
+[`pages/api/auth/entra/callback.ts`](../pages/api/auth/entra/callback.ts) muss der Callback:
+
+1. `entra_nonce` aus den Cookies lesen und sein Vorhandensein verlangen,
+2. das ID-Token kryptografisch validieren (siehe naechster Punkt),
+3. die validierte `nonce`-Claim mit dem Cookie-Wert in konstanter Zeit vergleichen und bei einer
+   Abweichung den Login abbrechen,
+4. `entra_nonce` sowohl nach Erfolg als auch in jedem Fehlerpfad mit `Max-Age=0` loeschen.
+
+Die `nonce` sollte nicht aus einem lediglich dekodierten, unvalidierten Token verglichen werden,
+weil ein Angreifer dessen Claims selbst schreiben koennte.
+
+### 2. Das ID-Token wird nicht kryptografisch validiert
+
+**Was bedeutet das?** `parseJwtPayload()` zerlegt das ID-Token und dekodiert seinen JSON-Inhalt.
+Das ist vergleichbar mit dem Lesen eines Dokuments, ohne Unterschrift und Aussteller zu pruefen.
+Der Code uebernimmt daraus derzeit `department` und ersatzweise `groups`. Die primaere Identitaet
+kommt zwar aus Graph `/me`, wodurch die unmittelbare Auswirkung reduziert wird; die Zusatzclaims
+koennen aber in spaetere Zugriffsentscheidungen einfliessen.
+
+**Warum ist das ein Risiko?** Ohne Validierung weiss die Anwendung nicht sicher, ob das Token von
+Microsoft fuer genau diese Anwendung und diesen Tenant ausgestellt wurde und noch gueltig ist.
+Insbesondere werden Signatur, `iss` (Aussteller), `aud` (Client-ID), `exp` (Ablaufzeit) und `nonce`
+nicht geprueft. Manipulierte Department- oder Gruppenwerte koennten dadurch als Zugriffsindikator
+verwendet werden. Dass der Code vom echten Token-Endpoint und Graph aufgerufen wird, senkt das
+praktische Risiko, ist aber kein Ersatz fuer die vorgesehene OIDC-Validierung.
+
+**Wie beheben?** Eine etablierte OIDC/JWT-Bibliothek wie `jose` verwenden und die Microsoft-
+Signaturschluessel ueber die OpenID-Connect-Metadaten beziehungsweise JWKS des konfigurierten
+Tenants laden. Bei der Verifikation mindestens Folgendes fest vorgeben:
+
+- erwarteter Issuer des konfigurierten `ENTRA_TENANT_ID`,
+- erwartete Audience `ENTRA_CLIENT_ID`,
+- gueltige Signatur und Zeitclaims (`exp`, gegebenenfalls `nbf`),
+- erwartete `nonce` aus dem Cookie.
+
+Erst Claims aus dem erfolgreich validierten Ergebnis verwenden. Alternativ sollten `department`
+und Gruppen ausschliesslich aus dem mit dem Access-Token aufgerufenen Graph gelesen und Claims aus
+dem ID-Token gar nicht verwendet werden. Eine selbst geschriebene Signaturpruefung ist hier nicht
+empfehlenswert, weil Schluesselrotation und Claim-Regeln leicht unvollstaendig umgesetzt werden.
+
+### 3. Das App-JWT ist fuer JavaScript lesbar
+
+**Was bedeutet das?** Das interne App-JWT liegt in `sessionStorage` und im nicht-`HttpOnly` Cookie
+`roadmap-admin-token`. Das Frontend liest es und setzt es als Bearer-Token in API-Aufrufen ein.
+
+**Warum ist das ein Risiko?** JavaScript, das innerhalb der Anwendungsseite ausgefuehrt wird, kann
+beide Speicherorte auslesen. Falls irgendwo eine Cross-Site-Scripting-Luecke (XSS) entsteht, kann
+eingeschleuster Code das JWT kopieren und an einen Angreifer senden. Dieser kann es bis zum Ablauf
+ausserhalb des urspruenglichen Browsers als angemeldeter Benutzer verwenden. `sessionStorage`
+begrenzt die Lebensdauer auf den Tab, verhindert das Auslesen durch XSS aber nicht.
+
+**Wie beheben?** Bevorzugt auf eine reine Cookie-Session umstellen:
+
+- Das App-JWT nur in einem Cookie mit `HttpOnly`, `Secure` und `SameSite=Lax` oder `Strict` ablegen.
+- Das Token nicht mehr in `sessionStorage` speichern und nicht mehr mit JavaScript auslesen.
+- Interne Requests senden das Cookie automatisch; `utils/apiAuth.ts` unterstuetzt Cookie-Tokens
+  bereits.
+- Fuer zustandsaendernde Requests zusaetzlich CSRF-Schutz vorsehen, beispielsweise SameSite plus
+  Origin-Pruefung oder ein CSRF-Token. `HttpOnly` schuetzt vor dem Auslesen, nicht vor dem Ausloesen
+  eines Requests aus dem Browser des Opfers.
+
+Ergaenzend bleiben konsequentes Output-Escaping, eine restriktive Content Security Policy und das
+Vermeiden unsicherer HTML-Injektion wichtig. Diese Massnahmen reduzieren XSS; sie ersetzen den
+Schutz des Session-Tokens nicht.
+
+### 4. Ein bekannter Fallback fuer `JWT_SECRET` ist eingebaut
+
+**Was bedeutet das?** Fehlt `JWT_SECRET`, signiert und prueft die Anwendung Tokens mit dem im
+Quellcode sichtbaren Text `roadmap-secret-change-in-production`.
+
+**Warum ist das ein hohes Risiko?** Jeder mit Zugriff auf das Repository kennt diesen Schluessel
+und kann selbst gueltig signierte App-JWTs mit beliebigen Benutzerdaten erzeugen. In einer falsch
+konfigurierten produktiven Instanz waere damit die Authentifizierung praktisch umgehbar.
+
+**Wie beheben?** Den Fallback entfernen und die Anwendung beim Start beziehungsweise spaetestens
+beim ersten Auth-Aufruf mit einer klaren Fehlermeldung abbrechen, wenn `JWT_SECRET` fehlt oder zu
+kurz ist. Fuer Produktion einen kryptografisch zufaelligen Wert mit mindestens 32 Bytes aus dem
+Secret Store der Deployment-Plattform injizieren. Der Wert darf weder in Git noch in Logs landen.
+Alle gleichzeitig laufenden Instanzen muessen denselben Schluessel verwenden. Eine Rotation macht
+bereits ausgestellte Tokens ungueltig und sollte deshalb als geplanter Session-Reset erfolgen.
+
+### 5. Cookie- und JWT-Laufzeit koennen voneinander abweichen
+
+**Was bedeutet das?** Die Laufzeit des signierten JWT wird mit `JWT_EXPIRES_IN` konfiguriert. Der
+Callback setzt fuer das Cookie dagegen immer `Max-Age=86400`, also 24 Stunden.
+
+**Warum ist das problematisch?** Ist das JWT kuerzer gueltig, sendet der Browser noch ein bereits
+abgelaufenes Cookie und der Benutzer erlebt unerwartete 401/403-Antworten. Ist das JWT laenger
+gueltig, entfernt der Browser das Cookie zu frueh. Eine eventuell noch vorhandene Kopie in
+`sessionStorage` verhaelt sich dann anders. Das ist primaer ein Zuverlaessigkeits- und
+Konfigurationsrisiko; zu lange Laufzeiten vergroessern ausserdem das Zeitfenster fuer ein
+gestohlenes Token.
+
+**Wie beheben?** Eine einzige kanonische Session-Laufzeit in Sekunden definieren und daraus sowohl
+JWT `expiresIn` als auch Cookie `Max-Age` erzeugen. Alternativ nach dem Signieren die `exp`-Claim
+auslesen und `Max-Age` als `exp - aktuelleZeit` setzen. Ungueltige Konfigurationswerte muessen zum
+Start abgelehnt werden. Eine fuer die Anwendung angemessene kurze Laufzeit festlegen; falls lange
+Sitzungen benoetigt werden, einen bewusst entworfenen Refresh-/Session-Mechanismus verwenden statt
+einfach nur die Lebensdauer des Bearer-Tokens zu verlaengern.
+
+### 6. `returnUrl` verliert Query-Parameter
+
+**Was bedeutet das?** Die aktuelle Normalisierung erlaubt nur lokale Pfade mit genau einem
+fuehrenden `/` und verhindert damit Open Redirects. Danach schneidet sie jedoch alles ab dem ersten
+`?` ab. Aus `/admin/projekte?filter=aktiv` wird somit `/admin/projekte`.
+
+**Warum ist das problematisch?** Das Abschneiden ist fuer sich genommen keine Sicherheitsluecke,
+sondern eine Implementierungsgrenze. Benutzer verlieren nach dem Login Filter, Ziel-IDs oder andere
+Navigationsparameter. Entwickler koennten versucht sein, die Pruefung komplett zu lockern und damit
+versehentlich wieder externe Redirects wie `//evil.example` oder eine fremde absolute URL zulassen.
+
+**Wie beheben?** Query-Parameter erhalten, aber das Ziel weiterhin strikt lokal validieren. Den Wert
+beispielsweise mit `new URL(returnUrl, festeInterneOrigin)` parsen und nur akzeptieren, wenn:
+
+- der Originalwert mit `/`, aber nicht mit `//` oder `\\` beginnt,
+- das geparste Protokoll und der Host exakt der festen internen Origin entsprechen,
+- der Pfad optional in einer erlaubten Liste liegt.
+
+Danach `pathname + search + hash` als Ruecksprungziel verwenden. Niemals die Origin aus einem
+beliebigen `Host`-Header als Vertrauensanker fuer diese Pruefung verwenden. Die gleiche zentrale
+Hilfsfunktion muss in Login und Callback benutzt werden, damit beide Routen identisch entscheiden.
+
+### 7. Logout beendet die Microsoft-Sitzung nicht
+
+**Was bedeutet das?** `logout()` loescht nur das lokale App-JWT. Die Sitzung bei Microsoft Entra
+bleibt bestehen; es findet kein Aufruf des Entra-End-Session-Endpunkts statt.
+
+**Warum ist das ein Risiko?** Auf einem gemeinsam verwendeten oder unbeaufsichtigten Geraet kann
+der naechste Benutzer die Anwendung erneut oeffnen und wegen der noch aktiven Microsoft-Sitzung
+schneller wieder angemeldet werden. `prompt=select_account` zeigt zwar eine Kontoauswahl, beendet
+die vorhandene Sitzung aber nicht. Aus Benutzersicht bedeutet "Abmelden" damit nicht zwingend,
+dass die zentrale Anmeldung beendet wurde.
+
+**Wie beheben?** Zwei bewusst benannte Varianten anbieten:
+
+- **Nur von dieser Anwendung abmelden:** lokales Cookie serverseitig mit denselben Attributen und
+  `Max-Age=0` loeschen. Das ist oft das gewuenschte Standardverhalten.
+- **Vollstaendig bei Microsoft abmelden:** nach dem lokalen Loeschen zum Logout-Endpunkt des
+  konfigurierten Entra-Tenants weiterleiten und eine vorregistrierte
+  `post_logout_redirect_uri` angeben. Den Endpunkt aus den OpenID-Connect-Metadaten beziehen.
+
+Ein zentraler Logout garantiert nicht, dass ein bereits kopiertes App-JWT sofort unbrauchbar wird.
+Wenn sofortige serverseitige Sperrung gefordert ist, braucht die Anwendung zusaetzlich kurze
+Token-Laufzeiten oder serverseitig widerrufbare Sessions beziehungsweise eine Revocation-Liste.
+
 ## CI/CD und Deployment
 
 Die Workflows injizieren Entra-Secrets explizit in die erzeugte `.env` Datei:
@@ -328,8 +550,8 @@ Im Ziel-Repo individuell definieren:
 
 Entscheide frueh, welches Modell du willst:
 
-- client-lesbares JWT plus Bearer Header, so wie in diesem Repo
-- oder `HttpOnly` Cookie-Session ohne clientseitiges Token-Lesen
+- eine `HttpOnly` Cookie-Session ohne clientseitiges Token-Lesen, wie in diesem Repo
+- oder ein bewusst abgesichertes alternatives Session-Modell
 
 ### 4. Autorisierung getrennt halten
 
@@ -359,7 +581,7 @@ Folgende Teile solltest du **nicht** 1:1 in ein anderes Repo kopieren, ohne sie 
 - Instanzmodell mit `roadmapInstance`
 - Department-basierte Leserechte
 - die aktuelle Policy "jeder erfolgreiche Entra-Login ist zulaessig"
-- das client-lesbare Cookie `roadmap-admin-token`
+- die Cookie-Session und ihre CSRF-/Origin-Policy
 
 ## Kurzfassung
 

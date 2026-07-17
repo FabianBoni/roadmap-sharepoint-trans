@@ -20,9 +20,7 @@ import SiteHeader from '@/components/SiteHeader';
 import {
   ADMIN_SESSION_CHANGED_EVENT,
   buildInstanceAwareUrl,
-  getAdminSessionToken,
   getAdminSessionState,
-  persistAdminSession,
 } from '@/utils/auth';
 import { extractAdminSessionFromHeaders } from '@/utils/apiAuth';
 import {
@@ -239,33 +237,6 @@ const InstancesPage = ({ instances }: LandingPageProps) => {
 
   useEffect(() => {
     if (!router.isReady) return;
-    if (typeof window === 'undefined') return;
-    try {
-      const hash = window.location.hash || '';
-      if (!hash.startsWith('#')) return;
-      const params = new URLSearchParams(hash.substring(1));
-      const token = params.get('token');
-      const u = params.get('username');
-      if (!token) return;
-
-      persistAdminSession(token, u || 'Microsoft SSO');
-      try {
-        const cleanUrl = window.location.pathname + window.location.search;
-        window.history.replaceState(null, document.title, cleanUrl);
-        window.location.replace(cleanUrl);
-        return;
-      } catch {
-        window.location.hash = '';
-      }
-      setAuthStatus('Anmeldung erfolgreich. Lade Instanzen ...');
-      window.location.reload();
-    } catch {
-      // ignore
-    }
-  }, [router.isReady, returnUrl]);
-
-  useEffect(() => {
-    if (!router.isReady) return;
     let cancelled = false;
 
     const run = async () => {
@@ -301,12 +272,10 @@ const InstancesPage = ({ instances }: LandingPageProps) => {
     let cancelled = false;
 
     const run = async () => {
-      const token = getAdminSessionToken();
-      if (!token) return;
       setInstancesLoading(true);
       try {
         const resp = await fetch(buildInstanceAwareUrl('/api/instances/slugs?details=landing'), {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'same-origin',
         });
         const payload = await resp.json().catch(() => null);
         if (!resp.ok) {
@@ -393,21 +362,15 @@ const InstancesPage = ({ instances }: LandingPageProps) => {
     try {
       document.cookie = `roadmap-instance=${encodeURIComponent(instance.slug)}; Path=/; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`;
 
-      const token = getAdminSessionToken();
-      if (token) {
-        try {
-          await fetch('/api/instances/select', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ slug: instance.slug }),
-          });
-        } catch {
-          // ignore and continue with client-side redirect + cookie fallback
-        }
+      try {
+        await fetch('/api/instances/select', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug: instance.slug }),
+        });
+      } catch {
+        // ignore and continue with client-side redirect + cookie fallback
       }
 
       const target = buildClientRedirectUrl(instance.frontendTarget) || '/roadmap';

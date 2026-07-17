@@ -1,10 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
 
-export type EntraSsoPopupSuccess = { token: string; username?: string };
+export type EntraSsoPopupSuccess = { username?: string };
 export type EntraSsoPopupError = { error: string };
 
 type EntraPopupMessage =
-  | { type: 'AUTH_SUCCESS'; token: string; username?: string }
+  | { type: 'AUTH_SUCCESS'; username?: string }
   | { type: 'AUTH_ERROR'; error?: string }
   | { type: string; [key: string]: unknown };
 
@@ -48,9 +48,9 @@ export function useEntraSsoPopup(args: {
       if (!data || typeof data !== 'object') return;
 
       const msg = data as EntraPopupMessage;
-      if (msg.type === 'AUTH_SUCCESS' && typeof msg.token === 'string') {
+      if (msg.type === 'AUTH_SUCCESS') {
         const username = typeof msg.username === 'string' ? msg.username : undefined;
-        setLastSuccess({ token: msg.token, username });
+        setLastSuccess({ username });
         try {
           popup.close();
         } catch {

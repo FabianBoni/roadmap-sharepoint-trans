@@ -1,13 +1,29 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { clientDataService } from '@/utils/clientDataService';
 import { requireUserSession } from '@/utils/apiAuth';
-import { isReadSessionAllowedForInstance } from '@/utils/instanceAccessServer';
+import {
+  isAdminSessionAllowedForInstance,
+  isReadSessionAllowedForInstance,
+} from '@/utils/instanceAccessServer';
 import {
   getInstanceConfigFromRequest,
   INSTANCE_COOKIE_NAME,
   INSTANCE_QUERY_PARAM,
 } from '@/utils/instanceConfig';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
+import {
+  AttachmentValidationError,
+  buildStorageFileName,
+  MAX_ATTACHMENT_CHUNK_BYTES,
+  toAttachmentDocument,
+  validateAttachmentName,
+  validateDeclaredSize,
+  validateDocumentId,
+  validateInitialFileContent,
+  validateProjectId,
+  validateUploadId,
+} from '@/utils/attachmentDocuments';
+import { randomUUID } from 'crypto';
 
 export const config = {
   api: {
@@ -15,33 +31,37 @@ export const config = {
   },
 };
 
-async function readRawBody(req: NextApiRequest): Promise<ArrayBuffer> {
+async function readRawBody(req: NextApiRequest, maxBytes: number): Promise<Uint8Array> {
   const chunks: Uint8Array[] = [];
-  return await new Promise((resolve, reject) => {
-    req.on('data', (chunk: unknown) => {
-      if (chunk instanceof Uint8Array) chunks.push(chunk);
-      else if (typeof chunk === 'string') chunks.push(new TextEncoder().encode(chunk));
-      else if (chunk) {
-        try {
-          chunks.push(new Uint8Array(chunk as ArrayBufferLike));
-        } catch {
-          /* ignore */
-        }
-      }
-    });
-    req.on('end', () => {
-      const total = chunks.reduce((sum, part) => sum + part.length, 0);
-      const merged = new Uint8Array(total);
-      let offset = 0;
-      for (const part of chunks) {
-        merged.set(part, offset);
-        offset += part.length;
-      }
-      resolve(merged.buffer.slice(merged.byteOffset, merged.byteOffset + merged.byteLength));
-    });
-    req.on('error', reject);
-  });
+  let total = 0;
+  for await (const chunk of req as AsyncIterable<unknown>) {
+    const bytes =
+      typeof chunk === 'string'
+        ? new TextEncoder().encode(chunk)
+        : chunk instanceof Uint8Array
+          ? chunk
+          : new Uint8Array(chunk as ArrayBufferLike);
+    total += bytes.byteLength;
+    if (total > maxBytes) {
+      throw new AttachmentValidationError('Upload payload is too large', 413);
+    }
+    chunks.push(bytes);
+  }
+
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const part of chunks) {
+    merged.set(part, offset);
+    offset += part.byteLength;
+  }
+  return merged;
 }
+
+const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+};
 
 const encodeServerRelativeUrl = (value: string): string => encodeURI(value).replace(/'/g, "''");
 
@@ -126,10 +146,13 @@ const shouldRetryAsLegacy = (status: number, bodyText: string) => {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { id } = req.query as { id: string };
-  const name = (req.query.name as string) || '';
-
-  if (!id || Array.isArray(id)) return res.status(400).json({ error: 'Invalid id' });
+  let projectId: string;
+  try {
+    projectId = validateProjectId(req.query.id);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid project ID';
+    return res.status(400).json({ error: message });
+  }
 
   let session: ReturnType<typeof requireUserSession>;
   try {
@@ -156,14 +179,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       cookie: typeof req.headers.cookie === 'string' ? req.headers.cookie : undefined,
     };
 
-    if (
-      !(await isReadSessionAllowedForInstance({
-        session,
-        instance,
-        requestHeaders: forwardedHeaders,
-      }))
-    ) {
+    const writeRequest = req.method === 'POST' || req.method === 'DELETE';
+    const accessAllowed = writeRequest
+      ? await isAdminSessionAllowedForInstance({
+          session,
+          instance,
+          requestHeaders: forwardedHeaders,
+        })
+      : await isReadSessionAllowedForInstance({
+          session,
+          instance,
+          requestHeaders: forwardedHeaders,
+        });
+    if (!accessAllowed) {
       return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const project = await clientDataService.withRequestHeaders(forwardedHeaders, () =>
+      clientDataService.withInstance(instance!.slug, () =>
+        clientDataService.getProjectById(projectId)
+      )
+    );
+    if (!project || String(project.id) !== projectId) {
+      return res.status(404).json({ error: 'Project not found in this roadmap instance' });
     }
 
     const baseUrl =
@@ -185,6 +223,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const attachHeaders = (headers: HeadersInit = {}) => {
       const h = new Headers(headers);
       h.set('x-roadmap-instance', instance!.slug);
+      if (forwardedHeaders.authorization) h.set('authorization', forwardedHeaders.authorization);
+      if (forwardedHeaders.cookie) h.set('cookie', forwardedHeaders.cookie);
+      try {
+        h.set('origin', new URL(baseUrl).origin);
+      } catch {
+        /* baseUrl was already validated by URL construction below */
+      }
       const cookieValue = `${INSTANCE_COOKIE_NAME}=${instance!.slug}`;
       const existingCookie = h.get('cookie');
       if (existingCookie) {
@@ -229,13 +274,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     const getProjectFolderUrl = (rootFolderUrl: string): string =>
-      `${rootFolderUrl.replace(/\/$/, '')}/${encodeURIComponent(String(id))}`;
+      `${rootFolderUrl.replace(/\/$/, '')}/${encodeURIComponent(projectId)}`;
 
     const ensureProjectFolder = async (rootFolderUrl: string) => {
       const parent = rootFolderUrl.replace(/\/$/, '');
       const url = withSlug(
         `${baseUrl}/api/sharepoint/_api/web/GetFolderByServerRelativeUrl('${encodeServerRelativeUrl(parent)}')/Folders/add('${encodeURIComponent(
-          String(id)
+          projectId
         )}')`
       );
       const r = await fetch(url, {
@@ -298,6 +343,59 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     };
 
+    const writeFileMetadata = async (
+      fileUrl: string,
+      documentId: string,
+      originalName: string
+    ): Promise<void> => {
+      const url = withSlug(
+        `${baseUrl}/api/sharepoint/_api/web/GetFileByServerRelativeUrl('${encodeServerRelativeUrl(
+          fileUrl
+        )}')/ListItemAllFields`
+      );
+      const uploadedBy =
+        session.displayName || session.entra?.upn || session.entra?.mail || session.username || '';
+      const uploadedByOid = session.entra?.id || '';
+      const availableFields = await clientDataService.withRequestHeaders(forwardedHeaders, () =>
+        clientDataService.withInstance(instance!.slug, () =>
+          clientDataService.getListFieldNames(storageTitle)
+        )
+      );
+      const metadata: Record<string, string> = {};
+      const candidates: Record<string, string> = {
+        DocumentId: documentId,
+        ProjectId: projectId,
+        InstanceSlug: instance!.slug,
+        OriginalFileName: originalName,
+        UploadedAt: new Date().toISOString(),
+        UploadedByOid: uploadedByOid,
+        UploadedByName: uploadedBy,
+      };
+      for (const [field, value] of Object.entries(candidates)) {
+        if (availableFields.has(field)) metadata[field] = value;
+      }
+      if (Object.keys(metadata).length === 0) return;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: attachHeaders({
+          Accept: 'application/json;odata=nometadata',
+          'Content-Type': 'application/json;odata=nometadata',
+          'X-HTTP-Method': 'MERGE',
+          'IF-MATCH': '*',
+        }),
+        body: JSON.stringify(metadata),
+      });
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        console.warn('[api/attachments] file uploaded but metadata update failed', {
+          status: response.status,
+          projectId,
+          documentId,
+          detail: detail.slice(0, 300),
+        });
+      }
+    };
+
     if (req.method === 'GET') {
       const rootFolderUrl = await getRootFolderUrl();
       const folderUrl = getProjectFolderUrl(rootFolderUrl);
@@ -343,7 +441,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               return FileName && ServerRelativeUrl ? { FileName, ServerRelativeUrl } : null;
             })
             .filter(Boolean);
-          return res.status(200).json(items);
+          return res
+            .status(200)
+            .json(items.map((item) => toAttachmentDocument(item.FileName, item.ServerRelativeUrl)));
         } catch {
           return res.status(200).json([]);
         }
@@ -355,18 +455,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const files = extractFileArray(attempt.payload, folderUrl);
-      return res.status(200).json(files);
+      return res
+        .status(200)
+        .json(files.map((file) => toAttachmentDocument(file.FileName, file.ServerRelativeUrl)));
     }
 
     if (req.method === 'POST') {
-      if (!name) return res.status(400).json({ error: 'Missing name' });
+      const originalName = validateAttachmentName(req.query.name);
+      const totalSize = validateDeclaredSize(req.query.totalSize);
 
       const rootFolderUrl = await getRootFolderUrl();
       await ensureProjectFolder(rootFolderUrl);
       const projectFolderUrl = getProjectFolderUrl(rootFolderUrl);
-      const fileUrl = fileUrlFor(rootFolderUrl, name);
-      const encodedFileUrl = encodeServerRelativeUrl(fileUrl);
-      const filePath = `${baseUrl}/api/sharepoint/_api/web/GetFileByServerRelativeUrl('${encodedFileUrl}')`;
       const folderPath = `${baseUrl}/api/sharepoint/_api/web/GetFolderByServerRelativeUrl('${encodeServerRelativeUrl(
         projectFolderUrl
       )}')`;
@@ -375,17 +475,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (isChunked) {
         const actionRaw = req.query.action;
         const action = Array.isArray(actionRaw) ? actionRaw[0] : actionRaw;
-        const uploadIdRaw = req.query.uploadId;
-        const uploadId = Array.isArray(uploadIdRaw) ? uploadIdRaw[0] : uploadIdRaw;
+        const uploadId = validateUploadId(req.query.uploadId);
         const offsetRaw = req.query.offset;
         const offset = Number(Array.isArray(offsetRaw) ? offsetRaw[0] : offsetRaw || 0);
 
-        if (!action || !uploadId || Number.isNaN(offset)) {
+        if (!action || !Number.isSafeInteger(offset) || offset < 0) {
           return res.status(400).json({ error: 'Missing chunked upload parameters' });
         }
 
-        const binary = await readRawBody(req);
+        if ((action === 'start' && offset !== 0) || (action !== 'start' && offset === 0)) {
+          return res.status(400).json({ error: 'Invalid chunk offset' });
+        }
+
+        const storageName = buildStorageFileName(uploadId, originalName);
+        const fileUrl = fileUrlFor(rootFolderUrl, storageName);
+        const encodedFileUrl = encodeServerRelativeUrl(fileUrl);
+        const filePath = `${baseUrl}/api/sharepoint/_api/web/GetFileByServerRelativeUrl('${encodedFileUrl}')`;
+        const binary = await readRawBody(req, MAX_ATTACHMENT_CHUNK_BYTES);
+        if (offset + binary.byteLength > totalSize) {
+          return res.status(400).json({ error: 'Chunk exceeds declared file size' });
+        }
+        if (action === 'finish' && offset + binary.byteLength !== totalSize) {
+          return res.status(400).json({ error: 'Final chunk does not match declared file size' });
+        }
         if (action === 'start') {
+          validateInitialFileContent(originalName, binary);
           try {
             await ensureEmptyFile(fileUrl);
           } catch (error: unknown) {
@@ -411,7 +525,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             Accept: 'application/json;odata=nometadata',
             'Content-Type': 'application/octet-stream',
           }),
-          body: binary,
+          body: toArrayBuffer(binary),
         });
         const bodyText = await r.text();
         if (!r.ok) {
@@ -426,12 +540,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           getNested(payload, ['d', 'FinishUpload']) ??
           undefined;
 
-        return res.status(200).json({ ok: true, nextOffset });
+        if (action === 'finish') {
+          await writeFileMetadata(fileUrl, uploadId, originalName);
+        }
+        return res.status(200).json({
+          ok: true,
+          nextOffset,
+          document: toAttachmentDocument(storageName, fileUrl),
+        });
       }
 
-      const binary = await readRawBody(req);
+      const binary = await readRawBody(req, totalSize);
+      if (binary.byteLength !== totalSize) {
+        return res.status(400).json({ error: 'Upload size does not match declared file size' });
+      }
+      validateInitialFileContent(originalName, binary);
+      const documentId = randomUUID();
+      const storageName = buildStorageFileName(documentId, originalName);
+      const fileUrl = fileUrlFor(rootFolderUrl, storageName);
       const addUrl = withSlug(
-        `${folderPath}/Files/add(url='${encodeURIComponent(name).replace(/'/g, "''")}',overwrite=true)`
+        `${folderPath}/Files/add(url='${encodeURIComponent(storageName).replace(/'/g, "''")}',overwrite=false)`
       );
       const r = await fetch(addUrl, {
         method: 'POST',
@@ -439,23 +567,59 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           Accept: 'application/json;odata=nometadata',
           'Content-Type': 'application/octet-stream',
         }),
-        body: binary,
+        body: toArrayBuffer(binary),
       });
       const body = await r.text();
       if (!r.ok) return res.status(r.status).json({ error: 'sp-upload-failed', body });
-      return res.status(200).json({ ok: true });
+      await writeFileMetadata(fileUrl, documentId, originalName);
+      return res.status(200).json({
+        ok: true,
+        document: toAttachmentDocument(storageName, fileUrl),
+      });
     }
 
     if (req.method === 'DELETE') {
-      if (!name) return res.status(400).json({ error: 'Missing name' });
+      const documentId = validateDocumentId(req.query.documentId ?? req.query.name);
       const rootFolderUrl = await getRootFolderUrl();
-      await deleteFile(rootFolderUrl, name);
+      const folderUrl = getProjectFolderUrl(rootFolderUrl);
+      const listUrl = withSlug(
+        `${baseUrl}/api/sharepoint/_api/web/GetFolderByServerRelativeUrl('${encodeServerRelativeUrl(
+          folderUrl
+        )}')/Files?$select=Name,ServerRelativeUrl`
+      );
+      let listResponse = await fetch(listUrl, {
+        headers: attachHeaders({ Accept: 'application/json;odata=nometadata' }),
+      });
+      let listText = await listResponse.text();
+      if (!listResponse.ok && shouldRetryAsLegacy(listResponse.status, listText)) {
+        listResponse = await fetch(listUrl, {
+          headers: attachHeaders({ Accept: 'application/json;odata=verbose' }),
+        });
+        listText = await listResponse.text();
+      }
+      if (!listResponse.ok) {
+        return res.status(listResponse.status).json({ error: 'sp-list-failed' });
+      }
+      const listPayload = extractJsonPayload(
+        listText,
+        listResponse.headers.get('content-type') || ''
+      );
+      const files = extractFileArray(listPayload, folderUrl);
+      const match = files.find(
+        (file) =>
+          toAttachmentDocument(file.FileName, file.ServerRelativeUrl).DocumentId === documentId
+      );
+      if (!match) return res.status(404).json({ error: 'Document not found in this project' });
+      await deleteFile(rootFolderUrl, match.FileName);
       return res.status(200).json({ ok: true });
     }
 
     res.setHeader('Allow', 'GET,POST,DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: unknown) {
+    if (error instanceof AttachmentValidationError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     const message = error instanceof Error ? error.message : 'attachments error';
     return res.status(500).json({ error: message });
   }

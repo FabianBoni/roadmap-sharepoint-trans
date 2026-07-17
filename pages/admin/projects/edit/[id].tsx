@@ -11,6 +11,7 @@ import { INSTANCE_QUERY_PARAM } from '@/utils/instanceConfig';
 import { parseMirroredProjectId } from '@/utils/instanceMirroring';
 
 type Attachment = {
+  DocumentId: string;
   FileName: string;
   ServerRelativeUrl: string;
 };
@@ -37,9 +38,9 @@ const EditProjectPage: FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const fetchRequestIdRef = useRef(0);
 
-  const buildAttachmentDownloadUrl = (projectId: string, fileName: string) => {
-    const base = `/api/attachments/${encodeURIComponent(projectId)}/download?name=${encodeURIComponent(
-      fileName
+  const buildAttachmentDownloadUrl = (projectId: string, documentId: string) => {
+    const base = `/api/attachments/${encodeURIComponent(projectId)}/download?documentId=${encodeURIComponent(
+      documentId
     )}`;
     const q = router.query?.[INSTANCE_QUERY_PARAM];
     if (typeof q === 'string' && q) {
@@ -190,14 +191,14 @@ const EditProjectPage: FC = () => {
     uploadAbortRef.current?.abort();
   };
 
-  const handleDeleteAttachment = async (fileName: string) => {
+  const handleDeleteAttachment = async (documentId: string) => {
     const projectId = project?.id || (typeof id === 'string' ? id : null);
     if (!projectId) return;
 
     setUploadError('');
-    const ok = await clientDataService.deleteAttachment(projectId, fileName);
+    const ok = await clientDataService.deleteAttachment(projectId, documentId);
     if (ok) {
-      setAttachments((prev) => prev.filter((item) => item.FileName !== fileName));
+      setAttachments((prev) => prev.filter((item) => item.DocumentId !== documentId));
     } else {
       setUploadError('Anhang konnte nicht gelöscht werden.');
     }
@@ -295,7 +296,7 @@ const EditProjectPage: FC = () => {
         <h2 className="text-lg font-semibold text-white sm:text-xl">Anhänge verwalten</h2>
         <p className="text-sm text-slate-300">
           Laden Sie Dateien hoch oder entfernen Sie bestehende Dokumente. Unterstützte Formate: PDF,
-          Office, Bilder, ZIP (max. 1&nbsp;GB je Datei).
+          Office, Bilder, ZIP (max. 100&nbsp;MB je Datei).
         </p>
       </header>
 
@@ -367,13 +368,13 @@ const EditProjectPage: FC = () => {
           )}
           {attachments.map((attachment) => (
             <li
-              key={attachment.ServerRelativeUrl}
+              key={attachment.DocumentId}
               className="flex items-center justify-between gap-3 rounded-2xl border border-slate-800/70 bg-slate-900/70 px-4 py-3"
             >
               <a
                 href={buildAttachmentDownloadUrl(
                   resolvedProjectId || String(id),
-                  attachment.FileName
+                  attachment.DocumentId
                 )}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -383,7 +384,7 @@ const EditProjectPage: FC = () => {
               </a>
               <button
                 type="button"
-                onClick={() => handleDeleteAttachment(attachment.FileName)}
+                onClick={() => handleDeleteAttachment(attachment.DocumentId)}
                 className="rounded-full border border-rose-500/50 px-3 py-1 text-xs font-semibold text-rose-200 transition hover:border-rose-400 hover:text-rose-100"
               >
                 Löschen

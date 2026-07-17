@@ -18,7 +18,6 @@ import SiteHeader from '@/components/SiteHeader';
 import withAdminAuth from '@/components/withAdminAuth';
 import { AppSettings, Category, Project } from '@/types';
 import {
-  getAdminSessionToken,
   getAdminUsername,
   getCurrentBrowserInstanceSlug,
   hasValidAdminSession,
@@ -112,8 +111,7 @@ const AdminPage: React.FC = () => {
   );
 
   const getAuthHeaders = () => {
-    const token = getAdminSessionToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return {};
   };
 
   useEffect(() => {

@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import {
-  buildInstanceAwareUrl,
-  getAdminSessionToken,
-  hasValidAdminSession,
-  persistAdminSession,
-} from '@/utils/auth';
+import { buildInstanceAwareUrl, hasValidAdminSession } from '@/utils/auth';
 import JSDoITLoader from '@/components/JSDoITLoader';
 
 export default function withSuperAdminAuth<P extends object>(
@@ -19,50 +14,15 @@ export default function withSuperAdminAuth<P extends object>(
     useEffect(() => {
       const run = async () => {
         try {
-          // Consume non-popup Entra callback token from URL fragment.
-          try {
-            if (typeof window !== 'undefined') {
-              const hash = window.location.hash || '';
-              if (hash.startsWith('#')) {
-                const params = new URLSearchParams(hash.substring(1));
-                const token = params.get('token');
-                const u = params.get('username');
-                if (token) {
-                  persistAdminSession(token, u || 'Microsoft SSO');
-                  const clean = window.location.pathname + window.location.search;
-                  try {
-                    window.history.replaceState(null, document.title, clean);
-                    window.location.replace(clean);
-                    return;
-                  } catch {
-                    window.location.hash = '';
-                  }
-                  window.location.reload();
-                  return;
-                }
-              }
-            }
-          } catch {
-            // ignore
-          }
-
           const ok = await hasValidAdminSession();
           if (!ok) {
             router.push('/admin/login?returnUrl=' + encodeURIComponent(router.asPath));
             return;
           }
 
-          const token = getAdminSessionToken();
-          if (!token) {
-            setForbiddenMessage(
-              'Instanzverwaltung erfordert eine Benutzer-Session mit der Gruppe superadmin.'
-            );
-            return;
-          }
-
           try {
             const resp = await fetch(buildInstanceAwareUrl('/api/auth/check-admin-session'), {
-              headers: { Authorization: `Bearer ${token}` },
+              credentials: 'same-origin',
             });
             const data = await resp.json().catch(() => null);
             if (!resp.ok || !data || data.isSuperAdmin !== true) {

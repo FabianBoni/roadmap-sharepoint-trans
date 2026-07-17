@@ -12,7 +12,7 @@ import {
 import JSDoITLoader from '@/components/JSDoITLoader';
 import SiteFooter from '@/components/SiteFooter';
 import SiteHeader from '@/components/SiteHeader';
-import { buildInstanceAwareUrl, getAdminSessionToken } from '@/utils/auth';
+import { buildInstanceAwareUrl, getAdminSessionState } from '@/utils/auth';
 
 type FeedbackVoteValue = -1 | 0 | 1;
 
@@ -34,8 +34,7 @@ type EntraStatus = {
 };
 
 const getAuthHeaders = (): HeadersInit => {
-  const token = getAdminSessionToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return {};
 };
 
 const formatDate = (value: string) =>
@@ -102,8 +101,8 @@ const FeedbackPage = () => {
     const run = async () => {
       setCheckingSession(true);
       try {
-        const token = getAdminSessionToken();
-        if (!cancelled) setAuthenticated(Boolean(token));
+        const session = await getAdminSessionState(true);
+        if (!cancelled) setAuthenticated(Boolean(session?.authenticated));
 
         try {
           const response = await fetch(buildInstanceAwareUrl('/api/auth/entra/status'));
@@ -115,7 +114,7 @@ const FeedbackPage = () => {
           if (!cancelled) setEntraStatus({ enabled: false });
         }
 
-        if (token && !cancelled) {
+        if (session?.authenticated && !cancelled) {
           await loadFeedback();
         }
       } finally {

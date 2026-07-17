@@ -10,9 +10,7 @@ import SiteHeader from '@/components/SiteHeader';
 import {
   ADMIN_SESSION_CHANGED_EVENT,
   buildInstanceAwareUrl,
-  getAdminSessionToken,
   getAdminSessionState,
-  persistAdminSession,
 } from '@/utils/auth';
 import type { RoadmapInstanceSummary } from '@/types/roadmapInstance';
 import { SHAREPOINT_LIST_DEFINITIONS } from '@/utils/sharePointLists';
@@ -304,10 +302,7 @@ const AdminInstancesPage = () => {
   const [bulkProvisionFailures, setBulkProvisionFailures] = useState<
     Array<{ slug: string; message?: string }>
   >([]);
-  const [tokenMissing, setTokenMissing] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return !getAdminSessionToken();
-  });
+  const [tokenMissing, setTokenMissing] = useState(true);
   const [listPanels, setListPanels] = useState<Record<string, InstanceListPanelState>>({});
   const [accessUsersInput, setAccessUsersInput] = useState('');
   const [accessGroupsInput, setAccessGroupsInput] = useState('');
@@ -340,10 +335,7 @@ const AdminInstancesPage = () => {
   }, []);
 
   const headersWithAuth = () => {
-    const token = getAdminSessionToken();
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    return headers;
+    return { 'Content-Type': 'application/json' };
   };
 
   const resetForm = () => {
@@ -481,18 +473,18 @@ const AdminInstancesPage = () => {
   };
 
   useEffect(() => {
-    const hasToken = Boolean(getAdminSessionToken());
-    setTokenMissing(!hasToken);
-
-    if (!hasToken) {
-      setInstances([]);
-      setSuperAdmins([]);
-      setLoading(false);
-      return;
-    }
-
-    void fetchInstances();
-    void fetchSuperAdmins();
+    void getAdminSessionState(true).then((session) => {
+      const authenticated = Boolean(session?.authenticated);
+      setTokenMissing(!authenticated);
+      if (!authenticated) {
+        setInstances([]);
+        setSuperAdmins([]);
+        setLoading(false);
+        return;
+      }
+      void fetchInstances();
+      void fetchSuperAdmins();
+    });
   }, [fetchInstances, fetchSuperAdmins, sessionRevision]);
 
   const updateField = (key: keyof AdminFormState, value: string | boolean) => {
@@ -1838,34 +1830,6 @@ const AdminInstancesGate = () => {
   const autoEntraSso =
     String(process.env.NEXT_PUBLIC_ENTRA_AUTO_LOGIN || '').toLowerCase() === 'true' ||
     String(router.query.autoSso || '') === '1';
-
-  // Consume non-popup Entra callback token
-  useEffect(() => {
-    if (!router.isReady) return;
-    if (typeof window === 'undefined') return;
-    try {
-      const hash = window.location.hash || '';
-      if (!hash.startsWith('#')) return;
-      const params = new URLSearchParams(hash.substring(1));
-      const token = params.get('token');
-      const u = params.get('username');
-      if (!token) return;
-
-      persistAdminSession(token, u || 'Microsoft SSO');
-      try {
-        const cleanUrl = window.location.pathname + window.location.search;
-        window.history.replaceState(null, document.title, cleanUrl);
-        window.location.replace(cleanUrl);
-        return;
-      } catch {
-        window.location.hash = '';
-      }
-      setStatus('Anmeldung erfolgreich. Lade Instanzen …');
-      window.location.reload();
-    } catch {
-      // ignore
-    }
-  }, [router.isReady]);
 
   useEffect(() => {
     if (!router.isReady) return;

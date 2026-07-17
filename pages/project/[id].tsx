@@ -97,15 +97,15 @@ const ProjectDetailPage: FC<{ accessDenied?: boolean }> = ({ accessDenied }) => 
   const [isAdmin, setIsAdmin] = useState(false);
   const [accessDeniedState, setAccessDeniedState] = useState<boolean>(Boolean(accessDenied));
   const [attachments, setAttachments] = useState<
-    Array<{ FileName: string; ServerRelativeUrl: string }>
+    Array<{ DocumentId: string; FileName: string; ServerRelativeUrl: string }>
   >([]);
   const [leadImageBroken, setLeadImageBroken] = useState(false);
   const [memberImageErrors, setMemberImageErrors] = useState<Record<number, boolean>>({});
   const fetchRequestIdRef = useRef(0);
 
-  const buildAttachmentDownloadUrl = (projectId: string, fileName: string) => {
-    const base = `/api/attachments/${encodeURIComponent(projectId)}/download?name=${encodeURIComponent(
-      fileName
+  const buildAttachmentDownloadUrl = (projectId: string, documentId: string) => {
+    const base = `/api/attachments/${encodeURIComponent(projectId)}/download?documentId=${encodeURIComponent(
+      documentId
     )}`;
     const q = router.query?.[INSTANCE_QUERY_PARAM];
     if (typeof q === 'string' && q) {
@@ -455,13 +455,13 @@ const ProjectDetailPage: FC<{ accessDenied?: boolean }> = ({ accessDenied }) => 
                     <li className="ds-project-list-item is-empty">Keine Anhänge vorhanden.</li>
                   )}
                   {attachments.map((attachment) => (
-                    <li key={attachment.ServerRelativeUrl} className="ds-project-attachment-item">
+                    <li key={attachment.DocumentId} className="ds-project-attachment-item">
                       <div className="ds-project-attachment-label">
                         <FiExternalLink className="ds-icon-sm" aria-hidden="true" />
                         <span className="ds-project-attachment-name">{attachment.FileName}</span>
                       </div>
                       <a
-                        href={buildAttachmentDownloadUrl(String(id), attachment.FileName)}
+                        href={buildAttachmentDownloadUrl(String(id), attachment.DocumentId)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="ds-project-inline-link"

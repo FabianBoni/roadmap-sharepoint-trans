@@ -3,10 +3,8 @@
  * Uses JWT tokens stored in sessionStorage after Windows authentication via SharePoint
  */
 
-const TOKEN_KEY = 'adminToken';
 const USERNAME_KEY = 'adminUsername';
 const INSTANCE_COOKIE_KEY = 'roadmap-instance';
-const ADMIN_TOKEN_COOKIE_KEY = 'roadmap-admin-token';
 export const ADMIN_SESSION_CHANGED_EVENT = 'roadmap-admin-session-changed';
 
 type AdminSessionState = {
@@ -80,118 +78,32 @@ function getSessionStorage(): Storage | null {
   }
 }
 
-function setAdminTokenCookie(token: string) {
-  if (typeof document === 'undefined') return;
-  try {
-    const secure = typeof window !== 'undefined' ? window.location.protocol === 'https:' : false;
-    const parts = [
-      `${ADMIN_TOKEN_COOKIE_KEY}=${encodeURIComponent(token)}`,
-      'Path=/',
-      'SameSite=Lax',
-    ];
-    if (secure) parts.push('Secure');
-    document.cookie = parts.join('; ');
-  } catch {
-    // ignore
-  }
-}
-
-function clearAdminTokenCookie() {
-  if (typeof document === 'undefined') return;
-  try {
-    const secure = typeof window !== 'undefined' ? window.location.protocol === 'https:' : false;
-    const parts = [`${ADMIN_TOKEN_COOKIE_KEY}=`, 'Path=/', 'SameSite=Lax', 'Max-Age=0'];
-    if (secure) parts.push('Secure');
-    document.cookie = parts.join('; ');
-  } catch {
-    // ignore
-  }
-}
-
-function getTokenFromCookie(): string | null {
-  if (typeof document === 'undefined') return null;
-  try {
-    const cookies = document.cookie.split(';').map((c) => c.trim());
-    for (const cookie of cookies) {
-      if (cookie.toLowerCase().startsWith(`${ADMIN_TOKEN_COOKIE_KEY}=`)) {
-        return decodeURIComponent(cookie.substring(ADMIN_TOKEN_COOKIE_KEY.length + 1)).trim();
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-function isJwtExpired(token: string): boolean {
-  try {
-    const parts = token.split('.');
-    if (parts.length < 2) return false;
-    const payloadPart = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = payloadPart + '==='.slice((payloadPart.length + 3) % 4);
-    const payloadRaw = atob(padded);
-    const payload = JSON.parse(payloadRaw) as { exp?: unknown };
-    const exp = typeof payload.exp === 'number' ? payload.exp : Number(payload.exp);
-    if (!Number.isFinite(exp)) return false;
-    return Date.now() >= exp * 1000;
-  } catch {
-    return false;
-  }
-}
-
-function getStoredToken(): string | null {
-  const storage = getSessionStorage();
-  const tokenFromCookieOnly = () => {
-    const token = getTokenFromCookie();
-    if (token && typeof window !== 'undefined' && isJwtExpired(token)) {
-      clearStoredSession();
-      return null;
-    }
-    return token;
-  };
-  if (!storage) return tokenFromCookieOnly();
-  try {
-    const token = storage.getItem(TOKEN_KEY) || getTokenFromCookie();
-    if (token && typeof window !== 'undefined' && isJwtExpired(token)) {
-      clearStoredSession();
-      return null;
-    }
-    return token;
-  } catch {
-    return tokenFromCookieOnly();
-  }
-}
-
 function clearStoredSession() {
   clearAdminSessionStateCache();
   const storage = getSessionStorage();
   if (storage) {
     try {
-      storage.removeItem(TOKEN_KEY);
       storage.removeItem(USERNAME_KEY);
     } catch {
       // ignore
     }
   }
-  clearAdminTokenCookie();
   dispatchAdminSessionChanged();
 }
 
-function setStoredSession(token: string, username: string) {
+function setStoredSession(username: string) {
   const storage = getSessionStorage();
   if (!storage) return;
   try {
-    storage.setItem(TOKEN_KEY, token);
     storage.setItem(USERNAME_KEY, username);
   } catch (error) {
     log('setStoredSession failed', error);
   }
 }
 
-export function persistAdminSession(token: string, username: string) {
+export function persistAdminSession(_token: string | null | undefined, username: string) {
   clearAdminSessionStateCache();
-  setStoredSession(token, username);
-  setAdminTokenCookie(token);
+  setStoredSession(username);
   dispatchAdminSessionChanged();
 }
 
@@ -224,16 +136,13 @@ export async function hasAdminAccessToCurrentInstance(): Promise<boolean> {
   try {
     if (typeof window === 'undefined') return true;
 
-    const token = getStoredToken();
-    if (!token) return true;
-
     const slug = getBrowserInstanceSlug();
     if (!slug) return true;
 
     const resp = await fetch(
       buildInstanceAwareUrl(`/api/instances/select?slug=${encodeURIComponent(slug)}&mode=admin`),
       {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'same-origin',
       }
     );
 
@@ -289,10 +198,6 @@ export function buildInstanceAwareUrl(path: string): string {
   return `${base}${separator}roadmapInstance=${encodeURIComponent(slug)}${hash}`;
 }
 
-export function getAdminSessionToken(): string | null {
-  return getStoredToken();
-}
-
 function normalizeAdminSessionState(raw: unknown): AdminSessionState | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
 
@@ -323,8 +228,7 @@ export async function getAdminSessionState(
   try {
     if (typeof window === 'undefined') return null;
 
-    const token = getStoredToken();
-    if (!token) return null;
+    const token = 'http-only-cookie-session';
 
     if (!forceRefresh && adminSessionStateCache) {
       if (adminSessionStateCache.token === token && adminSessionStateCache.expiresAt > Date.now()) {
@@ -339,7 +243,7 @@ export async function getAdminSessionState(
 
     const request = (async () => {
       const response = await fetch(buildInstanceAwareUrl('/api/auth/check-admin-session'), {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'same-origin',
       });
 
       if (!response.ok) {
@@ -402,25 +306,22 @@ export async function hasAdminAccess(): Promise<boolean> {
       return false;
     }
 
-    const token = getStoredToken();
-    if (token) {
-      log('hasAdminAccess: verifying stored admin session');
-      try {
-        const response = await fetch(buildInstanceAwareUrl('/api/auth/check-admin-session'), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.isAdmin) {
-            log('hasAdminAccess: session valid');
-            return true;
-          }
+    log('hasAdminAccess: verifying cookie session');
+    try {
+      const response = await fetch(buildInstanceAwareUrl('/api/auth/check-admin-session'), {
+        credentials: 'same-origin',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.isAdmin) {
+          log('hasAdminAccess: session valid');
+          return true;
         }
-        log('hasAdminAccess: stored session invalid, clearing');
-        clearStoredSession();
-      } catch (error) {
-        log('hasAdminAccess: error verifying token', error);
       }
+      log('hasAdminAccess: session invalid, clearing local metadata');
+      clearStoredSession();
+    } catch (error) {
+      log('hasAdminAccess: error verifying session', error);
     }
 
     return false;
@@ -438,7 +339,7 @@ export function logout(): void {
   if (typeof window !== 'undefined') {
     log('logout: clearing stored session');
     clearStoredSession();
-    window.location.href = '/admin/login';
+    window.location.href = buildInstanceAwareUrl('/api/auth/entra/logout');
   }
 }
 

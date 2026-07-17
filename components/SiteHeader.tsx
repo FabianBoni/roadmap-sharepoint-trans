@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { useMemo, useEffect, useState } from 'react';
 import {
   ADMIN_SESSION_CHANGED_EVENT,
-  getAdminSessionToken,
+  getAdminSessionState,
   hasAdminAccessToCurrentInstance,
   hasValidAdminSession,
 } from '@/utils/auth';
@@ -94,8 +94,12 @@ const SiteHeader: React.FC<SiteHeaderProps> = ({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const updateFeedbackLink = () => setShowFeedbackLink(Boolean(getAdminSessionToken()));
-    updateFeedbackLink();
+    const updateFeedbackLink = () => {
+      void getAdminSessionState(true).then((session) =>
+        setShowFeedbackLink(Boolean(session?.authenticated))
+      );
+    };
+    void updateFeedbackLink();
     window.addEventListener(ADMIN_SESSION_CHANGED_EVENT, updateFeedbackLink);
     return () => window.removeEventListener(ADMIN_SESSION_CHANGED_EVENT, updateFeedbackLink);
   }, [router.asPath]);

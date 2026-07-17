@@ -10,23 +10,17 @@ import {
   shouldUseSecureCookies,
   type EntraRedirectEnv,
 } from '@roadmap/entra-sso/next';
+import { getJwtSecret, normalizeLocalReturnUrl } from '@/utils/sessionSecurity';
 
 function entraSsoEnabled(): boolean {
-  return Boolean(
-    process.env.ENTRA_TENANT_ID && process.env.ENTRA_CLIENT_ID && process.env.ENTRA_CLIENT_SECRET
-  );
-}
-
-function normalizeReturnUrl(input: string | undefined | null, fallback = '/admin'): string {
-  const raw = typeof input === 'string' ? input.trim() : '';
-  if (!raw) return fallback;
-  if (!raw.startsWith('/')) return fallback;
-  if (raw.startsWith('//')) return fallback;
-
-  // Defensive: if a misconfigured Entra redirect sent code/state to an app page,
-  // the returnUrl may contain huge OIDC query params. Drop them.
-  const [pathOnly] = raw.split('?', 1);
-  return pathOnly || fallback;
+  try {
+    getJwtSecret();
+    return Boolean(
+      process.env.ENTRA_TENANT_ID && process.env.ENTRA_CLIENT_ID && process.env.ENTRA_CLIENT_SECRET
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isRedirectUriLikelyMisconfigured(envRedirectUri: string): boolean {
@@ -78,7 +72,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     };
     const expected = getEntraRedirectUri({ req, env: envWithoutOverride });
 
-    const returnUrl = normalizeReturnUrl(
+    const returnUrl = normalizeLocalReturnUrl(
       typeof req.query.returnUrl === 'string' ? req.query.returnUrl : null,
       '/admin'
     );
@@ -95,7 +89,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     return;
   }
 
-  const returnUrlRaw = normalizeReturnUrl(
+  const returnUrlRaw = normalizeLocalReturnUrl(
     typeof req.query.returnUrl === 'string' ? req.query.returnUrl : null,
     '/admin'
   );

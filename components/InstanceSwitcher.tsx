@@ -1,10 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
-import {
-  ADMIN_SESSION_CHANGED_EVENT,
-  buildInstanceAwareUrl,
-  getAdminSessionToken,
-} from '@/utils/auth';
+import { ADMIN_SESSION_CHANGED_EVENT, buildInstanceAwareUrl } from '@/utils/auth';
 
 export type InstanceOption = { slug: string; displayName: string };
 
@@ -67,14 +63,8 @@ const InstanceSwitcher = () => {
       setLoading(true);
       setError(null);
       try {
-        const token = getAdminSessionToken();
-        if (!token) {
-          if (!cancelled) setOptions([]);
-          return;
-        }
-
         const resp = await fetch(buildInstanceAwareUrl('/api/instances/slugs'), {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'same-origin',
         });
         if (!resp.ok) {
           if (resp.status === 401 || resp.status === 403) {
