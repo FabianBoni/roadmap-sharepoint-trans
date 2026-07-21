@@ -595,17 +595,29 @@ jobs:
 
           echo "PM2_HOME=$pm2Home" >> "$GITHUB_ENV"
 
-      - name: Install PM2 with Yarn
+      - name: Install PM2
         run: |
           set -euo pipefail
-          yarn global add pm2@6.0.14 --non-interactive
 
-          pm2Bin="$(yarn global bin)/pm2"
+          pm2ToolDir="${RUNNER_TEMP}/pm2-tool"
+          rm -rf "$pm2ToolDir"
+          mkdir -p "$pm2ToolDir"
+
+          npm install \
+            --prefix "$pm2ToolDir" \
+            --no-audit \
+            --no-fund \
+            pm2@6.0.14
+
+          pm2Bin="$pm2ToolDir/node_modules/.bin/pm2"
+
           if [ ! -x "$pm2Bin" ]; then
-            echo "[FAIL] pm2 binary not found after yarn global add." >&2
+            echo "[FAIL] PM2 binary was not created at $pm2Bin" >&2
+            find "$pm2ToolDir" -maxdepth 4 -type f -name 'pm2*' -print || true
             exit 1
           fi
 
+          "$pm2Bin" --version
           echo "PM2_BIN=$pm2Bin" >> "$GITHUB_ENV"
 
       - name: Stop existing instance and free port 3000
