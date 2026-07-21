@@ -109,12 +109,12 @@ Checks: (1) Site Collection Admin (`IsSiteAdmin`), (2) Owners Group, (3) Heurist
 
 ### Scripts
 
-- `npm run dev` - Dev server (port 3000)
-- `npm run build` - Production build
-- `npm run lint:fix` - ESLint auto-fix
-- `npm run format` - Prettier format
-- `npm run security:audit` - Vulnerability check
-- `npm run pm2:restart` - Restart PM2 process
+- `yarn dev` - Dev server (port 3000)
+- `yarn build` - Production build
+- `yarn lint:fix` - ESLint auto-fix
+- `yarn format` - Prettier format
+- `yarn security:audit` - Vulnerability check
+- `yarn pm2:restart` - Restart PM2 process
 
 ### Pre-commit (Husky + lint-staged)
 

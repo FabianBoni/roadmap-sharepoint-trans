@@ -1,112 +1,202 @@
 import Link from 'next/link';
+import { FiArrowRight, FiEye, FiFilter, FiSearch } from 'react-icons/fi';
 import HelpLayout from '@/components/HelpLayout';
+
+const findSteps = [
+  {
+    title: 'Passende Instanz öffnen',
+    description:
+      'Wählen Sie zuerst die Roadmap-Instanz Ihres Bereichs. So beziehen sich Suche und Filter auf den richtigen Datenbestand.',
+  },
+  {
+    title: 'Suche oder Filter einsetzen',
+    description:
+      'Suchen Sie nach einem Begriff oder grenzen Sie die Treffer nach Kategorien, Status, Projektart, Zeitraum und weiteren Merkmalen ein.',
+  },
+  {
+    title: 'Ansicht passend zur Frage wählen',
+    description:
+      'Nutzen Sie den Zeitstrahl für die zeitliche Einordnung und Kacheln für einen kompakten Projektvergleich.',
+  },
+  {
+    title: 'Projekt öffnen',
+    description:
+      'Klicken oder tippen Sie auf ein Projekt, um Beschreibung, Verantwortliche, Phase, Meilenstein, Links und Anhänge zu sehen.',
+  },
+];
 
 const ProjekteAnsehen = () => {
   return (
     <HelpLayout
-      title="Projekte finden und vergleichen"
+      title="Projekte gezielt finden und verstehen"
       description={
         <>
-          Filtern Sie Projekte nach Kategorie, Status, Tags oder Zeitraum und wechseln Sie zwischen
-          Zeitstrahl und Kachelansicht. Mit diesen Tipps gewinnen Sie schnell Orientierung.
+          Starten Sie mit Ihrer konkreten Frage: Suchen Sie ein bekanntes Projekt, laufende Vorhaben
+          oder einen Überblick über ein Jahr? Die folgenden Schritte führen ohne Umwege zur
+          passenden Ansicht.
         </>
       }
       breadcrumbs={[{ label: 'Hilfe', href: '/help' }, { label: 'Projekte ansehen' }]}
+      learningGoals={[
+        'Die richtige Instanz und das gewünschte Jahr auswählen.',
+        'Suche und Filter gezielt kombinieren und wieder zurücksetzen.',
+        'Zeitstrahl, Kacheln und Projekt-Details passend einsetzen.',
+        'Eine gefilterte Ansicht per URL weitergeben.',
+      ]}
+      actions={
+        <>
+          <Link className="ds-button ds-button-primary" href="/roadmap">
+            Roadmap öffnen
+            <FiArrowRight className="ds-icon-sm" />
+          </Link>
+          <Link className="ds-button ds-button-secondary" href="/help/erste-schritte">
+            Grundlagen ansehen
+          </Link>
+        </>
+      }
     >
-      <section className="grid gap-6 rounded-3xl border border-slate-800/70 bg-slate-950/70 p-6 sm:grid-cols-[1.1fr_0.9fr] sm:p-8">
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-white sm:text-xl">Visuelle Orientierung</h2>
-          <p className="text-sm text-slate-300 sm:text-base">
-            Die Roadmap nutzt die dunkle Grundgestaltung der Anwendung und hebt Fachbereiche durch
-            farbige Balken hervor. Bewegen Sie den Mauszeiger über ein Projekt oder tippen Sie auf
-            mobilen Geräten, um Details zu Phase, Budget, Team und Zeitplan anzuzeigen.
+      <section aria-labelledby="finden-heading">
+        <div className="ds-section-header">
+          <div>
+            <p className="ds-panel-label">Schritt für Schritt</p>
+            <h2 id="finden-heading" className="ds-section-title">
+              Vom Anliegen zum passenden Projekt
+            </h2>
+          </div>
+          <p className="ds-section-copy">
+            Arbeiten Sie von grob nach fein. Das reduziert unnötige Filterkombinationen und macht
+            fehlende Treffer leichter nachvollziehbar.
           </p>
         </div>
-        <ul className="grid gap-3">
-          <li className="flex items-start gap-3 rounded-2xl border border-slate-800/60 bg-slate-900/70 px-4 py-3 text-sm text-slate-200">
-            <span
-              className="mt-1 inline-flex h-2 w-5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500"
-              aria-hidden="true"
-            />
-            <span>
-              <strong className="text-slate-100">Kategorie-Farben:</strong> Jede Rubrik besitzt eine
-              eigene Farbe und erleichtert so das Erkennen von Zuständigkeiten.
-            </span>
-          </li>
-          <li className="flex items-start gap-3 rounded-2xl border border-slate-800/60 bg-slate-900/70 px-4 py-3 text-sm text-slate-200">
-            <span
-              className="mt-1 inline-flex h-2 w-5 rounded-full bg-slate-700"
-              aria-hidden="true"
-            />
-            <span>
-              <strong className="text-slate-100">Hover-Details:</strong> Tooltips liefern kompakte
-              Kontextinformationen ohne die Ansicht zu verlassen.
-            </span>
-          </li>
-          <li className="flex items-start gap-3 rounded-2xl border border-slate-800/60 bg-slate-900/70 px-4 py-3 text-sm text-slate-200">
-            <span
-              className="mt-1 inline-flex h-2 w-5 rounded-full bg-slate-600"
-              aria-hidden="true"
-            />
-            <span>
-              <strong className="text-slate-100">Tiles & Timeline:</strong> Wechseln Sie je nach
-              Fragestellung zwischen überblicksorientiertem Zeitstrahl und detailreicher
-              Kachelansicht.
-            </span>
-          </li>
-        </ul>
+        <div className="ds-steps">
+          {findSteps.map((step, index) => (
+            <article key={step.title} className="ds-step">
+              <span className="ds-step-number">{String(index + 1).padStart(2, '0')}</span>
+              <div>
+                <h3 className="ds-step-title">{step.title}</h3>
+                <p className="ds-step-copy">{step.description}</p>
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
 
-      <section className="grid gap-6 rounded-3xl border border-slate-800/70 bg-slate-950/70 p-6 sm:grid-cols-2 sm:p-8">
-        <article className="space-y-3">
-          <h2 className="text-lg font-semibold text-white sm:text-xl">Filter und Suche</h2>
-          <p className="text-sm text-slate-300 sm:text-base">
-            Nutzen Sie die Kombination aus Textsuche und Filtern, um Projekte in Sekunden
-            einzugrenzen. Alle Einstellungen werden automatisch in der URL gespeichert – ideal zum
-            Teilen mit Kolleginnen und Kollegen.
+      <section className="grid gap-5 md:grid-cols-2" aria-label="Suche und Filter">
+        <article className="ds-card ds-help-card">
+          <div className="ds-help-card-header">
+            <div className="ds-help-card-icon" aria-hidden="true">
+              <FiSearch className="ds-icon-sm" />
+            </div>
+            <span className="ds-help-card-badge">Bekanntes Projekt</span>
+          </div>
+          <h2 className="ds-help-card-title">Mit einem Begriff suchen</h2>
+          <p className="ds-help-card-copy">
+            Die Suche prüft Titel, Beschreibung, Projektleitung, nächsten Meilenstein, Tags und
+            Teammitglieder. Beginnen Sie mit einem markanten Wort; ergänzen Sie erst danach Filter.
           </p>
-          <ul className="space-y-2 text-sm text-slate-300">
-            <li>
-              <strong className="text-slate-100">Textsuche:</strong> Durchsucht Titel und
-              Beschreibung.
-            </li>
-            <li>
-              <strong className="text-slate-100">Kategorien & Tags:</strong> Fokus auf einen
-              Fachbereich oder Stakeholder-Kreis.
-            </li>
-            <li>
-              <strong className="text-slate-100">Zeitraum:</strong> Grenzen Sie Monate oder Quartale
-              ein, um aktuelle Vorhaben zu sehen.
-            </li>
-          </ul>
+          <div className="ds-note">
+            <span className="ds-note-icon" aria-hidden="true">
+              i
+            </span>
+            <p className="ds-step-copy">
+              Weniger ist oft mehr: „Portal“ liefert eher einen Treffer als ein vollständiger
+              Projekttitel mit abweichender Schreibweise.
+            </p>
+          </div>
         </article>
-        <article className="space-y-3">
-          <h2 className="text-lg font-semibold text-white sm:text-xl">Ansichten wechseln</h2>
-          <p className="text-sm text-slate-300 sm:text-base">
-            Der Zeitstrahl eignet sich für die Jahresplanung und zeigt Abhängigkeiten. Die
-            Kachelansicht fokussiert auf Zusammenfassungen, KPIs und Teammitglieder.
+
+        <article className="ds-card ds-help-card">
+          <div className="ds-help-card-header">
+            <div className="ds-help-card-icon" aria-hidden="true">
+              <FiFilter className="ds-icon-sm" />
+            </div>
+            <span className="ds-help-card-badge">Überblick</span>
+          </div>
+          <h2 className="ds-help-card-title">Mit Filtern eingrenzen</h2>
+          <p className="ds-help-card-copy">
+            Öffnen Sie „Erweiterte Filter“. Verfügbar sind unter anderem Projektart, Fortschritt,
+            Status, Phase, Leitung, Tags, Badges, Monate und „Nur laufende Projekte“. Aktive Filter
+            erscheinen als Chips und lassen sich einzeln entfernen.
           </p>
-          <div className="rounded-2xl border border-slate-800/60 bg-slate-900/70 px-4 py-3 text-sm text-slate-300">
-            Tipp: Aktivieren Sie „Nur laufende Projekte“, um schnell auf aktuelle Initiativen zu
-            fokussieren.
+          <div className="ds-note">
+            <span className="ds-note-icon" aria-hidden="true">
+              ↺
+            </span>
+            <p className="ds-step-copy">
+              Bei unerwartet wenigen Treffern zuerst „Alle Filter zurücksetzen“ wählen und dann
+              jeweils nur einen Filter ergänzen.
+            </p>
           </div>
         </article>
       </section>
 
-      <section className="rounded-3xl border border-slate-800/70 bg-slate-950/70 p-6 sm:p-8">
-        <h2 className="text-lg font-semibold text-white sm:text-xl">Weitere Ressourcen</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Link
-            href="/help/projekte-melden"
-            className="rounded-2xl border border-slate-800/60 bg-slate-900/70 px-5 py-4 text-sm text-slate-200 transition hover:border-sky-500/50 hover:text-white"
-          >
-            Informationen an das Roadmap-Team melden
+      <section aria-labelledby="ansichten-heading">
+        <div className="ds-section-header">
+          <div>
+            <p className="ds-panel-label">Ansichten richtig lesen</p>
+            <h2 id="ansichten-heading" className="ds-section-title">
+              Dieselben Projekte, ein anderer Fokus
+            </h2>
+          </div>
+        </div>
+        <div className="ds-help-list">
+          <div className="ds-help-list-item">
+            <div className="ds-help-list-icon" aria-hidden="true">
+              <FiEye className="ds-icon-sm" />
+            </div>
+            <div>
+              <h3>Zeitstrahl</h3>
+              <p>
+                Zeigt Projekte nach Kategorie und zeitlicher Lage. Wechseln Sie je nach benötigter
+                Genauigkeit zwischen Quartalen, Monaten, Wochen und Jahren.
+              </p>
+            </div>
+          </div>
+          <div className="ds-help-list-item">
+            <div className="ds-help-list-icon" aria-hidden="true">
+              <FiEye className="ds-icon-sm" />
+            </div>
+            <div>
+              <h3>Kachelansicht</h3>
+              <p>
+                Zeigt kompakte Angaben wie Zeitraum, Badges, Fortschritt sowie die Anzahl von Links
+                und Teammitgliedern. Sie eignet sich zum schnellen Vergleich.
+              </p>
+            </div>
+          </div>
+          <div className="ds-help-list-item">
+            <div className="ds-help-list-icon" aria-hidden="true">
+              <FiEye className="ds-icon-sm" />
+            </div>
+            <div>
+              <h3>Projekt-Detail</h3>
+              <p>
+                Enthält den vollständigen Kontext. Leere Bereiche bedeuten, dass für dieses Projekt
+                noch keine entsprechende Angabe hinterlegt wurde.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="ds-card ds-help-support-panel" aria-labelledby="teilen-heading">
+        <div>
+          <p className="ds-panel-label">Teilen & Fehler lösen</p>
+          <h2 id="teilen-heading" className="ds-section-title">
+            Ansicht weitergeben oder fehlende Daten melden
+          </h2>
+          <p className="ds-section-copy">
+            Suche, Filter, Kategorien und Kachelansicht werden in der URL gespeichert. Kopieren Sie
+            deshalb nach dem Filtern die vollständige Browseradresse. Fehlt ein Projekt trotz
+            zurückgesetzter Filter, melden Sie die Instanz und den erwarteten Projektnamen.
+          </p>
+        </div>
+        <div className="ds-actions ds-help-support-actions">
+          <Link className="ds-button ds-button-primary" href="/help/projekte-melden">
+            Inhalt melden
           </Link>
-          <Link
-            href="/docs/funktionen/roadmap"
-            className="rounded-2xl border border-slate-800/60 bg-slate-900/70 px-5 py-4 text-sm text-slate-200 transition hover:border-sky-500/50 hover:text-white"
-          >
-            Technische Dokumentation zur Roadmap-Ansicht
+          <Link className="ds-button ds-button-secondary" href="/docs/funktionen/roadmap">
+            Technische Details
           </Link>
         </div>
       </section>

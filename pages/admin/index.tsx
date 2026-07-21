@@ -7,6 +7,7 @@ import {
   FiBookOpen,
   FiExternalLink,
   FiLogOut,
+  FiMessageCircle,
   FiPlus,
   FiRefreshCw,
   FiShield,
@@ -511,6 +512,10 @@ const AdminPage: React.FC = () => {
               <Link href="/help/admin" className="ds-button ds-button-primary">
                 <FiBookOpen className="ds-icon-sm" />
                 Admin-Handbuch
+              </Link>
+              <Link href="/admin/support-chat" className="ds-button ds-button-secondary">
+                <FiMessageCircle className="ds-icon-sm" />
+                Support-Postfach
               </Link>
               <Link href={roadmapHref} className="ds-button ds-button-secondary">
                 <FiExternalLink className="ds-icon-sm" />

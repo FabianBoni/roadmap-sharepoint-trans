@@ -95,9 +95,9 @@ fehlschlägt; der Fehler wird serverseitig protokolliert.
 Ausgeführt wurden:
 
 ```text
-npx tsc --noEmit
-npm run test:security
-npm run build
+yarn tsc --noEmit
+yarn test:security
+yarn build
 ```
 
 Die Prüfungen und der Produktions-Build sind erfolgreich. Ein Live-Upload gegen eine reale

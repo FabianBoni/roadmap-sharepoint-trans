@@ -28,12 +28,12 @@ Additional auth documentation:
 
 1. Copy `.env.example` → `.env` (or `.env.local`).
 2. Fill required vars; keep the file local only.
-3. Run the app: `npm run dev`.
+3. Run the app: `yarn dev`.
 
 ## CI/CD & Deployment
 
 - Provide secrets to the runner via environment/CI secrets (e.g., GitHub Actions vars), not checked-in files.
-- After deploy on the self-hosted runner, restart with `npm run pm2:restart`.
+- After deploy on the self-hosted runner, restart with `yarn pm2:restart`.
 
 ## Safety Checklist
 

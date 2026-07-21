@@ -292,6 +292,7 @@ const InstancesLanding = (props: {
 const AdminInstancesPage = () => {
   const [instances, setInstances] = useState<RoadmapInstanceSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [instanceQuery, setInstanceQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<AdminFormState>(defaultForm);
   const [mode, setMode] = useState<'create' | 'edit'>('create');
@@ -535,8 +536,7 @@ const AdminInstancesPage = () => {
     const existingMetadata =
       mode === 'edit' && selectedSlug
         ? (instances.find((instance) => instance.slug === selectedSlug)?.metadata as
-            | Record<string, unknown>
-            | undefined)
+            Record<string, unknown> | undefined)
         : undefined;
     const metadata = setInstanceBadgeMetadata(existingMetadata, instanceBadge);
 
@@ -940,6 +940,30 @@ const AdminInstancesPage = () => {
     }
   };
 
+  const normalizedInstanceQuery = instanceQuery.trim().toLocaleLowerCase('de-CH');
+  const filteredInstances = normalizedInstanceQuery
+    ? instances.filter((instance) =>
+        [
+          instance.displayName,
+          instance.slug,
+          instance.department,
+          ...(instance.hosts ?? []),
+          ...(instance.allowedDepartments ?? []),
+        ].some((value) => value?.toLocaleLowerCase('de-CH').includes(normalizedInstanceQuery))
+      )
+    : instances;
+  const healthyInstanceCount = instances.filter(
+    (instance) => instance.health?.permissions.status === 'ok'
+  ).length;
+  const attentionInstanceCount = instances.filter((instance) => {
+    const permissionStatus = instance.health?.permissions.status;
+    return (
+      permissionStatus === 'error' ||
+      permissionStatus === 'insufficient' ||
+      Boolean(instance.health?.lists.missing.length)
+    );
+  }).length;
+
   if (tokenMissing) {
     return (
       <AdminSubpageLayout
@@ -981,8 +1005,15 @@ const AdminInstancesPage = () => {
       actions={
         <button
           type="button"
-          onClick={resetForm}
-          className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-sky-400 hover:text-white"
+          onClick={() => {
+            resetForm();
+            window.setTimeout(
+              () =>
+                document.getElementById('instance-form')?.scrollIntoView({ behavior: 'smooth' }),
+              0
+            );
+          }}
+          className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300"
         >
           Neue Instanz anlegen
         </button>
@@ -995,8 +1026,11 @@ const AdminInstancesPage = () => {
         </div>
       )}
 
-      <section className="grid gap-8 lg:grid-cols-2">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-lg shadow-slate-950/40">
+      <section className="grid gap-8">
+        <div
+          id="instance-form"
+          className="order-2 scroll-mt-24 rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-lg shadow-slate-950/40"
+        >
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-white">
               {mode === 'create' ? 'Neue Instanz' : `Instanz bearbeiten (${selectedSlug})`}
@@ -1272,9 +1306,38 @@ const AdminInstancesPage = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-lg shadow-slate-950/40">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-white">Bestehende Instanzen</h2>
+        <div className="order-1 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 shadow-lg shadow-slate-950/40 sm:p-6">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Instanzen
+              </p>
+              <p className="mt-1 text-3xl font-semibold text-white">{instances.length}</p>
+            </div>
+            <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-200">
+                Bereit
+              </p>
+              <p className="mt-1 text-3xl font-semibold text-white">{healthyInstanceCount}</p>
+            </div>
+            <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-amber-200">
+                Prüfen
+              </p>
+              <p className="mt-1 text-3xl font-semibold text-white">{attentionInstanceCount}</p>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-sky-300">
+                Übersicht
+              </p>
+              <h2 className="mt-1 text-xl font-semibold text-white">Bestehende Instanzen</h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Status prüfen, konfigurieren und SharePoint-Listen verwalten.
+              </p>
+            </div>
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -1403,6 +1466,16 @@ const AdminInstancesPage = () => {
               )}
             </div>
           </div>
+          <label className="mt-6 block">
+            <span className="sr-only">Instanzen durchsuchen</span>
+            <input
+              type="search"
+              value={instanceQuery}
+              onChange={(event) => setInstanceQuery(event.target.value)}
+              placeholder="Nach Name, Slug, Host oder Abteilung suchen …"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/20"
+            />
+          </label>
           {bulkProvisionSummary && (
             <div className="mt-2 space-y-1 text-xs text-slate-300">
               <p>{bulkProvisionSummary}</p>
@@ -1427,7 +1500,7 @@ const AdminInstancesPage = () => {
             <p className="mt-8 text-slate-400">Lade Daten …</p>
           ) : (
             <div className="mt-6 space-y-4">
-              {instances.map((instance) => {
+              {filteredInstances.map((instance) => {
                 const panelState = listPanels[instance.slug] ?? createListPanelState();
                 return (
                   <article
@@ -1755,6 +1828,19 @@ const AdminInstancesPage = () => {
                 <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-slate-400">
                   <p className="font-medium text-white">Noch keine Instanzen</p>
                   <p className="text-sm">Fülle das Formular aus, um die erste Instanz anzulegen.</p>
+                </div>
+              )}
+              {instances.length > 0 && filteredInstances.length === 0 && (
+                <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-slate-400">
+                  <p className="font-medium text-white">Keine passende Instanz</p>
+                  <p className="mt-1 text-sm">Passe den Suchbegriff an oder lösche ihn.</p>
+                  <button
+                    type="button"
+                    onClick={() => setInstanceQuery('')}
+                    className="mt-3 text-sm font-semibold text-sky-300 underline underline-offset-4 hover:text-sky-200"
+                  >
+                    Suche zurücksetzen
+                  </button>
                 </div>
               )}
             </div>

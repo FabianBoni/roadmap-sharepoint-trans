@@ -174,13 +174,13 @@ export default async function handler(
             <li>
               Erstellen Sie einen optimierten Build:
               <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto mt-2">
-                <code>npm run build # oder yarn build</code>
+                <code>yarn build</code>
               </pre>
             </li>
             <li>
               Starten Sie den Produktionsserver:
               <pre className="bg-gray-800 p-4 rounded-md overflow-x-auto mt-2">
-                <code>npm start # oder yarn start</code>
+                <code>yarn start</code>
               </pre>
             </li>
           </ol>
@@ -198,7 +198,7 @@ export default async function handler(
               korrekt ist
             </li>
             <li>
-              Führen Sie <code>npx prisma db push</code> aus, um die Datenbankschema zu
+              Führen Sie <code>yarn prisma db push</code> aus, um die Datenbankschema zu
               aktualisieren
             </li>
           </ol>
@@ -212,7 +212,7 @@ export default async function handler(
             <li>Überprüfen Sie die Browserkonsole auf Frontend-Fehler</li>
             <li>
               Stellen Sie sicher, dass alle Abhängigkeiten installiert sind (
-              <code>npm install</code>)
+              <code>yarn install --frozen-lockfile</code>)
             </li>
           </ol>
 

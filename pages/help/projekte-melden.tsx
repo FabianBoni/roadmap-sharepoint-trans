@@ -1,93 +1,179 @@
 import Link from 'next/link';
+import { FiArrowRight, FiEdit3, FiMessageSquare, FiShield } from 'react-icons/fi';
 import HelpLayout from '@/components/HelpLayout';
 
-const meldungHinweise = [
-  'Kurze Zusammenfassung (2–3 Sätze) hilft dem Team bei der Einordnung.',
-  'Optional: gewünschtes Go-live, betroffene Abteilungen oder KPIs.',
-  'Bitte keine vertraulichen Personendaten senden – dafür interne Kanäle nutzen.',
+const reportChecklist = [
+  'Roadmap-Instanz und Link zum betroffenen Projekt',
+  'Was aktuell angezeigt wird und was stattdessen gelten soll',
+  'Quelle oder zuständige Kontaktperson für die Änderung',
+  'Falls relevant: gewünschter Zeitraum oder nächster Meilenstein',
 ];
 
 const ProjekteMelden = () => {
   return (
     <HelpLayout
-      title="Projekte und Änderungen melden"
+      title="Neue Projekte und Korrekturen melden"
       description={
         <>
-          Egal ob neue Initiative, aktualisierte Meilensteine oder Ansprechpartner – über das
-          integrierte Formular landet Ihre Nachricht direkt beim Roadmap-Team. So bleibt die Roadmap
-          immer aktuell.
+          Nutzen Sie für inhaltliche Änderungen den Kontakt zum Roadmap-Team. Feature-Wünsche zur
+          Anwendung gehören dagegen auf die Feedback-Seite. Diese Trennung sorgt dafür, dass Ihr
+          Anliegen direkt bei der richtigen Stelle landet.
         </>
       }
       breadcrumbs={[{ label: 'Hilfe', href: '/help' }, { label: 'Projekte melden' }]}
-    >
-      <section className="grid gap-6 rounded-3xl border border-slate-800/70 bg-slate-950/70 p-6 sm:grid-cols-[1.1fr_0.9fr] sm:p-8">
-        <article className="space-y-4">
-          <h2 className="text-lg font-semibold text-white sm:text-xl">Was kann gemeldet werden?</h2>
-          <ul className="space-y-2 text-sm text-slate-300 sm:text-base">
-            <li>Neue Projektideen oder Vorhaben, die in die Roadmap aufgenommen werden sollen.</li>
-            <li>Aktualisierte Infos zu laufenden Projekten (Status, Budget, Meilensteine).</li>
-            <li>Links, Dokumente oder Ansprechpersonen, die ergänzt werden sollen.</li>
-          </ul>
-        </article>
-        <article className="space-y-4 rounded-2xl border border-slate-800/60 bg-slate-900/70 px-5 py-4 text-sm text-slate-300">
-          <h3 className="text-base font-semibold text-white">Direkter Draht</h3>
-          <p>
-            Meldungen landen im Backlog des Roadmap-Teams. Wir bestätigen den Eingang und
-            informieren, sobald die Änderung veröffentlicht wurde.
-          </p>
-          <a
-            href="mailto:roadmap@jsd.bs.ch"
-            className="inline-flex rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-slate-200 transition hover:border-sky-400 hover:text-white"
-          >
-            Alternativ: E-Mail senden
+      learningGoals={[
+        'Den richtigen Kanal für Inhalt, Störung oder Feature-Wunsch wählen.',
+        'Alle Angaben zusammenstellen, die Rückfragen vermeiden.',
+        'Vertrauliche Daten aus der Meldung heraushalten.',
+        'Nach der Aktualisierung das Ergebnis selbst prüfen.',
+      ]}
+      actions={
+        <>
+          <a className="ds-button ds-button-primary" href="mailto:roadmap@jsd.bs.ch">
+            Roadmap-Team anschreiben
+            <FiArrowRight className="ds-icon-sm" />
           </a>
-        </article>
-      </section>
-
-      <section className="space-y-5 rounded-3xl border border-slate-800/70 bg-slate-950/70 p-6 sm:p-8">
-        <h2 className="text-lg font-semibold text-white sm:text-xl">
-          So funktioniert das Formular
-        </h2>
-        <ol className="space-y-4 text-sm text-slate-300 sm:text-base">
-          <li>
-            Öffnen Sie das Projekt (oder die Startseite) und klicken Sie auf „Rückmeldung geben“.
-          </li>
-          <li>
-            Beschreiben Sie Ihr Anliegen: Was soll ergänzt oder geändert werden? Wer profitiert
-            davon?
-          </li>
-          <li>
-            Fügen Sie optional Links oder Dokumente hinzu. Je präziser die Angaben, desto schneller
-            die Umsetzung.
-          </li>
-        </ol>
-        <div className="rounded-2xl border border-slate-800/60 bg-slate-900/70 px-5 py-4 text-sm text-slate-300">
-          <h3 className="text-base font-semibold text-white">Hinweise für die Meldung</h3>
-          <ul className="mt-3 space-y-2">
-            {meldungHinweise.map((hinweis) => (
-              <li key={hinweis}>{hinweis}</li>
-            ))}
-          </ul>
+          <Link className="ds-button ds-button-secondary" href="/feedback">
+            Feature-Wunsch einreichen
+          </Link>
+        </>
+      }
+    >
+      <section aria-labelledby="kanal-heading">
+        <div className="ds-section-header">
+          <div>
+            <p className="ds-panel-label">Welcher Kanal passt?</p>
+            <h2 id="kanal-heading" className="ds-section-title">
+              Erst das Anliegen einordnen
+            </h2>
+          </div>
+          <p className="ds-section-copy">
+            Eine eindeutige Zuordnung senkt die Wartezeit und verhindert, dass Informationen
+            zwischen Teams verloren gehen.
+          </p>
+        </div>
+        <div className="grid gap-5 md:grid-cols-3">
+          <article className="ds-card ds-help-card">
+            <div className="ds-help-card-header">
+              <div className="ds-help-card-icon" aria-hidden="true">
+                <FiEdit3 className="ds-icon-sm" />
+              </div>
+              <span className="ds-help-card-badge">E-Mail</span>
+            </div>
+            <h3 className="ds-help-card-title">Roadmap-Inhalt</h3>
+            <p className="ds-help-card-copy">
+              Für neue Projekte, falsche Statusangaben, Termine, Verantwortliche, Texte, Links oder
+              fehlende Projekte schreiben Sie an das Roadmap-Team.
+            </p>
+          </article>
+          <article className="ds-card ds-help-card">
+            <div className="ds-help-card-header">
+              <div className="ds-help-card-icon" aria-hidden="true">
+                <FiMessageSquare className="ds-icon-sm" />
+              </div>
+              <span className="ds-help-card-badge">Feedback-Seite</span>
+            </div>
+            <h3 className="ds-help-card-title">Funktion der Anwendung</h3>
+            <p className="ds-help-card-copy">
+              Für neue Filter, Ansichten oder andere Produktideen nutzen Sie die Feedback-Seite.
+              Dort können angemeldete Personen Wünsche sehen und bewerten.
+            </p>
+          </article>
+          <article className="ds-card ds-help-card">
+            <div className="ds-help-card-header">
+              <div className="ds-help-card-icon" aria-hidden="true">
+                <FiShield className="ds-icon-sm" />
+              </div>
+              <span className="ds-help-card-badge">Support</span>
+            </div>
+            <h3 className="ds-help-card-title">Zugriff oder Störung</h3>
+            <p className="ds-help-card-copy">
+              Bei einer Fehlermeldung, einer Anmeldeschleife oder fehlendem Zugriff verwenden Sie
+              die Support-Seite und nennen den genauen Wortlaut der Meldung.
+            </p>
+          </article>
         </div>
       </section>
 
-      <section className="rounded-3xl border border-slate-800/70 bg-slate-950/70 p-6 sm:p-8">
-        <h2 className="text-lg font-semibold text-white sm:text-xl">Nächste Schritte</h2>
-        <p className="mt-3 text-sm text-slate-300 sm:text-base">
-          Nach Eingang prüfen wir die Meldung, stimmen uns bei Bedarf mit den verantwortlichen Teams
-          ab und veröffentlichen die aktualisierten Informationen innerhalb weniger Arbeitstage.
-        </p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Link
-            href="/help/projekte-ansehen"
-            className="rounded-full border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-sky-400 hover:text-white"
-          >
-            Projekte gezielt finden
+      <section className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]" aria-labelledby="meldung-heading">
+        <article className="ds-card p-6 sm:p-8">
+          <p className="ds-panel-label">Vor dem Absenden</p>
+          <h2 id="meldung-heading" className="ds-section-title">
+            Diese Angaben ermöglichen eine eindeutige Prüfung
+          </h2>
+          <div className="ds-info-list mt-6">
+            {reportChecklist.map((item) => (
+              <p key={item} className="ds-info-item">
+                {item}
+              </p>
+            ))}
+          </div>
+        </article>
+        <aside className="ds-card p-6 sm:p-8" aria-label="Vorlage für eine Meldung">
+          <p className="ds-panel-label">Kopiervorlage</p>
+          <h3 className="ds-help-card-title">Kurze, vollständige Nachricht</h3>
+          <div className="mt-5 rounded-2xl border border-slate-700 bg-slate-950/70 p-4 text-sm leading-7 text-slate-300">
+            <p>Instanz: …</p>
+            <p>Projekt/Link: …</p>
+            <p>Aktueller Stand: …</p>
+            <p>Gewünschte Änderung: …</p>
+            <p>Quelle/Kontakt: …</p>
+          </div>
+        </aside>
+      </section>
+
+      <section aria-labelledby="ablauf-heading">
+        <div className="ds-section-header">
+          <div>
+            <p className="ds-panel-label">Nach dem Absenden</p>
+            <h2 id="ablauf-heading" className="ds-section-title">
+              So bleibt der weitere Ablauf nachvollziehbar
+            </h2>
+          </div>
+        </div>
+        <div className="ds-steps">
+          {[
+            {
+              title: 'Prüfung ermöglichen',
+              copy: 'Das zuständige Team gleicht die Meldung mit der verantwortlichen Stelle ab. Bei fehlendem Kontext kann eine Rückfrage nötig sein.',
+            },
+            {
+              title: 'Keine feste Frist voraussetzen',
+              copy: 'Der Zeitpunkt der Aktualisierung hängt vom Umfang und von der fachlichen Freigabe ab. Dringlichkeit deshalb sachlich begründen.',
+            },
+            {
+              title: 'Ergebnis kontrollieren',
+              copy: 'Öffnen Sie nach der Rückmeldung die richtige Instanz neu und prüfen Sie Projekt-Detail, Zeitraum und Filterdarstellung.',
+            },
+          ].map((step, index) => (
+            <article key={step.title} className="ds-step">
+              <span className="ds-step-number">{String(index + 1).padStart(2, '0')}</span>
+              <div>
+                <h3 className="ds-step-title">{step.title}</h3>
+                <p className="ds-step-copy">{step.copy}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="ds-card ds-help-support-panel" aria-labelledby="datenschutz-heading">
+        <div>
+          <p className="ds-panel-label">Datenschutz</p>
+          <h2 id="datenschutz-heading" className="ds-section-title">
+            Nur notwendige Informationen senden
+          </h2>
+          <p className="ds-section-copy">
+            Übermitteln Sie keine Passwörter, Zugangstokens oder besonders schützenswerte
+            Personendaten. Verweisen Sie für vertrauliche Unterlagen auf den dafür vorgesehenen
+            internen Ablageort, sofern die empfangende Person zugriffsberechtigt ist.
+          </p>
+        </div>
+        <div className="ds-actions ds-help-support-actions">
+          <Link className="ds-button ds-button-primary" href="/support">
+            Support öffnen
           </Link>
-          <Link
-            href="/help/faq"
-            className="rounded-full border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-sky-400 hover:text-white"
-          >
+          <Link className="ds-button ds-button-secondary" href="/help/faq">
             Häufige Fragen
           </Link>
         </div>

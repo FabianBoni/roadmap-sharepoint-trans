@@ -2,7 +2,7 @@
   "name": "roadmap-next",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "npm@10.9.3",
+  "packageManager": "yarn@1.22.22",
   "workspaces": [
     "packages/*"
   ],
@@ -14,7 +14,7 @@
     "lint:fix": "next lint --fix",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md,mjs}\"",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md,mjs}\"",
-    "security:audit": "npm audit --audit-level=moderate",
+    "security:audit": "yarn audit --level moderate",
     "test:security": "tsx --test tests/security/*.test.ts",
     "pre-commit": "lint-staged",
     "pm2:restart": "pm2 startOrRestart ecosystem.config.js --only roadmap-app --update-env",
@@ -28,6 +28,8 @@
     "prisma:seed": "prisma db seed"
   },
   "dependencies": {
+    "@chatscope/chat-ui-kit-react": "2.1.1",
+    "@chatscope/chat-ui-kit-styles": "1.4.0",
     "@fluentui/react": "^8.121.2",
     "@prisma/client": "^5.20.0",
     "@roadmap/entra-sso": "0.1.0",
@@ -40,6 +42,7 @@
     "jose": "^6.1.3",
     "jsonwebtoken": "^9.0.2",
     "next": "^14.2.33",
+    "prop-types": "15.8.1",
     "react": "18.3.1",
     "react-datepicker": "^6.0.0",
     "react-dom": "18.3.1",
@@ -49,7 +52,7 @@
     "undici": "^6.22.0",
     "uuid": "^9.0.1"
   },
-  "overrides": {
+  "resolutions": {
     "xmldom": "npm:@xmldom/xmldom@^0.9.5",
     "jsonwebtoken": "^9.0.2",
     "tough-cookie": "^4.1.4",

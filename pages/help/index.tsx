@@ -31,21 +31,21 @@ const spotlightGuides: Guide[] = [
   },
   {
     title: 'Roadmap lesen & filtern',
-    description: 'Suchen, filtern und Ansichten nutzen, um Projekte gezielt einzugrenzen.',
+    description: 'Projekte finden, Filter zurücksetzen, Ansichten wählen und Ergebnisse teilen.',
     href: '/help/projekte-ansehen',
     badge: 'Visualisierung',
     icon: FiBookOpen,
   },
   {
     title: 'Projekte melden',
-    description: 'Welche Angaben helfen und wie neue Vorhaben strukturiert eingereicht werden.',
+    description: 'Inhaltskorrektur, Feature-Wunsch und Support richtig unterscheiden.',
     href: '/help/projekte-melden',
     badge: 'Input geben',
     icon: FiCheckCircle,
   },
   {
     title: 'Admin-Leitfaden',
-    description: 'Instanzen pflegen, Kategorien steuern und Einstellungen nachvollziehbar ändern.',
+    description: 'Projekte, Kategorien, Einstellungen und Rechte kontrolliert pflegen.',
     href: '/help/admin',
     badge: 'Für Admins',
     icon: FiSettings,
@@ -55,26 +55,26 @@ const spotlightGuides: Guide[] = [
 const knowledgeBase: Guide[] = [
   {
     title: 'FAQ & Problemlösung',
-    description: 'Schnelle Antworten auf wiederkehrende Fragen und Tipps bei Störungen.',
+    description: 'Antworten zu fehlenden Treffern, Zugriff, Anmeldung und Inhaltsänderungen.',
     href: '/help/faq',
     icon: FiHelpCircle,
   },
   {
     title: 'Berechtigungen & Rollen',
-    description: 'Wer sieht welche Roadmap? Überblick über SSO, Rollen und Instanzfreigaben.',
+    description: 'Microsoft SSO, Leserechte, Instanz-Admins und Superadmins unterscheiden.',
     href: '/help/admin/rechte-und-zugang',
     icon: FiShield,
   },
   {
     title: 'Roadmap-Projekte verwalten',
-    description: 'Status, Phasen und Meilensteine pflegen, inklusive Best Practices.',
+    description: 'Projektarten, Pflichtfelder, Spiegelungen und sicheres Löschen verstehen.',
     href: '/help/admin/projekte-verwalten',
     icon: FiSliders,
   },
   {
     title: 'Design & Einstellungen',
     description:
-      'Farben, Branding und Texte so konfigurieren, dass die Instanz verständlich bleibt.',
+      'Titel und Farbverlauf ändern, bisherigen Wert sichern und Ergebnis kontrollieren.',
     href: '/help/admin/einstellungen-und-design',
     icon: FiSettings,
   },

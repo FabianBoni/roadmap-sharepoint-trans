@@ -21,8 +21,8 @@ SharePoint-backed roadmap application built with Next.js 14 (pages router), Type
 
 ## Setup
 
-1. **Requirements**: Node 20.x (repo ships `node-bin` v20.11.1 if you need a pinned runtime), npm or yarn.
-2. **Install**: `npm install` (or `yarn install`).
+1. **Requirements**: Node 20.x (repo ships `node-bin` v20.11.1 if you need a pinned runtime) and Yarn 1.22.22. Run `corepack enable` if Yarn isn't available yet.
+2. **Install**: `yarn install --frozen-lockfile`.
 3. **Env**: copy `.env.example` to `.env` and set values. Key vars:
    - `NEXT_PUBLIC_DEPLOYMENT_ENV` (`dev`|`production`)
    - `INTERNAL_API_BASE_URL` (absolute server URL for SSR fetches)
@@ -31,8 +31,8 @@ SharePoint-backed roadmap application built with Next.js 14 (pages router), Type
    - `SP_USE_CURL` (deprecated; Kerberos proxy uses curl unconditionally)
    - `NEXT_PUBLIC_BASE_PATH_DEV` / `NEXT_PUBLIC_BASE_PATH_PROD` (reverse proxy base paths)
    - SharePoint site/web URLs and credentials for the active strategy (see `utils/sharepointEnv.ts`).
-4. **Run dev**: `npm run dev` (port 3000, Turbo mode enabled via `next dev --turbo`).
-5. **Build**: `npm run build`; **start**: `npm run start`.
+4. **Run dev**: `yarn dev` (port 3000, Turbo mode enabled via `next dev --turbo`).
+5. **Build**: `yarn build`; **start**: `yarn start`.
 
 ## Auth Modes
 
@@ -42,12 +42,20 @@ SharePoint-backed roadmap application built with Next.js 14 (pages router), Type
 
 ## Development Workflow
 
-- Lint: `npm run lint` (fix: `npm run lint:fix`).
-- Format: `npm run format` (check: `npm run format:check`).
-- Security audit: `npm run security:audit`.
-- Prisma: `npm run prisma:generate | migrate | deploy | studio | seed`.
+- Lint: `yarn lint` (fix: `yarn lint:fix`).
+- Format: `yarn format` (check: `yarn format:check`).
+- Security audit: `yarn security:audit`.
+- Prisma: `yarn prisma:generate | migrate | deploy | studio | seed`.
 - SharePoint auth diagnostics: use `/api/auth/whoami` and proxy debug logs.
-- PM2 ops: `npm run pm2:restart | pm2:stop | pm2:logs | pm2:status` (see `ecosystem.config.js`).
+- PM2 ops: `yarn pm2:restart | yarn pm2:stop | yarn pm2:logs | yarn pm2:status` (see `ecosystem.config.js`).
+
+## Local Support Chat
+
+- The floating chat widget is available throughout the application; support staff answer at `/admin/support-chat`.
+- Chat conversations are stored by Prisma in the local SQLite file configured through `DATABASE_URL`. No external chat service is used.
+- The browser receives only a random `HttpOnly` conversation token. The database stores its SHA-256 hash, not the token itself.
+- New deployments must apply the chat tables with `yarn prisma:deploy` before the application is restarted.
+- The widget and support inbox poll the local Next.js API while open, so the existing `next start`/PM2 setup requires no additional realtime process.
 
 ## Conventions and Guardrails
 
@@ -61,7 +69,7 @@ SharePoint-backed roadmap application built with Next.js 14 (pages router), Type
 
 - PM2 runs the built app on port 3000 (see `ecosystem.config.js`).
 - Build output lives in `.next`; keep it out of version control.
-- Self-hosted Windows GitHub runner expected; use `npm run pm2:restart` after deploy.
+- Self-hosted Windows GitHub runner expected; use `yarn pm2:restart` after deploy.
 - GitHub Actions can inject public API keys from `PUBLIC_PROJECTS_API_KEYS` or `ROADMAP_API_KEY` secrets into the generated `.env` during branch builds and deploys.
 
 ## Troubleshooting

@@ -153,15 +153,14 @@ jobs:
           cacheRoot="$best/.ci-cache"
           echo "Selected cache root: $cacheRoot (avail_kb=$bestAvail)"
 
-          mkdir -p "$cacheRoot/yarn" "$cacheRoot/npm" "$cacheRoot/xdg" "$cacheRoot/tmp"
+          mkdir -p "$cacheRoot/yarn" "$cacheRoot/xdg" "$cacheRoot/tmp"
 
           # Clean old caches to prevent accumulation on long-lived runners
-          rm -rf "$cacheRoot/yarn" "$cacheRoot/npm" "$cacheRoot/xdg" "$cacheRoot/tmp"
-          mkdir -p "$cacheRoot/yarn" "$cacheRoot/npm" "$cacheRoot/xdg" "$cacheRoot/tmp"
+          rm -rf "$cacheRoot/yarn" "$cacheRoot/xdg" "$cacheRoot/tmp"
+          mkdir -p "$cacheRoot/yarn" "$cacheRoot/xdg" "$cacheRoot/tmp"
 
           echo "CI_CACHE_ROOT=$cacheRoot" >> "$GITHUB_ENV"
           echo "YARN_CACHE_FOLDER=$cacheRoot/yarn" >> "$GITHUB_ENV"
-          echo "npm_config_cache=$cacheRoot/npm" >> "$GITHUB_ENV"
           echo "XDG_CACHE_HOME=$cacheRoot/xdg" >> "$GITHUB_ENV"
           echo "TMPDIR=$cacheRoot/tmp" >> "$GITHUB_ENV"
 
@@ -341,10 +340,11 @@ jobs:
           node -p "process.versions.node"
           node -e "require('async_hooks'); console.log('async_hooks module available')"
 
-      - name: Verify npm runtime
+      - name: Enable Corepack and verify Yarn runtime
         run: |
           set -euo pipefail
-          npm --version
+          corepack enable
+          yarn --version
 
       - name: Install Linux prerequisites (RHEL)
         run: |
@@ -403,10 +403,10 @@ jobs:
           echo "Disk space before:"
           df -h .
 
-      - name: Clean npm cache
+      - name: Clean Yarn cache
         run: |
           set -euo pipefail
-          npm cache verify || true
+          yarn cache clean || true
 
       - name: Free up disk space (caches, logs, artifacts)
         run: |
@@ -450,8 +450,8 @@ jobs:
       - name: Install dependencies
         run: |
           set -euo pipefail
-          # Force full dependency install even if NODE_ENV is set globally on runner.
-          npm ci --include=dev
+          # Install dev dependencies even if NODE_ENV is set globally on the runner.
+          yarn install --frozen-lockfile --non-interactive --production=false
 
       - name: Verify runtime modules are present
         run: |
@@ -496,7 +496,7 @@ jobs:
           fi
 
           deployOutput=""
-          if ! deployOutput="$(npx prisma migrate deploy 2>&1)"; then
+          if ! deployOutput="$(yarn prisma migrate deploy 2>&1)"; then
             echo "$deployOutput" >&2
 
             if [ "$isFileDb" = "true" ]; then
@@ -504,19 +504,19 @@ jobs:
                 echo "[WARN] P3005: SQLite DB exists without migration history. Aligning schema via db push and baselining migrations..." >&2
 
                 # Ensure the schema matches the current Prisma schema first.
-                npx prisma db push --accept-data-loss
+                yarn prisma db push --accept-data-loss
 
                 # Then baseline migration history so future deploys can use migrate deploy.
                 for migDir in prisma/migrations/*/; do
                   migName="$(basename "$migDir")"
-                  npx prisma migrate resolve --applied "$migName" || true
+                  yarn prisma migrate resolve --applied "$migName" || true
                 done
 
                 # No-op (should be up-to-date), but keeps logs consistent.
-                npx prisma migrate deploy || true
+                yarn prisma migrate deploy || true
               else
                 echo "[WARN] prisma migrate deploy failed. Trying prisma db push --accept-data-loss (SQLite fallback)." >&2
-                npx prisma db push --accept-data-loss
+                yarn prisma db push --accept-data-loss
               fi
             else
               echo "prisma migrate deploy failed and no safe fallback is available." >&2
@@ -528,14 +528,14 @@ jobs:
           fi
 
           echo "Generating Prisma client..."
-          npx prisma generate
+          yarn prisma generate
 
       - name: Build application
         env:
           NODE_ENV: production
         run: |
           set -euo pipefail
-          npm run build
+          yarn build
 
       - name: Verify Next.js build output exists
         run: |
@@ -610,15 +610,15 @@ jobs:
           fi
           echo "PM2_HOME=$pm2Home" >> "$GITHUB_ENV"
 
-      - name: Install PM2 (process manager)
+      - name: Install PM2 with Yarn
         run: |
           set -euo pipefail
-          npm install -g pm2
+          yarn global add pm2@6.0.14 --non-interactive
 
-          # Pin absolute pm2 path so sudo/root can execute it even if PATH differs.
-          pm2Bin="$(command -v pm2 || true)"
-          if [ -z "$pm2Bin" ]; then
-            echo "[FAIL] pm2 binary not found after install." >&2
+          # Pin the global Yarn binary so sudo/root can execute it even if PATH differs.
+          pm2Bin="$(yarn global bin)/pm2"
+          if [ ! -x "$pm2Bin" ]; then
+            echo "[FAIL] pm2 binary not found after yarn global add." >&2
             exit 1
           fi
           echo "PM2_BIN=$pm2Bin" >> "$GITHUB_ENV"

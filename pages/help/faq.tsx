@@ -1,88 +1,181 @@
 import Link from 'next/link';
+import { FiArrowRight, FiHelpCircle } from 'react-icons/fi';
 import HelpLayout from '@/components/HelpLayout';
 
-const questions = [
+type Question = {
+  question: string;
+  answer: string;
+  link?: { label: string; href: string };
+};
+
+const groups: Array<{ id: string; title: string; questions: Question[] }> = [
   {
-    question: 'Was ist die Roadmap?',
-    answer:
-      'Die Roadmap bündelt alle zentralen Projekte des Justiz- und Sicherheitsdepartements. Sie zeigt Status, Verantwortliche und Zeiträume in einer einheitlichen Darstellung.',
+    id: 'orientierung-inhalte',
+    title: 'Orientierung und Inhalte',
+    questions: [
+      {
+        question: 'Was zeigt die Roadmap?',
+        answer:
+          'Eine Roadmap-Instanz bündelt die für ihren Bereich gepflegten Projekte. Je nach Datenlage sehen Sie unter anderem Zeitraum, Status, Fortschritt, Phase, Verantwortliche, Meilensteine, Links und Anhänge.',
+      },
+      {
+        question: 'Warum sehe ich andere Projekte als eine Kollegin oder ein Kollege?',
+        answer:
+          'Prüfen Sie zuerst die ausgewählte Instanz, das Jahr und aktive Filter. Zusätzlich kann die Sichtbarkeit einer Instanz von Ihrer Abteilung oder einer expliziten Freigabe abhängen.',
+        link: { label: 'Projekte finden und filtern', href: '/help/projekte-ansehen' },
+      },
+      {
+        question: 'Was bedeutet „Read-only Spiegelung“?',
+        answer:
+          'Das Projekt stammt aus einer anderen Roadmap-Instanz und wird in der aktuellen Instanz nur angezeigt. Bearbeitet wird es in seiner Quellinstanz; deshalb stehen hier keine Bearbeitungsaktionen zur Verfügung.',
+      },
+      {
+        question: 'Warum fehlen in einem Projekt einzelne Angaben?',
+        answer:
+          'Nicht jedes Feld ist für jedes Projekt befüllt. Insbesondere Kurzzeitprojekte können bewusst weniger Detailangaben enthalten. Ein leerer Bereich ist daher nicht automatisch ein technischer Fehler.',
+      },
+    ],
   },
   {
-    question: 'Wie finde ich bestimmte Projekte?',
-    answer:
-      'Nutzen Sie die Suche für Stichworte oder filtern Sie nach Kategorien, Status und Monaten. Die aktuelle Auswahl bleibt in der URL gespeichert – so können Sie Ansichten einfach teilen.',
-    link: { label: 'Projekte finden', href: '/help/projekte-ansehen' },
+    id: 'suche-darstellung',
+    title: 'Suche und Darstellung',
+    questions: [
+      {
+        question: 'Wie finde ich ein bestimmtes Projekt?',
+        answer:
+          'Beginnen Sie mit einem eindeutigen Stichwort. Die Suche berücksichtigt neben Titel und Beschreibung auch Projektleitung, Meilenstein, Tags und Teammitglieder. Grenzen Sie die Treffer anschließend mit wenigen Filtern ein.',
+        link: { label: 'Anleitung zur Roadmap', href: '/help/projekte-ansehen' },
+      },
+      {
+        question: 'Warum zeigt die Suche keine Treffer?',
+        answer:
+          'Wählen Sie zunächst „Alle Filter zurücksetzen“, kontrollieren Sie Instanz und Jahr und versuchen Sie einen kürzeren Suchbegriff. Prüfen Sie auch, ob „Nur laufende Projekte“ oder ein enger Monatsbereich aktiv ist.',
+      },
+      {
+        question: 'Welche Ansicht sollte ich verwenden?',
+        answer:
+          'Der Zeitstrahl beantwortet vor allem die Frage „Wann findet etwas statt?“. Die Kacheln erleichtern den kompakten Vergleich von Projekten. Für den vollständigen Kontext öffnen Sie das Projekt-Detail.',
+      },
+      {
+        question: 'Kann ich eine gefilterte Ansicht teilen?',
+        answer:
+          'Ja. Suche, Filter, Kategorien und die Kachelansicht werden in der URL abgebildet. Kopieren Sie die vollständige Browseradresse, nachdem die gewünschte Ansicht sichtbar ist.',
+      },
+    ],
   },
   {
-    question: 'Wer pflegt die Inhalte?',
-    answer:
-      'Das Roadmap-Team im Bereich IT + Digital sammelt Meldungen aus den Fachbereichen, stimmt Aktualisierungen ab und veröffentlicht geprüfte Informationen.',
-  },
-  {
-    question: 'Wie gebe ich Feedback oder Ergänzungen weiter?',
-    answer:
-      'Über den Button „Rückmeldung geben“ direkt in der Roadmap oder per E-Mail an roadmap@jsd.bs.ch. Bitte beschreiben Sie Ihr Anliegen möglichst konkret.',
-    link: { label: 'Projekte melden', href: '/help/projekte-melden' },
-  },
-  {
-    question: 'Benötige ich spezielle Berechtigungen?',
-    answer:
-      'Die meisten Roadmap-Instanzen sind für das interne Netzwerk freigeschaltet. Für administrative Aufgaben benötigen Sie einen Service-Account oder persönliche Freigaben.',
-    link: { label: 'Berechtigungen verstehen', href: '/help/admin/rechte-und-zugang' },
+    id: 'zugang-support',
+    title: 'Zugang, Änderungen und Support',
+    questions: [
+      {
+        question: 'Warum erhalte ich „Kein Zugriff“?',
+        answer:
+          'Die Sichtbarkeit wird pro Instanz gesteuert. Vergewissern Sie sich, dass Sie die richtige Instanz geöffnet und sich mit dem vorgesehenen Microsoft-Konto angemeldet haben. Bleibt die Meldung bestehen, senden Sie dem Support den Instanznamen und den Wortlaut der Meldung.',
+        link: { label: 'Rechte und Zugang', href: '/help/admin/rechte-und-zugang' },
+      },
+      {
+        question: 'Wie erhalte ich Admin-Rechte?',
+        answer:
+          'Admin-Rechte entstehen über die Admin-Liste der Instanz, eine konfigurierte Admin-Gruppe oder eine Superadmin-Rolle. Eine bestehende Administratorin oder ein bestehender Administrator kann Sie für die betreffende Instanz hinzufügen.',
+        link: { label: 'Admin-Zugang verstehen', href: '/help/admin/rechte-und-zugang' },
+      },
+      {
+        question: 'Wie melde ich eine falsche Projektangabe?',
+        answer:
+          'Schreiben Sie dem Roadmap-Team und nennen Sie Instanz, Projektlink, aktuellen Stand, gewünschte Änderung und die fachlich zuständige Kontaktperson. Für Feature-Wünsche der Anwendung nutzen Sie stattdessen die Feedback-Seite.',
+        link: { label: 'Inhalte richtig melden', href: '/help/projekte-melden' },
+      },
+      {
+        question: 'Was hilft bei einer Anmeldeschleife oder abgelaufenen Sitzung?',
+        answer:
+          'Öffnen Sie die Anmeldung erneut und wählen Sie „Status erneut prüfen“. Falls ein Popup blockiert wird, erlauben Sie Popups für diese Website. Bleibt das Problem bestehen, nennen Sie dem Support Browser, Instanz und genaue Fehlermeldung.',
+      },
+    ],
   },
 ];
 
 const FAQ = () => {
   return (
     <HelpLayout
-      title="Häufige Fragen"
+      title="Häufige Fragen und schnelle Lösungen"
       description={
         <>
-          Die wichtigsten Antworten auf einen Blick. Nicht fündig geworden? Schreiben Sie uns oder
-          besuchen Sie die ausführliche Dokumentation.
+          Suchen Sie zuerst nach dem Bereich, der zu Ihrer Situation passt. Jede Antwort nennt den
+          nächsten sinnvollen Schritt, ohne technisches Vorwissen vorauszusetzen.
         </>
       }
       breadcrumbs={[{ label: 'Hilfe', href: '/help' }, { label: 'FAQ' }]}
-    >
-      <section className="space-y-4">
-        {questions.map((entry) => (
-          <article
-            key={entry.question}
-            className="rounded-3xl border border-slate-800/70 bg-slate-950/70 p-6 transition hover:border-sky-500/40 hover:bg-slate-900 sm:p-7"
-          >
-            <h2 className="text-lg font-semibold text-white sm:text-xl">{entry.question}</h2>
-            <p className="mt-3 text-sm text-slate-300 sm:text-base">{entry.answer}</p>
-            {entry.link && (
-              <Link
-                href={entry.link.href}
-                className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold uppercase tracking-[0.25em] text-slate-200 transition hover:border-sky-400 hover:text-white"
-              >
-                {entry.link.label}
-              </Link>
-            )}
-          </article>
-        ))}
-      </section>
-
-      <section className="rounded-3xl border border-slate-800/70 bg-slate-950/70 p-6 sm:p-8">
-        <h2 className="text-lg font-semibold text-white sm:text-xl">Weitere Unterstützung</h2>
-        <p className="mt-3 text-sm text-slate-300 sm:text-base">
-          Für alle Anliegen, die hier nicht beantwortet wurden, erreichen Sie uns via{' '}
-          <a
-            href="mailto:roadmap@jsd.bs.ch"
-            className="underline decoration-dotted underline-offset-4 transition hover:text-white"
-          >
-            roadmap@jsd.bs.ch
-          </a>
-          . Technische Details und API-Infos finden Sie in der{' '}
-          <Link
-            href="/docs"
-            className="underline decoration-dotted underline-offset-4 transition hover:text-white"
-          >
-            Dokumentation
+      learningGoals={[
+        'Abweichende oder fehlende Projekte systematisch erklären.',
+        'Probleme mit Suche und Filtern selbst beheben.',
+        'Zugriffs- und Anmeldeprobleme richtig einordnen.',
+        'Inhaltskorrektur, Feature-Wunsch und Support unterscheiden.',
+      ]}
+      actions={
+        <>
+          <Link className="ds-button ds-button-primary" href="/help/erste-schritte">
+            Mit den Grundlagen starten
+            <FiArrowRight className="ds-icon-sm" />
           </Link>
-          .
-        </p>
+          <Link className="ds-button ds-button-secondary" href="/support">
+            Support kontaktieren
+          </Link>
+        </>
+      }
+    >
+      {groups.map((group) => (
+        <section key={group.id} aria-labelledby={`faq-${group.id}`}>
+          <div className="ds-section-header">
+            <div>
+              <p className="ds-panel-label">FAQ</p>
+              <h2 id={`faq-${group.id}`} className="ds-section-title">
+                {group.title}
+              </h2>
+            </div>
+          </div>
+          <div className="space-y-4">
+            {group.questions.map((entry) => (
+              <details key={entry.question} className="ds-card group p-6 open:border-sky-500/40">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-white sm:text-lg">
+                  <span>{entry.question}</span>
+                  <FiHelpCircle
+                    className="ds-icon-sm shrink-0 text-sky-300 transition group-open:rotate-180"
+                    aria-hidden="true"
+                  />
+                </summary>
+                <p className="mt-4 text-sm leading-7 text-slate-300 sm:text-base">{entry.answer}</p>
+                {entry.link && (
+                  <Link className="ds-help-link" href={entry.link.href}>
+                    {entry.link.label}
+                    <FiArrowRight className="ds-icon-sm" />
+                  </Link>
+                )}
+              </details>
+            ))}
+          </div>
+        </section>
+      ))}
+
+      <section className="ds-card ds-help-support-panel" aria-labelledby="support-heading">
+        <div>
+          <p className="ds-panel-label">Noch offen?</p>
+          <h2 id="support-heading" className="ds-section-title">
+            Eine gute Supportanfrage spart Rückfragen
+          </h2>
+          <p className="ds-section-copy">
+            Nennen Sie Instanz, Seite oder Projektlink, den gewünschten Ablauf, den tatsächlich
+            beobachteten Ablauf und die genaue Fehlermeldung. Senden Sie keine Passwörter oder
+            Zugangstokens.
+          </p>
+        </div>
+        <div className="ds-actions ds-help-support-actions">
+          <Link className="ds-button ds-button-primary" href="/support">
+            Support-Seite öffnen
+          </Link>
+          <Link className="ds-button ds-button-secondary" href="/docs">
+            Technische Dokumentation
+          </Link>
+        </div>
       </section>
     </HelpLayout>
   );

@@ -4,6 +4,7 @@ import { clientDataService } from '@/utils/clientDataService';
 import { initializeIcons } from '@fluentui/react/lib/Icons';
 import type { AppProps } from 'next/app';
 import type { Category, Project } from '@/types';
+import '@chatscope/chat-ui-kit-styles/dist/default/styles.min.css';
 import './css/design-system.css';
 import './css/globals.css';
 import 'react-quill/dist/quill.snow.css';
@@ -12,6 +13,7 @@ import SiteFooter from '@/components/SiteFooter';
 import SiteHeader from '@/components/SiteHeader';
 import Head from 'next/head';
 import { prefixBasePath } from '@/utils/nextBasePath';
+import SupportChatWidget from '@/components/SupportChatWidget';
 
 // Define a type for the window with our custom property
 interface CustomWindow extends Window {
@@ -159,6 +161,7 @@ function RoadmapApp({ Component, pageProps }: AppProps): JSX.Element {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <Component {...pageProps} />
+      <SupportChatWidget />
     </>
   );
 }
