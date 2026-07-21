@@ -610,18 +610,29 @@ jobs:
           fi
           echo "PM2_HOME=$pm2Home" >> "$GITHUB_ENV"
 
-      - name: Install PM2 with Yarn
+      - name: Install PM2 with Yarn (fixed path)
         run: |
           set -euo pipefail
+
           yarn global add pm2@6.0.14 --non-interactive
 
-          # Pin the global Yarn binary so sudo/root can execute it even if PATH differs.
-          pm2Bin="$(yarn global bin)/pm2"
-          if [ ! -x "$pm2Bin" ]; then
-            echo "[FAIL] pm2 binary not found after yarn global add." >&2
+          yarnGlobalDir="$(yarn global dir)"
+          pm2Bin="$yarnGlobalDir/node_modules/pm2/bin/pm2"
+
+          echo "Yarn global directory: $yarnGlobalDir"
+          echo "PM2 package entrypoint: $pm2Bin"
+
+          if [ ! -f "$pm2Bin" ]; then
+            echo "[FAIL] PM2 package entrypoint not found." >&2
+            find "$yarnGlobalDir" -maxdepth 5 -type f -name 'pm2*' -print || true
             exit 1
           fi
+
+          chmod +x "$pm2Bin"
+          "$pm2Bin" --version
+
           echo "PM2_BIN=$pm2Bin" >> "$GITHUB_ENV"
+          echo "[OK] PM2 binary configured: $pm2Bin"
 
       - name: Stop existing instance and free port 3000
         run: |
