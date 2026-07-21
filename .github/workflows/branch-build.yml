@@ -601,20 +601,37 @@ jobs:
 
           yarn global add pm2@6.0.14 --non-interactive
 
+          yarnGlobalBin="$(yarn global bin)"
           yarnGlobalDir="$(yarn global dir)"
-          pm2Bin="$yarnGlobalDir/node_modules/pm2/bin/pm2"
+          pm2BinFromDir="$yarnGlobalDir/node_modules/pm2/bin/pm2"
+          pm2BinFromGlobal="$yarnGlobalBin/pm2"
+          pm2Bin=""
 
+          echo "Yarn global bin: $yarnGlobalBin"
           echo "Yarn global directory: $yarnGlobalDir"
-          echo "Expected PM2 binary: $pm2Bin"
+          echo "Candidate PM2 binary (global bin): $pm2BinFromGlobal"
+          echo "Candidate PM2 binary (package entrypoint): $pm2BinFromDir"
 
-          if [ ! -f "$pm2Bin" ]; then
-            echo "[FAIL] PM2 package entrypoint not found." >&2
+          if [ -x "$pm2BinFromGlobal" ]; then
+            pm2Bin="$pm2BinFromGlobal"
+          elif [ -f "$pm2BinFromDir" ]; then
+            pm2Bin="$pm2BinFromDir"
+            chmod +x "$pm2Bin"
+          fi
+
+          if [ -z "$pm2Bin" ]; then
+            echo "[FAIL] PM2 binary not found after yarn global add." >&2
+            echo "[INFO] Listing Yarn global bin and pm2 files for diagnostics..."
+            ls -la "$yarnGlobalBin" || true
             find "$yarnGlobalDir" -maxdepth 5 -type f -name 'pm2*' -print || true
             exit 1
           fi
 
-          chmod +x "$pm2Bin"
+          echo "$yarnGlobalBin" >> "$GITHUB_PATH"
+          export PATH="$yarnGlobalBin:$PATH"
+
           "$pm2Bin" --version
+          pm2 --version
 
           echo "PM2_BIN=$pm2Bin" >> "$GITHUB_ENV"
           echo "[OK] PM2 binary configured: $pm2Bin"
