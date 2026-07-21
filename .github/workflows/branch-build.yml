@@ -595,46 +595,51 @@ jobs:
 
           echo "PM2_HOME=$pm2Home" >> "$GITHUB_ENV"
 
-      - name: Install PM2 with Yarn (fixed path)
+      - name: Install PM2 in executable workspace
         run: |
           set -euo pipefail
 
-          yarn global add pm2@6.0.14 --non-interactive
+          pm2ToolDir="$GITHUB_WORKSPACE/.ci-tools/pm2"
+          rm -rf "$pm2ToolDir"
+          mkdir -p "$pm2ToolDir"
 
-          yarnGlobalBin="$(yarn global bin)"
-          yarnGlobalDir="$(yarn global dir)"
-          pm2BinFromDir="$yarnGlobalDir/node_modules/pm2/bin/pm2"
-          pm2BinFromGlobal="$yarnGlobalBin/pm2"
-          pm2Bin=""
+          npm install \
+            --prefix "$pm2ToolDir" \
+            --no-audit \
+            --no-fund \
+            --package-lock=false \
+            pm2@6.0.14
 
-          echo "Yarn global bin: $yarnGlobalBin"
-          echo "Yarn global directory: $yarnGlobalDir"
-          echo "Candidate PM2 binary (global bin): $pm2BinFromGlobal"
-          echo "Candidate PM2 binary (package entrypoint): $pm2BinFromDir"
+          nodeBin="$(command -v node)"
+          pm2Script="$pm2ToolDir/node_modules/pm2/bin/pm2"
+          pm2Bin="$pm2ToolDir/pm2-wrapper"
 
-          if [ -x "$pm2BinFromGlobal" ]; then
-            pm2Bin="$pm2BinFromGlobal"
-          elif [ -f "$pm2BinFromDir" ]; then
-            pm2Bin="$pm2BinFromDir"
-            chmod +x "$pm2Bin"
-          fi
-
-          if [ -z "$pm2Bin" ]; then
-            echo "[FAIL] PM2 binary not found after yarn global add." >&2
-            echo "[INFO] Listing Yarn global bin and pm2 files for diagnostics..."
-            ls -la "$yarnGlobalBin" || true
-            find "$yarnGlobalDir" -maxdepth 5 -type f -name 'pm2*' -print || true
+          if [ ! -x "$nodeBin" ]; then
+            echo "[FAIL] Node.js binary not found." >&2
             exit 1
           fi
 
-          echo "$yarnGlobalBin" >> "$GITHUB_PATH"
-          export PATH="$yarnGlobalBin:$PATH"
+          if [ ! -f "$pm2Script" ]; then
+            echo "[FAIL] PM2 script not found at $pm2Script" >&2
+            find "$pm2ToolDir" -maxdepth 5 -type f -name 'pm2*' -print || true
+            exit 1
+          fi
+
+          printf '#!/bin/bash\nexec %q %q "$@"\n' \
+            "$nodeBin" \
+            "$pm2Script" \
+            > "$pm2Bin"
+
+          chmod 755 "$pm2Bin"
+
+          echo "Node binary: $nodeBin"
+          echo "PM2 script: $pm2Script"
+          echo "PM2 wrapper: $pm2Bin"
 
           "$pm2Bin" --version
-          pm2 --version
 
           echo "PM2_BIN=$pm2Bin" >> "$GITHUB_ENV"
-          echo "[OK] PM2 binary configured: $pm2Bin"
+          echo "[OK] PM2 installed and executable."
 
       - name: Stop existing instance and free port 3000
         run: |
