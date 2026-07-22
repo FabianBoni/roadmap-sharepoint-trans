@@ -6,7 +6,7 @@ import { Category, Project, ProjectOrderByCategory } from '../types';
 import { INSTANCE_COOKIE_NAME, INSTANCE_QUERY_PARAM } from '../utils/instanceConfig';
 import { normalizeCategoryId, UNCATEGORIZED_ID } from '../utils/categoryUtils';
 import CategorySidebar from './CategorySidebar';
-import { FaBars, FaGripVertical as FiGripVertical, FaTimes } from 'react-icons/fa';
+import { FaBars, FaFileExcel, FaGripVertical as FiGripVertical, FaTimes } from 'react-icons/fa';
 import { loadThemeSettings } from '../utils/theme';
 import RoadmapFilters from './RoadmapFilters';
 import CompactProjectCard from './CompactProjectCard';
@@ -16,6 +16,7 @@ import {
   hasValidAdminSession,
 } from '@/utils/auth';
 import { getRichTextPlainText } from '@/utils/richText';
+import { exportRoadmapToExcel } from '@/utils/roadmapExcelExport';
 
 type ProgressBucket = 'all' | 'not-started' | 'active' | 'almost-done' | 'completed';
 
@@ -181,6 +182,8 @@ const Roadmap: React.FC<RoadmapProps> = ({
   const [dragOverProjectId, setDragOverProjectId] = useState<string | null>(null);
   const [isSavingProjectOrder, setIsSavingProjectOrder] = useState(false);
   const [projectOrderError, setProjectOrderError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   // Track whether URL-derived category selection has been applied to prevent race conditions
@@ -987,6 +990,29 @@ const Roadmap: React.FC<RoadmapProps> = ({
     ? getRichTextPlainText(hoveredProject.description)
     : '';
 
+  const handleExcelExport = async () => {
+    const projectsToExport = visibleCategoryIds.flatMap(
+      (categoryId) => orderedProjectsByCategory[categoryId] || []
+    );
+    if (projectsToExport.length === 0 || isExporting) return;
+
+    setExportError(null);
+    setIsExporting(true);
+    try {
+      await exportRoadmapToExcel({
+        projects: projectsToExport,
+        categories,
+        year: currentYear,
+        instanceSlug,
+      });
+    } catch (error) {
+      console.error('Error exporting roadmap to Excel:', error);
+      setExportError('Der Excel-Export konnte nicht erstellt werden. Bitte versuche es erneut.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Handle mouse over for project tooltip
   const handleMouseOver = (e: React.MouseEvent, project: Project) => {
     setHoveredProject(project);
@@ -1282,10 +1308,25 @@ const Roadmap: React.FC<RoadmapProps> = ({
             </div>
 
             {/* Year navigation - Responsive */}
-            <div className="flex w-full flex-wrap items-center justify-center gap-4 md:justify-end">
+            <div className="flex w-full flex-wrap items-center justify-center gap-3 md:justify-end">
+              <button
+                type="button"
+                className="ds-roadmap-export-button"
+                onClick={handleExcelExport}
+                disabled={filteredProjects.length === 0 || isExporting}
+                title="Aktuell sichtbare Projekte als Excel-Datei exportieren"
+              >
+                <FaFileExcel aria-hidden="true" />
+                <span>{isExporting ? 'Export wird erstellt ...' : 'Excel exportieren'}</span>
+              </button>
               <RoadmapYearNavigation initialYear={currentYear} onYearChange={setCurrentYear} />
             </div>
           </div>
+          {exportError && (
+            <p className="ds-roadmap-export-error" role="alert">
+              {exportError}
+            </p>
+          )}
         </div>
 
         {/* Mobile categories toggle button */}

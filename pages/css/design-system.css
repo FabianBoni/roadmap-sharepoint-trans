@@ -1919,6 +1919,44 @@ textarea::placeholder {
   color: var(--ds-text-inverse);
 }
 
+.ds-roadmap-export-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 9px 16px;
+  border: 1px solid color-mix(in srgb, #22c55e 72%, var(--ds-border-default));
+  border-radius: 12px;
+  background: linear-gradient(135deg, #15803d, #166534);
+  box-shadow: 0 10px 22px rgb(21 128 61 / 20%);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 800;
+  transition:
+    transform var(--ds-duration-fast) var(--ds-ease-out),
+    box-shadow var(--ds-duration-base) var(--ds-ease-out),
+    opacity var(--ds-duration-base) var(--ds-ease-out);
+}
+
+.ds-roadmap-export-button:hover:not(:disabled) {
+  box-shadow: 0 13px 28px rgb(21 128 61 / 30%);
+  transform: translateY(-1px);
+}
+
+.ds-roadmap-export-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ds-roadmap-export-error {
+  margin: var(--ds-space-3) 0 0;
+  color: var(--ds-danger);
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-align: right;
+}
+
 .ds-roadmap-year-button {
   width: 40px;
   min-height: 40px;
@@ -4143,6 +4181,14 @@ html[data-theme='light'] .ds-roadmap-shell .roadmap-project-label {
   .ds-roadmap-segmented,
   .ds-roadmap-year-nav {
     width: 100%;
+  }
+
+  .ds-roadmap-export-button {
+    width: 100%;
+  }
+
+  .ds-roadmap-export-error {
+    text-align: left;
   }
 
   .ds-roadmap-segment,
