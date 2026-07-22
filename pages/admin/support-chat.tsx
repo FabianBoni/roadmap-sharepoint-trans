@@ -11,7 +11,7 @@ import {
 } from '@chatscope/chat-ui-kit-react';
 import AdminSubpageLayout from '@/components/AdminSubpageLayout';
 import JSDoITLoader from '@/components/JSDoITLoader';
-import withAdminAuth from '@/components/withAdminAuth';
+import withSuperAdminAuth from '@/components/withSuperAdminAuth';
 import type {
   SupportChatConversation,
   SupportChatMessage,
@@ -183,14 +183,17 @@ const SupportChatAdminPage = () => {
       </Head>
       <AdminSubpageLayout
         title="Support-Postfach"
-        eyebrow="Lokaler Live-Chat"
+        eyebrow="Superadmin · Lokaler Live-Chat"
         description={
           <>
             Beantworten Sie Supportanfragen direkt in der Anwendung. Gespräche und Nachrichten
             werden ausschließlich in der lokalen Roadmap-Datenbank gespeichert.
           </>
         }
-        breadcrumbs={[{ label: 'Admin', href: '/admin' }, { label: 'Support-Postfach' }]}
+        breadcrumbs={[
+          { label: 'Superadmin', href: '/admin/instances' },
+          { label: 'Support-Postfach' },
+        ]}
         maxWidthClassName="max-w-6xl"
         actions={
           <button
@@ -343,4 +346,4 @@ const SupportChatAdminPage = () => {
   );
 };
 
-export default withAdminAuth(SupportChatAdminPage);
+export default withSuperAdminAuth(SupportChatAdminPage);

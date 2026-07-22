@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { disableSupportChatCache, mapSupportChatMessage } from '@/lib/supportChat';
 import type { SupportChatSummary } from '@/types/supportChat';
-import { requireAdminSession } from '@/utils/apiAuth';
+import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
 
 type ApiResponse = { conversations: SupportChatSummary[] } | { error: string };
 
@@ -14,9 +14,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   }
 
   try {
-    requireAdminSession(req);
-  } catch {
-    return res.status(401).json({ error: 'Unauthorized' });
+    await requireSuperAdminAccess(req);
+  } catch (error) {
+    const status = error instanceof Error && error.message === 'Unauthorized' ? 401 : 403;
+    return res
+      .status(status)
+      .json({ error: status === 401 ? 'Unauthorized' : 'Superadmin access required' });
   }
 
   const rows = await prisma.supportConversation.findMany({

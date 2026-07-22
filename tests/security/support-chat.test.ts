@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import test from 'node:test';
 import {
   SUPPORT_CHAT_COOKIE,
@@ -48,4 +50,29 @@ test('support chat rate limiter rejects requests after the configured limit', ()
   const rejected = consumeSupportChatRateLimit(key, 2, 60_000);
   assert.equal(rejected.allowed, false);
   assert.ok(rejected.retryAfterSeconds > 0);
+});
+
+test('support inbox is restricted to superadmins in UI and API', () => {
+  const page = readFileSync(resolve(process.cwd(), 'pages/admin/support-chat.tsx'), 'utf8');
+  const listApi = readFileSync(
+    resolve(process.cwd(), 'pages/api/admin/support-chat/conversations/index.ts'),
+    'utf8'
+  );
+  const detailApi = readFileSync(
+    resolve(process.cwd(), 'pages/api/admin/support-chat/conversations/[id].ts'),
+    'utf8'
+  );
+  const adminDashboard = readFileSync(resolve(process.cwd(), 'pages/admin/index.tsx'), 'utf8');
+  const superAdminDashboard = readFileSync(
+    resolve(process.cwd(), 'pages/admin/instances.tsx'),
+    'utf8'
+  );
+
+  assert.match(page, /withSuperAdminAuth\(SupportChatAdminPage\)/);
+  for (const apiSource of [listApi, detailApi]) {
+    assert.match(apiSource, /await requireSuperAdminAccess\(req\)/);
+    assert.doesNotMatch(apiSource, /requireAdminSession/);
+  }
+  assert.doesNotMatch(adminDashboard, /href="\/admin\/support-chat"/);
+  assert.match(superAdminDashboard, /href="\/admin\/support-chat"/);
 });

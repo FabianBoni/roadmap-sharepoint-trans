@@ -1003,20 +1003,28 @@ const AdminInstancesPage = () => {
       }
       breadcrumbs={[{ label: 'Admin', href: '/admin' }, { label: 'Instanzen' }]}
       actions={
-        <button
-          type="button"
-          onClick={() => {
-            resetForm();
-            window.setTimeout(
-              () =>
-                document.getElementById('instance-form')?.scrollIntoView({ behavior: 'smooth' }),
-              0
-            );
-          }}
-          className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300"
-        >
-          Neue Instanz anlegen
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/support-chat"
+            className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-sky-400 hover:text-white"
+          >
+            Support-Postfach
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              resetForm();
+              window.setTimeout(
+                () =>
+                  document.getElementById('instance-form')?.scrollIntoView({ behavior: 'smooth' }),
+                0
+              );
+            }}
+            className="rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300"
+          >
+            Neue Instanz anlegen
+          </button>
+        </div>
       }
       maxWidthClassName="max-w-6xl"
     >

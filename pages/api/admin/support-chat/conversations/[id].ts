@@ -10,7 +10,7 @@ import {
   normalizeSupportChatText,
 } from '@/lib/supportChat';
 import type { SupportChatConversation } from '@/types/supportChat';
-import { requireAdminSession } from '@/utils/apiAuth';
+import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
 
 type ApiResponse = { conversation: SupportChatConversation } | { error: string };
 
@@ -24,9 +24,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
   let session;
   try {
-    session = requireAdminSession(req);
-  } catch {
-    return res.status(401).json({ error: 'Unauthorized' });
+    session = await requireSuperAdminAccess(req);
+  } catch (error) {
+    const status = error instanceof Error && error.message === 'Unauthorized' ? 401 : 403;
+    return res
+      .status(status)
+      .json({ error: status === 401 ? 'Unauthorized' : 'Superadmin access required' });
   }
 
   const id = parseConversationId(req.query.id);
