@@ -118,6 +118,9 @@ jobs:
           NODE
           chmod 600 .env
 
+      - name: Install locked dependencies
+        run: yarn install --frozen-lockfile --non-interactive --production=false
+
       - name: Reject unsafe production configuration
         run: |
           set -euo pipefail
@@ -150,9 +153,6 @@ jobs:
             throw new Error('Production SQLite must use an absolute path outside the checkout workspace');
           }
           NODE
-
-      - name: Install locked dependencies
-        run: yarn install --frozen-lockfile --non-interactive --production=false
 
       - name: Apply reviewed database migrations
         run: |
