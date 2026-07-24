@@ -50,7 +50,6 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22.20.0'
-          cache: yarn
 
       - name: Enable package manager
         run: |
@@ -58,6 +57,22 @@ jobs:
           corepack enable
           test "$(node --version)" = 'v22.20.0'
           test "$(yarn --version)" = '1.22.22'
+
+      - name: Reclaim dependency cache space
+        run: |
+          set -euo pipefail
+          cache_dir="$(yarn cache dir)"
+          case "$cache_dir" in
+            "$HOME"/.cache/yarn/*|"$HOME"/.yarn/*) ;;
+            *)
+              echo "Refusing to clean unexpected Yarn cache path: $cache_dir" >&2
+              exit 1
+              ;;
+          esac
+          yarn cache clean
+          rm -rf -- "$RUNNER_TEMP/yarn-cache"
+          mkdir -p "$RUNNER_TEMP/yarn-cache"
+          df -h "$HOME" "$RUNNER_TEMP"
 
       - name: Materialize protected runtime configuration
         env:
@@ -119,6 +134,8 @@ jobs:
           chmod 600 .env
 
       - name: Install locked dependencies
+        env:
+          YARN_CACHE_FOLDER: ${{ runner.temp }}/yarn-cache
         run: yarn install --frozen-lockfile --non-interactive --production=false
 
       - name: Reject unsafe production configuration
@@ -200,3 +217,7 @@ jobs:
           done
           echo 'Roadmap failed its local readiness check.' >&2
           exit 1
+
+      - name: Remove temporary dependency cache
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/yarn-cache"
