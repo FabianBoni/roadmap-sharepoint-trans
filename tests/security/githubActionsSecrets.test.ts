@@ -19,6 +19,8 @@ test('deployment is scoped to the protected production environment and a non-roo
   assert.match(workflow, /environment: production/);
   assert.match(workflow, /test "\$\(id -un\)" = 'roadmap'/);
   assert.match(workflow, /Deployment refuses to run as root/);
+  assert.match(workflow, /Repair stale checkout metadata/);
+  assert.match(workflow, /commit --allow-empty -m 'Initialize runner checkout workspace'/);
   assert.doesNotMatch(workflow, /\bsudo\b|--accept-data-loss|PM2_RUN_AS_USER: root/);
 });
 
