@@ -39,9 +39,16 @@ test('production deployment maps every SSO GitHub Environment secret explicitly'
   }
 });
 
-test('production deployment maps standalone application and malware scanner secrets', () => {
+test('production deployment maps standalone runtime and malware scanner secrets', () => {
   const workflow = read('.github/workflows/deploy.yml');
-  for (const secret of ['APP_ORIGIN', 'CLAMAV_HOST', 'CLAMAV_PORT', 'CLAMAV_TIMEOUT_MS']) {
+  for (const secret of [
+    'APP_ORIGIN',
+    'DATABASE_URL',
+    'INTERNAL_API_BASE_URL',
+    'CLAMAV_HOST',
+    'CLAMAV_PORT',
+    'CLAMAV_TIMEOUT_MS',
+  ]) {
     assert.match(workflow, new RegExp(`${secret}: \\$\\{\\{ secrets\\.${secret} \\}\\}`), secret);
     assert.match(workflow, new RegExp(`'${secret}'`), `${secret} runtime override`);
   }

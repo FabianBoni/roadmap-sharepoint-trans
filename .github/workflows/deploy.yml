@@ -91,6 +91,8 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           INTERNAL_API_SECRET: ${{ secrets.INTERNAL_API_SECRET }}
           APP_ORIGIN: ${{ secrets.APP_ORIGIN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          INTERNAL_API_BASE_URL: ${{ secrets.INTERNAL_API_BASE_URL }}
           CLAMAV_HOST: ${{ secrets.CLAMAV_HOST }}
           CLAMAV_PORT: ${{ secrets.CLAMAV_PORT }}
           CLAMAV_TIMEOUT_MS: ${{ secrets.CLAMAV_TIMEOUT_MS }}
@@ -111,6 +113,8 @@ jobs:
             'JWT_SECRET',
             'INTERNAL_API_SECRET',
             'APP_ORIGIN',
+            'DATABASE_URL',
+            'INTERNAL_API_BASE_URL',
             'CLAMAV_HOST',
             'CLAMAV_PORT',
             'CLAMAV_TIMEOUT_MS',
@@ -126,6 +130,8 @@ jobs:
             'JWT_SECRET',
             'INTERNAL_API_SECRET',
             'APP_ORIGIN',
+            'DATABASE_URL',
+            'INTERNAL_API_BASE_URL',
             'CLAMAV_HOST',
             'SP_KERBEROS_SERVICE_USER',
             'SP_KERBEROS_SERVICE_PASSWORD',
