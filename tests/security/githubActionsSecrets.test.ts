@@ -37,10 +37,12 @@ test('production deployment maps every SSO GitHub Environment secret explicitly'
   }
 });
 
-test('production deployment maps the configured application origin', () => {
+test('production deployment maps standalone application and malware scanner secrets', () => {
   const workflow = read('.github/workflows/deploy.yml');
-  assert.match(workflow, /APP_ORIGIN: \$\{\{ vars\.APP_ORIGIN \|\| secrets\.APP_ORIGIN \}\}/);
-  assert.match(workflow, /'APP_ORIGIN'/);
+  for (const secret of ['APP_ORIGIN', 'CLAMAV_HOST', 'CLAMAV_PORT', 'CLAMAV_TIMEOUT_MS']) {
+    assert.match(workflow, new RegExp(`${secret}: \\$\\{\\{ secrets\\.${secret} \\}\\}`), secret);
+    assert.match(workflow, new RegExp(`'${secret}'`), `${secret} runtime override`);
+  }
 });
 
 test('mirror publishes a history-free snapshot and never mirrors historical refs', () => {

@@ -84,7 +84,10 @@ jobs:
           ENTRA_POST_LOGOUT_REDIRECT_URI: ${{ secrets.ENTRA_POST_LOGOUT_REDIRECT_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           INTERNAL_API_SECRET: ${{ secrets.INTERNAL_API_SECRET }}
-          APP_ORIGIN: ${{ vars.APP_ORIGIN || secrets.APP_ORIGIN }}
+          APP_ORIGIN: ${{ secrets.APP_ORIGIN }}
+          CLAMAV_HOST: ${{ secrets.CLAMAV_HOST }}
+          CLAMAV_PORT: ${{ secrets.CLAMAV_PORT }}
+          CLAMAV_TIMEOUT_MS: ${{ secrets.CLAMAV_TIMEOUT_MS }}
           PUBLIC_PROJECTS_API_KEYS: ${{ secrets.PUBLIC_PROJECTS_API_KEYS }}
           SP_KERBEROS_SERVICE_USER: ${{ secrets.SP_KERBEROS_SERVICE_USER }}
           SP_KERBEROS_SERVICE_PASSWORD: ${{ secrets.SP_KERBEROS_SERVICE_PASSWORD }}
@@ -102,6 +105,9 @@ jobs:
             'JWT_SECRET',
             'INTERNAL_API_SECRET',
             'APP_ORIGIN',
+            'CLAMAV_HOST',
+            'CLAMAV_PORT',
+            'CLAMAV_TIMEOUT_MS',
             'PUBLIC_PROJECTS_API_KEYS',
             'SP_KERBEROS_SERVICE_USER',
             'SP_KERBEROS_SERVICE_PASSWORD',
@@ -113,6 +119,8 @@ jobs:
             'ENTRA_REDIRECT_URI',
             'JWT_SECRET',
             'INTERNAL_API_SECRET',
+            'APP_ORIGIN',
+            'CLAMAV_HOST',
             'SP_KERBEROS_SERVICE_USER',
             'SP_KERBEROS_SERVICE_PASSWORD',
           ];
