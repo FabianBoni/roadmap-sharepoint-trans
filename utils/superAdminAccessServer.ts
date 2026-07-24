@@ -73,7 +73,7 @@ async function isDbSuperAdmin(ids: ReturnType<typeof extractIdentifiers>): Promi
     const rows = await prisma.$queryRaw<Array<{ id: number }>>(Prisma.sql`
       SELECT "id"
       FROM "SuperAdmin"
-      WHERE "isActive" = 1
+      WHERE "isActive" IS TRUE
         AND "normalizedUsername" IN (${Prisma.join(candidates)})
       LIMIT 1
     `);

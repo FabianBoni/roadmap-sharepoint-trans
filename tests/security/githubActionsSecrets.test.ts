@@ -68,6 +68,7 @@ test('database schema, baseline and deployment target PostgreSQL only', () => {
   const migration = read('prisma/migrations/20260724130000_postgresql_baseline/migration.sql');
   const workflow = read('.github/workflows/deploy.yml');
   const superadmins = read('pages/api/superadmins/index.ts');
+  const superAdminAccess = read('utils/superAdminAccessServer.ts');
 
   assert.match(schema, /provider\s*=\s*"postgresql"/);
   assert.match(lock, /provider\s*=\s*"postgresql"/);
@@ -79,6 +80,8 @@ test('database schema, baseline and deployment target PostgreSQL only', () => {
   assert.doesNotMatch(workflow, /must run locally|127\.0\.0\.1.*localhost/);
   assert.doesNotMatch(workflow, /Production SQLite|file:\.\//);
   assert.doesNotMatch(superadmins, /isActive \? 1 : 0/);
+  assert.match(superAdminAccess, /WHERE "isActive" IS TRUE/);
+  assert.doesNotMatch(superAdminAccess, /"isActive"\s*=\s*[01]\b/);
 });
 
 test('deployment normalizes one database URL for migrations, verification and PM2', () => {
