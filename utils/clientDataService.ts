@@ -15,6 +15,7 @@ import { prefixBasePath } from '@/utils/nextBasePath';
 import { normalizeAllowedExternalUrl } from '@/utils/safeUrl';
 import { escapeODataStringLiteral } from '@/utils/odata';
 import { getInternalApiBaseUrl } from '@/utils/internalApiBaseUrl';
+import { parseSharePointPeoplePickerResponse } from '@/utils/sharePointPeoplePicker';
 
 type NodeRequireFn = typeof require;
 type AsyncLocalStorageCtor = new <T>() => AsyncLocalStorage<T>;
@@ -4095,6 +4096,9 @@ class ClientDataService {
       // Configure search parameters
       const searchRequest = {
         queryParams: {
+          __metadata: {
+            type: 'SP.UI.ApplicationPages.ClientPeoplePickerQueryParameters',
+          },
           AllowEmailAddresses: true,
           AllowMultipleEntities: false,
           AllUrlZones: false,
@@ -4102,6 +4106,7 @@ class ClientDataService {
           PrincipalSource: 15, // All sources (15)
           PrincipalType: 1, // User (1)
           QueryString: trimmedQuery,
+          SharePointGroupID: null,
         },
       };
 
@@ -4121,18 +4126,11 @@ class ClientDataService {
       }
 
       const data = await response.json();
+      const clientPeoplePickerData = parseSharePointPeoplePickerResponse(data);
 
-      const pickerPayload =
-        typeof data?.d?.ClientPeoplePickerSearchUser === 'string'
-          ? data.d.ClientPeoplePickerSearchUser
-          : typeof data?.ClientPeoplePickerSearchUser === 'string'
-            ? data.ClientPeoplePickerSearchUser
-            : typeof data === 'string'
-              ? data
-              : null;
-
-      if (!pickerPayload) {
+      if (clientPeoplePickerData === null) {
         console.warn('[clientDataService.searchUsers] unexpected People Picker payload shape', {
+          payloadType: Array.isArray(data) ? 'array' : typeof data,
           topLevelKeys:
             data && typeof data === 'object' ? Object.keys(data as Record<string, unknown>) : [],
           hasDObject: Boolean(data?.d && typeof data.d === 'object'),
@@ -4140,17 +4138,6 @@ class ClientDataService {
             data?.d && typeof data.d === 'object'
               ? Object.keys(data.d as Record<string, unknown>)
               : [],
-        });
-        return [];
-      }
-
-      let clientPeoplePickerData: any[] = [];
-      try {
-        const parsed = JSON.parse(pickerPayload);
-        clientPeoplePickerData = Array.isArray(parsed) ? parsed : [];
-      } catch (parseError) {
-        console.warn('[clientDataService.searchUsers] failed to parse People Picker payload', {
-          error: parseError instanceof Error ? parseError.message : 'parse-failed',
         });
         return [];
       }
