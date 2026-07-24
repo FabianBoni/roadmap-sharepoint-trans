@@ -204,9 +204,72 @@ jobs:
           set -euo pipefail
           yarn prisma generate
 
-      - name: Inspect PostgreSQL migration access
+      - name: Align Prisma target schema
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { PrismaClient } = require('@prisma/client');
+          const prisma = new PrismaClient();
+
+          async function main() {
+            const rawUrl = process.env.DATABASE_URL;
+            if (/[\r\n]/.test(rawUrl)) {
+              throw new Error('DATABASE_URL must not contain line breaks');
+            }
+
+            const parsedUrl = new URL(rawUrl);
+            let targetSchema = parsedUrl.searchParams.get('schema');
+            let normalizedUrl = rawUrl;
+
+            if (!targetSchema) {
+              const [connection] = await prisma.$queryRaw`
+                SELECT current_schema() AS schema
+              `;
+              targetSchema = connection?.schema;
+              if (!targetSchema) {
+                throw new Error('PostgreSQL did not provide a default schema');
+              }
+              const separator = rawUrl.includes('?') ? '&' : '?';
+              normalizedUrl =
+                `${rawUrl}${separator}schema=${encodeURIComponent(targetSchema)}`;
+            }
+
+            const envLines = fs.readFileSync('.env', 'utf8').split(/\r?\n/);
+            let replacements = 0;
+            const normalizedEnv = envLines
+              .map((line) => {
+                if (!/^DATABASE_URL=/.test(line)) return line;
+                replacements += 1;
+                return `DATABASE_URL=${JSON.stringify(normalizedUrl)}`;
+              })
+              .join('\n');
+            if (replacements !== 1) {
+              throw new Error(
+                `Expected exactly one DATABASE_URL in .env, found ${replacements}`,
+              );
+            }
+
+            fs.writeFileSync('.env', normalizedEnv, { mode: 0o600 });
+            process.stdout.write(`::add-mask::${normalizedUrl}\n`);
+            fs.appendFileSync(
+              process.env.GITHUB_ENV,
+              `DATABASE_URL=${normalizedUrl}\n`,
+            );
+            console.log(`Prisma database schema: ${targetSchema}`);
+          }
+
+          main()
+            .finally(() => prisma.$disconnect())
+            .catch((error) => {
+              console.error(error);
+              process.exit(1);
+            });
+          NODE
+
+      - name: Inspect PostgreSQL migration access
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -281,8 +344,6 @@ jobs:
           yarn prisma migrate deploy
 
       - name: Verify PostgreSQL schema
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -341,7 +402,6 @@ jobs:
         env:
           NODE_ENV: production
           PORT: '3000'
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           # Keep the long-lived PM2 daemon and app outside the Actions job's
           # orphan-process cleanup.
           RUNNER_TRACKING_ID: ''
