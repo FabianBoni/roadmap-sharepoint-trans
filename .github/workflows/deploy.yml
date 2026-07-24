@@ -191,8 +191,8 @@ jobs:
           if (!['postgres:', 'postgresql:'].includes(db.protocol)) {
             throw new Error('Production DATABASE_URL must use PostgreSQL');
           }
-          if (!['127.0.0.1', 'localhost', '[::1]'].includes(db.hostname)) {
-            throw new Error('Production PostgreSQL must run locally on the deployment host');
+          if (!db.hostname) {
+            throw new Error('Production PostgreSQL requires a database host');
           }
           if (!db.username || !db.password || db.pathname === '/') {
             throw new Error('Production PostgreSQL requires a database, user, and password');

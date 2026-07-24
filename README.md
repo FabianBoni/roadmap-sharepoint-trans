@@ -58,7 +58,7 @@ SharePoint-backed roadmap application built with Next.js 15 (pages router), Type
 ## Local Support Chat
 
 - The floating chat widget is available throughout the application; only superadmins can open and answer the inbox at `/admin/support-chat`.
-- Chat conversations are stored through Prisma in the local PostgreSQL database configured through `DATABASE_URL`. No external chat service is used.
+- Chat conversations are stored through Prisma in the PostgreSQL database configured through `DATABASE_URL`. No external chat service is used.
 - The browser receives only a random `HttpOnly` conversation token. The database stores its SHA-256 hash, not the token itself.
 - New deployments must apply the chat tables with `yarn prisma:deploy` before the application is restarted.
 - The widget and support inbox poll the local Next.js API while open, so the existing `next start`/PM2 setup requires no additional realtime process.
@@ -75,7 +75,7 @@ SharePoint-backed roadmap application built with Next.js 15 (pages router), Type
 
 - PM2 runs the built app on port 3000 (see `ecosystem.config.js`).
 - Build output lives in `.next`; keep it out of version control.
-- Production data is stored in a local PostgreSQL service, never inside the runner checkout. Set its connection string through the protected `DATABASE_URL` secret.
+- Production data is stored in PostgreSQL, never inside the runner checkout. Set its connection string through the protected `DATABASE_URL` secret.
 - Production deployment requires a protected GitHub `production` environment and a dedicated, non-root Linux runner account named `roadmap`.
 - Untrusted branch builds run on GitHub-hosted runners without production secrets. Production secrets are materialized only in the protected deployment job with mode `0600`.
 - Required Microsoft Entra SSO GitHub Environment Secrets are documented in [`docs/ENTRA_SSO_IMPLEMENTATION.md`](docs/ENTRA_SSO_IMPLEMENTATION.md#cicd-und-deployment).

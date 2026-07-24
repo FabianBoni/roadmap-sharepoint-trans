@@ -339,7 +339,7 @@ const SupportChatAdminPage = () => {
         </section>
         {selectedSummary && (
           <p className="support-chat-admin-storage-note">
-            Chat-ID {selectedSummary.id} · Speicherung in der lokalen PostgreSQL-Datenbank
+            Chat-ID {selectedSummary.id} · Speicherung in der PostgreSQL-Datenbank
           </p>
         )}
       </AdminSubpageLayout>

@@ -62,7 +62,7 @@ test('production deployment maps standalone runtime and malware scanner secrets'
   }
 });
 
-test('database schema, baseline and deployment target local PostgreSQL only', () => {
+test('database schema, baseline and deployment target PostgreSQL only', () => {
   const schema = read('prisma/schema.prisma');
   const lock = read('prisma/migrations/migration_lock.toml');
   const migration = read('prisma/migrations/20260724130000_postgresql_baseline/migration.sql');
@@ -75,7 +75,8 @@ test('database schema, baseline and deployment target local PostgreSQL only', ()
   assert.match(migration, /ADD CONSTRAINT "SupportMessage_conversationId_fkey"/);
   assert.doesNotMatch(migration, /PRAGMA|AUTOINCREMENT|\bDATETIME\b/);
   assert.match(workflow, /\['postgres:', 'postgresql:'\]/);
-  assert.match(workflow, /\['127\.0\.0\.1', 'localhost', '\[::1\]'\]/);
+  assert.match(workflow, /Production PostgreSQL requires a database host/);
+  assert.doesNotMatch(workflow, /must run locally|127\.0\.0\.1.*localhost/);
   assert.doesNotMatch(workflow, /Production SQLite|file:\.\//);
   assert.doesNotMatch(superadmins, /isActive \? 1 : 0/);
 });

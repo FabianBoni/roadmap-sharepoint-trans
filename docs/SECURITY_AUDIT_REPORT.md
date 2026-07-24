@@ -169,7 +169,7 @@ Das Produktionsdeployment:
 - verweigert UID 0 und jeden Benutzer außer `roadmap`,
 - verwendet Node.js 22.20.0 und Yarn 1.22.22,
 - schreibt die Laufzeitkonfiguration mit Modus `0600`, ohne Werte auszugeben,
-- lehnt unsichere TLS-/Debug-Schalter und nicht-lokale oder Nicht-PostgreSQL-Datenbank-URLs ab,
+- lehnt unsichere TLS-/Debug-Schalter und Nicht-PostgreSQL-Datenbank-URLs ab,
 - führt nur `prisma migrate deploy` aus; kein `db push` und kein `--accept-data-loss`,
 - erzwingt TypeScript, Lint, Sicherheitstests, Dependency-Audit und Produktionsbuild vor dem Restart,
 - startet ausschließlich den benannten PM2-Prozess mit der gelockten lokalen PM2-Version neu.
@@ -192,8 +192,8 @@ Erwartete Auswirkungen:
 - Uploads funktionieren in Produktion nur mit erreichbarem ClamAV.
 - `INTERNAL_API_SECRET` ist zusätzlich zu `JWT_SECRET` zwingend und muss unabhängig erzeugt werden.
 - Die öffentliche API akzeptiert keine Schlüssel mehr in der URL und keine POST-Weiterleitung.
-- Produktionsdaten liegen in einem lokalen PostgreSQL-Dienst auf dem Deployment-Host; SQLite-URLs
-  sowie entfernte PostgreSQL-Hosts werden vom Deployment abgelehnt.
+- Produktionsdaten liegen in PostgreSQL außerhalb des Runner-Checkouts; SQLite-URLs werden vom
+  Deployment abgelehnt.
 - Unsichere alte TLS- und Debug-Schalter verhindern absichtlich den Start.
 - Die nonce-geschützten Pages werden serverseitig pro Request gerendert.
 
