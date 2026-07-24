@@ -205,6 +205,50 @@ jobs:
           yarn prisma generate
           yarn prisma migrate deploy
 
+      - name: Verify PostgreSQL schema
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { Prisma, PrismaClient } = require('@prisma/client');
+          const prisma = new PrismaClient();
+          const expected = [
+            'RoadmapInstance',
+            'RoadmapInstanceHost',
+            'SuperAdmin',
+            'InstanceDepartmentAccess',
+            'FeedbackRequest',
+            'FeedbackVote',
+            'SupportConversation',
+            'SupportMessage',
+            'RateLimitBucket',
+            'AuthSession',
+          ];
+
+          async function main() {
+            const rows = await prisma.$queryRaw(Prisma.sql`
+              SELECT tablename
+              FROM pg_catalog.pg_tables
+              WHERE schemaname = current_schema()
+                AND tablename IN (${Prisma.join(expected)})
+            `);
+            const present = new Set(rows.map(({ tablename }) => tablename));
+            const missing = expected.filter((table) => !present.has(table));
+            if (missing.length > 0) {
+              throw new Error(`PostgreSQL schema is incomplete: ${missing.join(', ')}`);
+            }
+            console.log(`Verified ${expected.length} PostgreSQL application tables.`);
+          }
+
+          main()
+            .finally(() => prisma.$disconnect())
+            .catch((error) => {
+              console.error(error);
+              process.exit(1);
+            });
+          NODE
+
       - name: Run verification gates
         run: |
           set -euo pipefail
@@ -222,6 +266,7 @@ jobs:
         env:
           NODE_ENV: production
           PORT: '3000'
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           # Keep the long-lived PM2 daemon and app outside the Actions job's
           # orphan-process cleanup.
           RUNNER_TRACKING_ID: ''

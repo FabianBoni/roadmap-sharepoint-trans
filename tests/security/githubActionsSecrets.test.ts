@@ -81,6 +81,19 @@ test('database schema, baseline and deployment target PostgreSQL only', () => {
   assert.doesNotMatch(superadmins, /isActive \? 1 : 0/);
 });
 
+test('deployment verifies the PostgreSQL schema and passes the same URL to PM2', () => {
+  const workflow = read('.github/workflows/deploy.yml');
+  assert.match(
+    workflow,
+    /- name: Verify PostgreSQL schema[\s\S]*?DATABASE_URL: \$\{\{ secrets\.DATABASE_URL \}\}[\s\S]*?'AuthSession'/
+  );
+  assert.match(workflow, /PostgreSQL schema is incomplete/);
+  assert.match(
+    workflow,
+    /- name: Restart only the roadmap service[\s\S]*?DATABASE_URL: \$\{\{ secrets\.DATABASE_URL \}\}[\s\S]*?pm2 startOrRestart/
+  );
+});
+
 test('mirror publishes a history-free snapshot and never mirrors historical refs', () => {
   const workflow = read('.github/workflows/mirror.yml');
   assert.match(workflow, /git archive HEAD/);
