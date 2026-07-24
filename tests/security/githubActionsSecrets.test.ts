@@ -37,6 +37,12 @@ test('production deployment maps every SSO GitHub Environment secret explicitly'
   }
 });
 
+test('production deployment maps the configured application origin', () => {
+  const workflow = read('.github/workflows/deploy.yml');
+  assert.match(workflow, /APP_ORIGIN: \$\{\{ vars\.APP_ORIGIN \|\| secrets\.APP_ORIGIN \}\}/);
+  assert.match(workflow, /'APP_ORIGIN'/);
+});
+
 test('mirror publishes a history-free snapshot and never mirrors historical refs', () => {
   const workflow = read('.github/workflows/mirror.yml');
   assert.match(workflow, /git archive HEAD/);

@@ -84,6 +84,7 @@ jobs:
           ENTRA_POST_LOGOUT_REDIRECT_URI: ${{ secrets.ENTRA_POST_LOGOUT_REDIRECT_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           INTERNAL_API_SECRET: ${{ secrets.INTERNAL_API_SECRET }}
+          APP_ORIGIN: ${{ vars.APP_ORIGIN || secrets.APP_ORIGIN }}
           PUBLIC_PROJECTS_API_KEYS: ${{ secrets.PUBLIC_PROJECTS_API_KEYS }}
           SP_KERBEROS_SERVICE_USER: ${{ secrets.SP_KERBEROS_SERVICE_USER }}
           SP_KERBEROS_SERVICE_PASSWORD: ${{ secrets.SP_KERBEROS_SERVICE_PASSWORD }}
@@ -100,6 +101,7 @@ jobs:
             'ENTRA_POST_LOGOUT_REDIRECT_URI',
             'JWT_SECRET',
             'INTERNAL_API_SECRET',
+            'APP_ORIGIN',
             'PUBLIC_PROJECTS_API_KEYS',
             'SP_KERBEROS_SERVICE_USER',
             'SP_KERBEROS_SERVICE_PASSWORD',
