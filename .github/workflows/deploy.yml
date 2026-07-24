@@ -50,7 +50,7 @@ jobs:
             exit 0
           fi
           git -C "$GITHUB_WORKSPACE" init
-          repository_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          repository_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
           if git -C "$GITHUB_WORKSPACE" remote get-url origin >/dev/null 2>&1; then
             git -C "$GITHUB_WORKSPACE" remote set-url origin "$repository_url"
           else
