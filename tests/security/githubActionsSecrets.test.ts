@@ -62,6 +62,24 @@ test('production deployment maps standalone runtime and malware scanner secrets'
   }
 });
 
+test('database schema, baseline and deployment target local PostgreSQL only', () => {
+  const schema = read('prisma/schema.prisma');
+  const lock = read('prisma/migrations/migration_lock.toml');
+  const migration = read('prisma/migrations/20260724130000_postgresql_baseline/migration.sql');
+  const workflow = read('.github/workflows/deploy.yml');
+  const superadmins = read('pages/api/superadmins/index.ts');
+
+  assert.match(schema, /provider\s*=\s*"postgresql"/);
+  assert.match(lock, /provider\s*=\s*"postgresql"/);
+  assert.match(migration, /"id" SERIAL NOT NULL/);
+  assert.match(migration, /ADD CONSTRAINT "SupportMessage_conversationId_fkey"/);
+  assert.doesNotMatch(migration, /PRAGMA|AUTOINCREMENT|\bDATETIME\b/);
+  assert.match(workflow, /\['postgres:', 'postgresql:'\]/);
+  assert.match(workflow, /\['127\.0\.0\.1', 'localhost', '\[::1\]'\]/);
+  assert.doesNotMatch(workflow, /Production SQLite|file:\.\//);
+  assert.doesNotMatch(superadmins, /isActive \? 1 : 0/);
+});
+
 test('mirror publishes a history-free snapshot and never mirrors historical refs', () => {
   const workflow = read('.github/workflows/mirror.yml');
   assert.match(workflow, /git archive HEAD/);

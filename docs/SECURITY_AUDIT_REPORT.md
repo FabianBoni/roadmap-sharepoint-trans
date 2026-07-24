@@ -169,7 +169,7 @@ Das Produktionsdeployment:
 - verweigert UID 0 und jeden Benutzer außer `roadmap`,
 - verwendet Node.js 22.20.0 und Yarn 1.22.22,
 - schreibt die Laufzeitkonfiguration mit Modus `0600`, ohne Werte auszugeben,
-- lehnt unsichere TLS-/Debug-Schalter und relative Produktions-SQLite-Pfade ab,
+- lehnt unsichere TLS-/Debug-Schalter und nicht-lokale oder Nicht-PostgreSQL-Datenbank-URLs ab,
 - führt nur `prisma migrate deploy` aus; kein `db push` und kein `--accept-data-loss`,
 - erzwingt TypeScript, Lint, Sicherheitstests, Dependency-Audit und Produktionsbuild vor dem Restart,
 - startet ausschließlich den benannten PM2-Prozess mit der gelockten lokalen PM2-Version neu.
@@ -179,11 +179,8 @@ Angriffsfläche wurden entfernt. Das Runtime-Dependency-Audit meldet keine bekan
 
 ## Datenbankmigration und Rollout-Auswirkungen
 
-Reihenfolge der neuen Migrationen:
-
-1. `20260722143000_drop_instance_plaintext_credentials`
-2. `20260722150000_add_persistent_rate_limits`
-3. `20260722160000_add_revocable_auth_sessions`
+Die verlorene lokale SQLite-Datenbank wird nicht weitergeführt. Die neue PostgreSQL-Datenbank wird
+aus der vollständigen Baseline-Migration `20260724130000_postgresql_baseline` aufgebaut.
 
 Vor einem Produktionsrollout sind ein verschlüsseltes Backup und ein getesteter Restore zwingend.
 Anschließend wird ausschließlich `yarn prisma migrate deploy` verwendet.
@@ -195,32 +192,31 @@ Erwartete Auswirkungen:
 - Uploads funktionieren in Produktion nur mit erreichbarem ClamAV.
 - `INTERNAL_API_SECRET` ist zusätzlich zu `JWT_SECRET` zwingend und muss unabhängig erzeugt werden.
 - Die öffentliche API akzeptiert keine Schlüssel mehr in der URL und keine POST-Weiterleitung.
-- Produktions-SQLite muss über einen absoluten Pfad außerhalb des Checkout-Verzeichnisses liegen.
+- Produktionsdaten liegen in einem lokalen PostgreSQL-Dienst auf dem Deployment-Host; SQLite-URLs
+  sowie entfernte PostgreSQL-Hosts werden vom Deployment abgelehnt.
 - Unsichere alte TLS- und Debug-Schalter verhindern absichtlich den Start.
 - Die nonce-geschützten Pages werden serverseitig pro Request gerendert.
 
 ## Verifikation
 
-| Prüfung                                            | Ergebnis                                                                                                         |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `yarn install --frozen-lockfile --non-interactive` | Erfolgreich; Lockfile konsistent                                                                                 |
-| `yarn tsc --noEmit`                                | Erfolgreich; 0 TypeScript-Fehler                                                                                 |
-| `yarn lint --max-warnings 100`                     | Erfolgreich; 0 Fehler, 30 nicht blockierende Warnungen                                                           |
-| `yarn test:security`                               | **35/35 bestanden**                                                                                              |
-| `yarn audit --groups dependencies --level low`     | **0 Schwachstellen, 240 Pakete geprüft**                                                                         |
-| `yarn prisma validate`                             | Schema gültig                                                                                                    |
-| SQL-Migrationskette in SQLite `:memory:`           | 12/12 Migrationen; Credential-Spalten entfernt; `RateLimitBucket` und `AuthSession` vorhanden; 0 FK-Verletzungen |
-| ExcelJS-Smoke-Test                                 | Gültiger XLSX-Buffer erzeugt (6.405 Bytes)                                                                       |
-| `yarn build` mit Node.js 22.20.0                   | Erfolgreicher Next.js-15.5.21-Produktionsbuild                                                                   |
-| Workflow-YAML                                      | 4/4 Dateien syntaktisch geparst                                                                                  |
-| `git diff --check`                                 | Keine Whitespace-Fehler                                                                                          |
-| Current-tree DB-Scan                               | Keine versionierte `.db`, `.sqlite` oder `.sqlite3` im aktuellen Tree                                            |
+| Prüfung                                            | Ergebnis                                                                                                  |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `yarn install --frozen-lockfile --non-interactive` | Erfolgreich; Lockfile konsistent                                                                          |
+| `yarn tsc --noEmit`                                | Erfolgreich; 0 TypeScript-Fehler                                                                          |
+| `yarn lint --max-warnings 100`                     | Erfolgreich; 0 Fehler, 30 nicht blockierende Warnungen                                                    |
+| `yarn test:security`                               | **35/35 bestanden**                                                                                       |
+| `yarn audit --groups dependencies --level low`     | **0 Schwachstellen, 240 Pakete geprüft**                                                                  |
+| `yarn prisma validate`                             | Schema gültig                                                                                             |
+| PostgreSQL-Baseline aus Prisma-Schema              | Vollständige PostgreSQL-DDL; keine SQLite-Anweisungen; alle Modelle, Indizes und Fremdschlüssel enthalten |
+| ExcelJS-Smoke-Test                                 | Gültiger XLSX-Buffer erzeugt (6.405 Bytes)                                                                |
+| `yarn build` mit Node.js 22.20.0                   | Erfolgreicher Next.js-15.5.21-Produktionsbuild                                                            |
+| Workflow-YAML                                      | 4/4 Dateien syntaktisch geparst                                                                           |
+| `git diff --check`                                 | Keine Whitespace-Fehler                                                                                   |
+| Current-tree DB-Scan                               | Keine versionierte `.db`, `.sqlite` oder `.sqlite3` im aktuellen Tree                                     |
 
-Der lokale Windows-Aufruf von `prisma migrate deploy` gegen eine neue temporäre Datenbank wurde vom
-Prisma-5.20-Schema-Engine-Prozess ohne Detailmeldung mit `Schema engine error` beendet. Deshalb wurde
-die vollständige SQL-Kette zusätzlich direkt mit SQLite im Speicher geprüft. Das Schema selbst ist
-gültig; der Linux-Deployment-Job bleibt trotzdem ein zwingender Pre-Deployment-Gate und darf bei
-einem Migrationsfehler nicht fortfahren.
+Die PostgreSQL-Baseline wurde mit `prisma migrate diff --from-empty` direkt aus dem validierten
+aktuellen Schema erzeugt. Der Linux-Deployment-Job bleibt ein zwingender Pre-Deployment-Gate und
+darf bei einem Verbindungs- oder Migrationsfehler nicht fortfahren.
 
 Nicht lokal End-to-End geprüft wurden der reale Entra-Tenant, das produktive SharePoint, ClamAV im
 Produktionsnetz, der Reverse Proxy und die GitHub-Schutzregeln. Dafür wären reale Infrastruktur und

@@ -187,9 +187,15 @@ jobs:
           if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0') {
             throw new Error('TLS certificate verification cannot be disabled');
           }
-          const db = process.env.DATABASE_URL;
-          if (db.startsWith('file:./') || db.startsWith('file:../')) {
-            throw new Error('Production SQLite must use an absolute path outside the checkout workspace');
+          const db = new URL(process.env.DATABASE_URL);
+          if (!['postgres:', 'postgresql:'].includes(db.protocol)) {
+            throw new Error('Production DATABASE_URL must use PostgreSQL');
+          }
+          if (!['127.0.0.1', 'localhost', '[::1]'].includes(db.hostname)) {
+            throw new Error('Production PostgreSQL must run locally on the deployment host');
+          }
+          if (!db.username || !db.password || db.pathname === '/') {
+            throw new Error('Production PostgreSQL requires a database, user, and password');
           }
           NODE
 

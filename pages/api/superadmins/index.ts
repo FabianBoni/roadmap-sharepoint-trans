@@ -113,7 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         VALUES (
           ${username},
           ${normalizedUsername},
-          ${isActive ? 1 : 0},
+          ${isActive},
           ${note},
           CURRENT_TIMESTAMP,
           CURRENT_TIMESTAMP

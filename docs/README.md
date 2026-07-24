@@ -22,6 +22,7 @@ Additional auth documentation:
 - `SP_STRATEGY`: deprecated for proxy (Kerberos is the hardcoded default).
 - `SP_USE_CURL`: deprecated (Kerberos proxy uses curl unconditionally).
 - `INTERNAL_API_BASE_URL`: Absolute server URL for SSR fetches.
+- `DATABASE_URL`: Local PostgreSQL connection URL; production accepts loopback hosts only.
 - `NEXT_PUBLIC_DEPLOYMENT_ENV`: `dev` | `production`.
 - `NEXT_PUBLIC_BASE_PATH_DEV` / `NEXT_PUBLIC_BASE_PATH_PROD`: Reverse proxy base paths.
 - SharePoint site/web URLs and credentials for the active strategy (see `utils/sharepointEnv.ts`).
