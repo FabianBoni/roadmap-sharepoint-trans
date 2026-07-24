@@ -199,10 +199,85 @@ jobs:
           }
           NODE
 
-      - name: Apply reviewed database migrations
+      - name: Generate Prisma client
         run: |
           set -euo pipefail
           yarn prisma generate
+
+      - name: Inspect PostgreSQL migration access
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { Prisma, PrismaClient } = require('@prisma/client');
+          const prisma = new PrismaClient();
+          const tablesToInspect = [
+            '_prisma_migrations',
+            'RoadmapInstance',
+            'RoadmapInstanceHost',
+            'SuperAdmin',
+            'InstanceDepartmentAccess',
+            'FeedbackRequest',
+            'FeedbackVote',
+            'SupportConversation',
+            'SupportMessage',
+            'RateLimitBucket',
+            'AuthSession',
+          ];
+
+          async function main() {
+            const [schemaAccess] = await prisma.$queryRaw`
+              SELECT
+                current_schema() AS schema,
+                has_schema_privilege(current_user, current_schema(), 'USAGE') AS can_use,
+                has_schema_privilege(current_user, current_schema(), 'CREATE') AS can_create
+            `;
+            const tableAccess = await prisma.$queryRaw(Prisma.sql`
+              SELECT
+                tables.tablename,
+                tables.tableowner = current_user AS owned_by_deployment_role,
+                has_table_privilege(
+                  current_user,
+                  format('%I.%I', tables.schemaname, tables.tablename),
+                  'SELECT'
+                ) AS can_select,
+                has_table_privilege(
+                  current_user,
+                  format('%I.%I', tables.schemaname, tables.tablename),
+                  'INSERT,UPDATE,DELETE'
+                ) AS can_write
+              FROM pg_catalog.pg_tables AS tables
+              WHERE tables.schemaname = current_schema()
+                AND tables.tablename IN (${Prisma.join(tablesToInspect)})
+              ORDER BY tables.tablename
+            `);
+
+            console.log('PostgreSQL schema access:', schemaAccess);
+            console.table(tableAccess);
+
+            const migrations = tableAccess.find(
+              ({ tablename }) => tablename === '_prisma_migrations',
+            );
+            if (migrations && (!migrations.can_select || !migrations.can_write)) {
+              throw new Error(
+                'The deployment database role cannot manage public._prisma_migrations. ' +
+                  'The database owner must grant SELECT, INSERT, UPDATE, and DELETE on that table.',
+              );
+            }
+          }
+
+          main()
+            .finally(() => prisma.$disconnect())
+            .catch((error) => {
+              console.error(error);
+              process.exit(1);
+            });
+          NODE
+
+      - name: Apply reviewed database migrations
+        run: |
+          set -euo pipefail
           yarn prisma migrate deploy
 
       - name: Verify PostgreSQL schema
