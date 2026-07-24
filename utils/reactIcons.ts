@@ -33,16 +33,44 @@ import * as Cg from 'react-icons/cg';
 type IconComponent = React.ComponentType<React.SVGProps<SVGSVGElement>>;
 
 // Create a map of all icon libraries
-const iconLibraries: Record<string, Record<string, any>> = {
-  Ai, Bs, Bi, Ci, Di, Fi, Fc, Fa, Fa6, Gi, Go, Gr, Hi, Hi2, Im, Io, Io5, 
-  Lu, Md, Pi, Ri, Rx, Si, Sl, Tb, Tfi, Ti, Vsc, Wi, Cg
+const iconLibraries: Record<string, Record<string, unknown>> = {
+  Ai,
+  Bs,
+  Bi,
+  Ci,
+  Di,
+  Fi,
+  Fc,
+  Fa,
+  Fa6,
+  Gi,
+  Go,
+  Gr,
+  Hi,
+  Hi2,
+  Im,
+  Io,
+  Io5,
+  Lu,
+  Md,
+  Pi,
+  Ri,
+  Rx,
+  Si,
+  Sl,
+  Tb,
+  Tfi,
+  Ti,
+  Vsc,
+  Wi,
+  Cg,
 };
 
 // Create a flat map of all icons for faster lookup
 const allIcons: Record<string, IconComponent> = {};
 
 // Populate the allIcons map
-Object.entries(iconLibraries).forEach(([prefix, library]) => {
+Object.entries(iconLibraries).forEach(([_prefix, library]) => {
   Object.entries(library).forEach(([iconName, IconComponent]) => {
     // Only add actual icon components (functions/components)
     if (typeof IconComponent === 'function') {
@@ -61,14 +89,14 @@ export const getIconByName = (iconName: string): IconComponent | null => {
   if (allIcons[iconName]) {
     return allIcons[iconName];
   }
-  
+
   // If not found in the flat map, try to find it in the libraries
-  for (const [prefix, library] of Object.entries(iconLibraries)) {
+  for (const [_prefix, library] of Object.entries(iconLibraries)) {
     if (library[iconName] && typeof library[iconName] === 'function') {
       return library[iconName] as IconComponent;
     }
   }
-  
+
   console.warn(`Icon not found: ${iconName}`);
   return null;
 };
@@ -81,10 +109,10 @@ export const getIconByName = (iconName: string): IconComponent | null => {
  */
 export const searchIcons = (searchTerm: string, limit: number = 100): string[] => {
   if (!searchTerm) return [];
-  
+
   const term = searchTerm.toLowerCase();
   const results: string[] = [];
-  
+
   // Search in all icon names
   for (const iconName in allIcons) {
     if (iconName.toLowerCase().includes(term)) {
@@ -92,7 +120,7 @@ export const searchIcons = (searchTerm: string, limit: number = 100): string[] =
       if (results.length >= limit) break;
     }
   }
-  
+
   return results;
 };
 
@@ -103,17 +131,17 @@ export const searchIcons = (searchTerm: string, limit: number = 100): string[] =
  */
 export const getIconSamples = (count: number = 5): Record<string, string[]> => {
   const samples: Record<string, string[]> = {};
-  
+
   Object.entries(iconLibraries).forEach(([prefix, library]) => {
     const libraryIcons = Object.keys(library)
-      .filter(key => typeof library[key] === 'function')
+      .filter((key) => typeof library[key] === 'function')
       .slice(0, count);
-    
+
     if (libraryIcons.length > 0) {
       samples[prefix.toLowerCase()] = libraryIcons;
     }
   });
-  
+
   return samples;
 };
 

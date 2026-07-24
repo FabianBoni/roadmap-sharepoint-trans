@@ -150,7 +150,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const details = String(req.query.details || '').toLowerCase() === 'landing';
-    const session = extractAdminSession(req);
+    const session = await extractAdminSession(req);
     if (!session) {
       return res.status(403).json({ error: 'Forbidden' });
     }

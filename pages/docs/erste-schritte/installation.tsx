@@ -145,8 +145,8 @@ const InstallationDocsPage: React.FC = () => {
               korrekt ist
             </li>
             <li>
-              Führen Sie <code>yarn prisma db push</code> aus, um die Datenbankschema zu
-              aktualisieren
+              Führen Sie in Produktion <code>yarn prisma migrate deploy</code> aus, um
+              ausschließlich versionierte Migrationen anzuwenden
             </li>
           </ol>
 

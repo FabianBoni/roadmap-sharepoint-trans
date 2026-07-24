@@ -25,8 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let instance: RoadmapInstanceConfig | null = null;
   try {
     instance = await getInstanceConfigFromRequest(req);
-  } catch (error) {
-    console.error('[api/categories] failed to resolve instance', error);
+  } catch {
+    console.error('[api/categories] failed to resolve instance');
     return res.status(500).json({ error: 'Failed to resolve roadmap instance' });
   }
   if (!instance) {
@@ -43,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') {
     disableCache();
     try {
-      const session = requireUserSession(req);
+      const session = await requireUserSession(req);
       if (
         !(await isReadSessionAllowedForInstance({
           session,
@@ -69,8 +69,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       res.setHeader('x-categories-instance', instance.slug);
       res.status(200).json(responseCategories);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
+    } catch {
+      console.error('Error fetching categories');
       res.status(500).json({ error: 'Failed to fetch categories' });
     }
   }
@@ -81,7 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(501).json({ error: 'Sample data instance is read-only' });
       }
 
-      const session = requireUserSession(req);
+      const session = await requireUserSession(req);
 
       if (
         !(await isAdminSessionAllowedForInstance({
@@ -101,8 +101,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         clientDataService.createCategory({ name, color, icon })
       );
       res.status(201).json(newCategory);
-    } catch (error) {
-      console.error('Error creating category:', error);
+    } catch {
+      console.error('Error creating category');
       res.status(500).json({ error: 'Failed to create category' });
     }
   } else {

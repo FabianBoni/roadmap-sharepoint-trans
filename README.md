@@ -1,10 +1,10 @@
-# SharePoint Roadmap (Next.js 14)
+# SharePoint Roadmap (Next.js 15)
 
-SharePoint-backed roadmap application built with Next.js 14 (pages router), TypeScript, Tailwind CSS, and PM2. It integrates with SharePoint via resilient fetch fallbacks and supports Kerberos (SPNEGO), delegated access, and optional basic auth.
+SharePoint-backed roadmap application built with Next.js 15 (pages router), TypeScript, Tailwind CSS, and PM2. It integrates with SharePoint via resilient fetch fallbacks and supports Kerberos (SPNEGO), tightly scoped delegated access, and optional basic auth.
 
 ## Tech Stack
 
-- Next.js 14 (pages router), React 18, TypeScript
+- Next.js 15 (pages router), React 18, TypeScript
 - Tailwind CSS for styling
 - SharePoint REST with custom fetch fallback
 - Prisma (included, optional) and PM2 for process management
@@ -16,12 +16,12 @@ SharePoint-backed roadmap application built with Next.js 14 (pages router), Type
 - **SharePoint lists**: `Roadmap Projects`, `Roadmap Categories`, `Roadmap Settings`, `Roadmap Team Members`, `Roadmap Project Links`.
 - **Category normalization**: trim and collapse values like `7.0` → `7` across API and client data service.
 - **Quarter → date derivation**: shared helper maps Q1–Q4 to start/end ISO dates; do not change logic.
-- **Admin check**: `clientDataService.isCurrentUserAdmin()` (site collection admin, owners group, heuristic owners).
-- **Caching**: in-memory only (list titles, field metadata, request digests); avoid persistent caches.
+- **Authorization**: exact Entra/UPN/on-prem identities plus live SharePoint role checks; display names never grant access.
+- **Rate limits**: shared, persistent Prisma buckets for public APIs and support chat.
 
 ## Setup
 
-1. **Requirements**: Node 20.x (repo ships `node-bin` v20.11.1 if you need a pinned runtime) and Yarn 1.22.22. Run `corepack enable` if Yarn isn't available yet.
+1. **Requirements**: Node 22.20.0 and Yarn 1.22.22. Run `corepack enable` if Yarn isn't available yet.
 2. **Install**: `yarn install --frozen-lockfile`.
 3. **Env**: copy `.env.example` to `.env` and set values. Key vars:
    - `NEXT_PUBLIC_DEPLOYMENT_ENV` (`dev`|`production`)
@@ -46,12 +46,18 @@ SharePoint-backed roadmap application built with Next.js 14 (pages router), Type
 - Format: `yarn format` (check: `yarn format:check`).
 - Security audit: `yarn security:audit`.
 - Prisma: `yarn prisma:generate | migrate | deploy | studio | seed`.
-- SharePoint auth diagnostics: use `/api/auth/whoami` and proxy debug logs.
+- Sensitive diagnostics are disabled by default and forbidden in production.
 - PM2 ops: `yarn pm2:restart | yarn pm2:stop | yarn pm2:logs | yarn pm2:status` (see `ecosystem.config.js`).
+
+## Implementation Documentation
+
+- [`docs/SSO_PORTING_SPEC.md`](docs/SSO_PORTING_SPEC.md): canonical, LLM-ready specification for reproducing the current Microsoft Entra SSO flow in another application.
+- [`docs/ENTRA_SSO_IMPLEMENTATION.md`](docs/ENTRA_SSO_IMPLEMENTATION.md): architecture narrative and implementation history.
+- [`docs/SECURITY_AUDIT_REPORT.md`](docs/SECURITY_AUDIT_REPORT.md): authoritative findings, remediations, residual external actions, and verification evidence.
 
 ## Local Support Chat
 
-- The floating chat widget is available throughout the application; support staff answer at `/admin/support-chat`.
+- The floating chat widget is available throughout the application; only superadmins can open and answer the inbox at `/admin/support-chat`.
 - Chat conversations are stored by Prisma in the local SQLite file configured through `DATABASE_URL`. No external chat service is used.
 - The browser receives only a random `HttpOnly` conversation token. The database stores its SHA-256 hash, not the token itself.
 - New deployments must apply the chat tables with `yarn prisma:deploy` before the application is restarted.
@@ -69,8 +75,9 @@ SharePoint-backed roadmap application built with Next.js 14 (pages router), Type
 
 - PM2 runs the built app on port 3000 (see `ecosystem.config.js`).
 - Build output lives in `.next`; keep it out of version control.
-- Self-hosted Windows GitHub runner expected; use `yarn pm2:restart` after deploy.
-- GitHub Actions can inject public API keys from `PUBLIC_PROJECTS_API_KEYS` or `ROADMAP_API_KEY` secrets into the generated `.env` during branch builds and deploys.
+- Production deployment requires a protected GitHub `production` environment and a dedicated, non-root Linux runner account named `roadmap`.
+- Untrusted branch builds run on GitHub-hosted runners without production secrets. Production secrets are materialized only in the protected deployment job with mode `0600`.
+- Required Microsoft Entra SSO GitHub Environment Secrets are documented in [`docs/ENTRA_SSO_IMPLEMENTATION.md`](docs/ENTRA_SSO_IMPLEMENTATION.md#cicd-und-deployment).
 
 ## Troubleshooting
 

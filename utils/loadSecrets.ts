@@ -28,7 +28,7 @@ export function loadEncryptedSecrets(vaultPath?: string): boolean {
     const resolvedPath = vaultPath || path.join(process.cwd(), '.env.vault.json');
 
     if (!fs.existsSync(resolvedPath)) {
-      console.warn(`[Secrets] Vault file not found: ${resolvedPath}`);
+      console.warn('[Secrets] Configured vault file not found');
       return false;
     }
 
@@ -72,9 +72,8 @@ export function loadEncryptedSecrets(vaultPath?: string): boolean {
 
     console.log(`[Secrets] ✅ Loaded ${loadedCount} secret(s) from encrypted vault`);
     return true;
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('[Secrets] ❌ Failed to load encrypted secrets:', message);
+  } catch {
+    console.error('[Secrets] ❌ Failed to load encrypted secrets');
     if (process.env.NODE_ENV === 'production') {
       // In production, fail hard if decryption fails
       throw new Error('Failed to decrypt production secrets. Check SECRETS_MASTER_KEY.');
@@ -96,11 +95,11 @@ export function validateSecretsConfiguration(): {
   const warnings: string[] = [];
 
   // Check for required SharePoint credentials
-  if (!process.env.SP_USERNAME) {
-    errors.push('SP_USERNAME is not set');
+  if (!process.env.SP_KERBEROS_SERVICE_USER && !process.env.SP_USERNAME) {
+    errors.push('SharePoint service username is not set');
   }
-  if (!process.env.SP_PASSWORD) {
-    errors.push('SP_PASSWORD is not set');
+  if (!process.env.SP_KERBEROS_SERVICE_PASSWORD && !process.env.SP_PASSWORD) {
+    errors.push('SharePoint service password is not set');
   }
 
   // Check for JWT secret
@@ -138,10 +137,7 @@ export function validateSecretsConfiguration(): {
  */
 export function maskSensitiveEnv(envVar: string | undefined): string {
   if (!envVar) return '(not set)';
-  if (envVar.length <= 4) return '****';
-  return (
-    envVar.substring(0, 2) + '*'.repeat(envVar.length - 4) + envVar.substring(envVar.length - 2)
-  );
+  return '<set>';
 }
 
 /**
@@ -158,7 +154,9 @@ export function logEnvironmentStatus(): void {
   console.log(`   Environment: ${process.env.NEXT_PUBLIC_DEPLOYMENT_ENV || 'development'}`);
   console.log(`   Node Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   Auth Strategy: ${process.env.SP_STRATEGY || 'kerberos'}`);
-  console.log(`   SharePoint User: ${maskSensitiveEnv(process.env.SP_USERNAME)}`);
+  console.log(
+    `   SharePoint User: ${maskSensitiveEnv(process.env.SP_KERBEROS_SERVICE_USER || process.env.SP_USERNAME)}`
+  );
   console.log(`   JWT Secret: ${maskSensitiveEnv(process.env.JWT_SECRET)}`);
   console.log(
     `   Master Key: ${process.env.SECRETS_MASTER_KEY ? '✓ Set' : '✗ Not Set (using .env.local)'}`

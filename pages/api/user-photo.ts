@@ -8,6 +8,7 @@ import {
 } from '@/utils/instanceConfig';
 import { prefixBasePath } from '@/utils/nextBasePath';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
+import { getInternalApiBaseUrl } from '@/utils/internalApiBaseUrl';
 
 const USERPHOTO_PATH_REGEX = /^\/_layouts\/15\/userphoto\.aspx(?:\?.*)?$/i;
 const PROFILE_PICTURE_LIBRARY_REGEX = /^\/.*\/User(?:%20| )Photos\/Profile(?:%20| )Pictures\/.*$/i;
@@ -65,9 +66,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  let session: ReturnType<typeof requireUserSession>;
+  let session: Awaited<ReturnType<typeof requireUserSession>>;
   try {
-    session = requireUserSession(req);
+    session = await requireUserSession(req);
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -75,8 +76,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let instance: RoadmapInstanceConfig | null = null;
   try {
     instance = await getInstanceConfigFromRequest(req);
-  } catch (error) {
-    console.error('[user-photo] failed to resolve instance', error);
+  } catch {
+    console.error('[user-photo] failed to resolve instance');
     return res.status(500).json({ error: 'Failed to resolve roadmap instance' });
   }
 
@@ -116,8 +117,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     normalizedPath ||
     `/_layouts/15/userphoto.aspx?size=${encodeURIComponent(size)}&accountname=${encodeURIComponent(rawAccountName.trim())}`;
 
-  const baseUrl =
-    (process.env.INTERNAL_API_BASE_URL || '').replace(/\/$/, '') || 'http://localhost:3000';
+  const baseUrl = getInternalApiBaseUrl();
   const internalUrl = withInstanceSlug(
     `${baseUrl}${prefixBasePath('/api/sharepoint')}${proxyPath}`,
     instance.slug
@@ -145,8 +145,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.setHeader('Content-Length', contentLength);
     }
     return res.status(200).send(buffer);
-  } catch (error) {
-    console.error('[user-photo] failed to fetch internal sharepoint photo', error);
+  } catch {
+    console.error('[user-photo] failed to fetch internal sharepoint photo');
     return res.status(500).json({ error: 'Failed to fetch user photo' });
   }
 }

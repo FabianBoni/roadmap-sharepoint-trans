@@ -1,6 +1,7 @@
 import type { NextApiRequest } from 'next';
 
-const DEFAULT_SESSION_TTL = '24h';
+const DEFAULT_SESSION_TTL = '8h';
+const MAX_SESSION_TTL_SECONDS = 12 * 60 * 60;
 const MIN_SECRET_LENGTH = 32;
 const PLACEHOLDER_SECRETS = new Set([
   'roadmap-secret-change-in-production',
@@ -29,11 +30,25 @@ export function getSessionTtlSeconds(): number {
   const value = Number(match[1]);
   const multiplier = { s: 1, m: 60, h: 3600, d: 86400 }[match[2] || 's'];
   const seconds = value * multiplier;
-  if (!Number.isSafeInteger(seconds) || seconds <= 0) {
-    throw new Error('JWT_EXPIRES_IN must resolve to a positive number of seconds');
+  if (!Number.isSafeInteger(seconds) || seconds <= 0 || seconds > MAX_SESSION_TTL_SECONDS) {
+    throw new Error('JWT_EXPIRES_IN must resolve to between 1 second and 12 hours');
   }
   return seconds;
 }
+
+export const getSessionIssuer = (): string =>
+  String(process.env.JWT_ISSUER || 'roadmap-sharepoint').trim() || 'roadmap-sharepoint';
+
+export const getSessionAudience = (): string =>
+  String(process.env.JWT_AUDIENCE || 'roadmap-web').trim() || 'roadmap-web';
+
+export const getSessionVersion = (): string => {
+  const version = String(process.env.JWT_SESSION_VERSION || '1').trim();
+  if (!/^[A-Za-z0-9._-]{1,64}$/.test(version)) {
+    throw new Error('JWT_SESSION_VERSION must be 1-64 safe characters');
+  }
+  return version;
+};
 
 export function normalizeLocalReturnUrl(
   input: string | undefined | null,
@@ -79,14 +94,19 @@ export function isSafeCookieRequest(req: NextApiRequest): boolean {
   const origin = firstHeader(req.headers.origin);
   if (!origin) return false;
 
-  const proto = firstHeader(req.headers['x-forwarded-proto']).split(',')[0].trim() || 'http';
-  const host =
-    firstHeader(req.headers['x-forwarded-host']).split(',')[0].trim() ||
-    firstHeader(req.headers.host).trim();
-  if (!host) return false;
-
   try {
-    return new URL(origin).origin === `${proto}://${host}`;
+    const allowedOrigins = new Set<string>();
+    for (const raw of String(process.env.APP_ORIGIN || '').split(',')) {
+      if (raw.trim()) allowedOrigins.add(new URL(raw.trim()).origin);
+    }
+    const redirectUri = String(process.env.ENTRA_REDIRECT_URI || '').trim();
+    if (redirectUri) allowedOrigins.add(new URL(redirectUri).origin);
+    if (process.env.NODE_ENV !== 'production') {
+      const port = /^\d{1,5}$/.test(process.env.PORT || '') ? process.env.PORT : '3000';
+      allowedOrigins.add(`http://localhost:${port}`);
+      allowedOrigins.add(`http://127.0.0.1:${port}`);
+    }
+    return allowedOrigins.has(new URL(origin).origin);
   } catch {
     return false;
   }

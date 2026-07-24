@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   let session;
   try {
-    session = requireUserSession(req);
+    session = await requireUserSession(req);
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });
   }

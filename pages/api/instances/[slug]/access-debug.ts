@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { Prisma } from '@prisma/client';
-import path from 'path';
 import prisma from '@/lib/prisma';
 import { requireUserSession } from '@/utils/apiAuth';
 import { isAdminSessionAllowedForInstance } from '@/utils/instanceAccessServer';
+import { isSuperAdminSessionWithSharePointFallback } from '@/utils/superAdminAccessServer';
 import { clientDataService } from '@/utils/clientDataService';
 import {
   isDepartmentAllowedForInstance,
@@ -13,11 +13,6 @@ import { sanitizeSlug } from '../helpers';
 
 type DebugResponse = {
   slug: string;
-  runtime: {
-    cwd: string;
-    databaseUrl: string | null;
-    sqliteFilePath: string | null;
-  };
   session: {
     username: string | null;
     displayName: string | null;
@@ -64,7 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   let session;
   try {
-    session = requireUserSession(req);
+    session = await requireUserSession(req);
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -81,6 +76,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'Invalid slug' });
   }
 
+  if (process.env.ENABLE_SECURITY_DEBUG_ENDPOINTS !== 'true') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
   const sessionRecord = asRecord(session);
   const entra = asRecord(session?.entra);
   const requestHeaders = {
@@ -89,10 +88,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     cookie: typeof req.headers.cookie === 'string' ? req.headers.cookie : undefined,
   };
 
+  const candidateInstanceSlugs = (
+    await prisma.roadmapInstance.findMany({ select: { slug: true } })
+  ).map((instance) => instance.slug);
   if (
-    !(await isAdminSessionAllowedForInstance({
-      session,
-      instance: { slug },
+    !(await isSuperAdminSessionWithSharePointFallback(session, {
+      candidateInstanceSlugs,
       requestHeaders,
     }))
   ) {
@@ -114,7 +115,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       username: typeof session?.username === 'string' ? session.username : null,
       upn: entra && typeof entra.upn === 'string' ? entra.upn : null,
       mail: entra && typeof entra.mail === 'string' ? entra.mail : null,
-      displayName: typeof session?.displayName === 'string' ? session.displayName : null,
+      onPremisesUserPrincipalName:
+        entra && typeof entra.onPremisesUserPrincipalName === 'string'
+          ? entra.onPremisesUserPrincipalName
+          : null,
+      onPremisesAccountName:
+        entra &&
+        typeof entra.onPremisesDomainName === 'string' &&
+        typeof entra.onPremisesSamAccountName === 'string'
+          ? `${entra.onPremisesDomainName}\\${entra.onPremisesSamAccountName}`
+          : null,
     })
   );
 
@@ -163,20 +173,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     requestHeaders,
   });
 
-  const databaseUrl =
-    typeof process.env.DATABASE_URL === 'string' ? process.env.DATABASE_URL : null;
-  const sqliteFilePath =
-    databaseUrl && databaseUrl.startsWith('file:')
-      ? path.resolve(process.cwd(), databaseUrl.replace(/^file:/, ''))
-      : null;
-
   const response: DebugResponse = {
     slug,
-    runtime: {
-      cwd: process.cwd(),
-      databaseUrl,
-      sqliteFilePath,
-    },
     session: {
       username: typeof session?.username === 'string' ? session.username : null,
       displayName: typeof session?.displayName === 'string' ? session.displayName : null,

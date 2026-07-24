@@ -1,5 +1,9 @@
 # Sicherheits-Audit: SSO, Sessions und SharePoint-Authentifizierung
 
+> **Historischer Teilbericht:** Dieses Dokument hält den damaligen SSO-Teilaudit fest. Der
+> aktuelle, repositoryweite Abschlussstatus einschließlich späterer Härtungen und offener
+> Betriebsmaßnahmen steht in [`SECURITY_AUDIT_REPORT.md`](./SECURITY_AUDIT_REPORT.md).
+
 Stand: 17. Juli 2026
 
 ## Management Summary

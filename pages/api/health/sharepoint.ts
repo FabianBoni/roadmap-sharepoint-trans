@@ -1,37 +1,31 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import { clientDataService } from '@/utils/clientDataService';
 import { getInstanceConfigFromRequest } from '@/utils/instanceConfig';
-import { resolveSharePointSiteUrl } from '@/utils/sharepointEnv';
-import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
+import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const start = Date.now();
-  try {
-    let instance: RoadmapInstanceConfig | null = null;
-    try {
-      instance = await getInstanceConfigFromRequest(req);
-    } catch (error) {
-      console.error('[health/sharepoint] failed to resolve instance', error);
-      return res.status(500).json({ ok: false, error: 'Failed to resolve roadmap instance' });
-    }
-    if (!instance) {
-      return res.status(404).json({ ok: false, error: 'No roadmap instance configured' });
-    }
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.setHeader('Allow', ['GET', 'HEAD']);
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-    const projects = await clientDataService.withInstance(instance.slug, () =>
-      clientDataService.getAllProjects()
-    );
-    res.status(200).json({
-      ok: true,
-      projectCount: projects.length,
-      elapsedMs: Date.now() - start,
-      site: resolveSharePointSiteUrl(instance),
-      deploymentEnv:
-        instance.deploymentEnv || process.env.NEXT_PUBLIC_DEPLOYMENT_ENV || process.env.NODE_ENV,
-      instance: instance.slug,
-    });
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : 'Unknown error';
-    res.status(500).json({ ok: false, error: message });
+  try {
+    await requireSuperAdminAccess(req);
+  } catch (error) {
+    const status = error instanceof Error && error.message === 'Unauthorized' ? 401 : 403;
+    return res.status(status).json({ error: status === 401 ? 'Unauthorized' : 'Forbidden' });
+  }
+
+  const instance = await getInstanceConfigFromRequest(req).catch(() => null);
+  if (!instance) return res.status(404).json({ ok: false });
+
+  try {
+    await clientDataService.withInstance(instance.slug, () => clientDataService.getAllCategories());
+    if (req.method === 'HEAD') return res.status(200).end();
+    return res.status(200).json({ ok: true });
+  } catch {
+    if (req.method === 'HEAD') return res.status(503).end();
+    return res.status(503).json({ ok: false });
   }
 }

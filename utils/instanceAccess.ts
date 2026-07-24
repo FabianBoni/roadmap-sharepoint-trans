@@ -1,4 +1,8 @@
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
+import {
+  isStableAuthorizationIdentifier,
+  normalizeAuthorizationIdentifier,
+} from '@/utils/authorizationIdentity';
 
 const normalize = (value: unknown): string => {
   if (typeof value !== 'string') return '';
@@ -22,7 +26,10 @@ export const getInstanceAdminAccessConfig = (
 
   const allowedUsersRaw = cfg.allowedUsers;
   const allowedUsers = Array.isArray(allowedUsersRaw)
-    ? allowedUsersRaw.map((u) => normalize(u)).filter(Boolean)
+    ? allowedUsersRaw
+        .filter((u) => isStableAuthorizationIdentifier(u))
+        .map((u) => normalizeAuthorizationIdentifier(u))
+        .filter(Boolean)
     : [];
 
   const allowedGroupsRaw = cfg.allowedGroups;
@@ -106,8 +113,8 @@ export const isAdminUserAllowedForInstance = (
   username: string | null | undefined,
   instance: Pick<RoadmapInstanceConfig, 'metadata'>
 ): boolean => {
-  const normalizedUsername = normalize(username);
-  if (!normalizedUsername) return false;
+  if (!isStableAuthorizationIdentifier(username)) return false;
+  const normalizedUsername = normalizeAuthorizationIdentifier(username);
   const accessConfig = getInstanceAdminAccessConfig(instance.metadata);
   return Boolean(accessConfig?.allowedUsers?.includes(normalizedUsername));
 };
@@ -121,7 +128,10 @@ export const filterInstancesForAdminUser = <T extends Pick<RoadmapInstanceConfig
 
 export const coerceAllowedUsersPayload = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
-  const normalized = value.map((entry) => normalize(entry)).filter(Boolean);
+  const normalized = value
+    .filter((entry) => isStableAuthorizationIdentifier(entry))
+    .map((entry) => normalizeAuthorizationIdentifier(entry))
+    .filter(Boolean);
   return Array.from(new Set(normalized));
 };
 
@@ -144,8 +154,10 @@ export const appendAllowedUser = (
   existingUsers: string[] | undefined,
   candidate: string | null | undefined
 ): string[] => {
-  const normalizedCandidate = normalize(candidate);
-  if (!normalizedCandidate) return Array.isArray(existingUsers) ? [...existingUsers] : [];
+  if (!isStableAuthorizationIdentifier(candidate)) {
+    return Array.isArray(existingUsers) ? [...existingUsers] : [];
+  }
+  const normalizedCandidate = normalizeAuthorizationIdentifier(candidate);
   return Array.from(new Set([...(existingUsers ?? []), normalizedCandidate]));
 };
 

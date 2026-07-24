@@ -67,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   let session;
   try {
-    session = requireUserSession(req);
+    session = await requireUserSession(req);
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -75,8 +75,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let instance: RoadmapInstanceConfig | null = null;
   try {
     instance = await getInstanceConfigFromRequest(req);
-  } catch (error) {
-    console.error('[sharepoint-user-search] failed to resolve instance', error);
+  } catch {
+    console.error('[sharepoint-user-search] failed to resolve instance');
     return res.status(500).json({ error: 'Failed to resolve roadmap instance' });
   }
 
@@ -115,8 +115,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ).values()
       ).slice(0, 20),
     });
-  } catch (error) {
-    console.error('[sharepoint-user-search] failed to search users', error);
+  } catch {
+    console.error('[sharepoint-user-search] failed to search users');
     return res.status(500).json({ error: 'Failed to search users' });
   }
 }

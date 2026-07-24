@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import type { GetStaticPaths, GetStaticProps } from 'next';
+import type { GetServerSideProps } from 'next';
 import prisma from '@/lib/prisma';
 import SiteFooter from '@/components/SiteFooter';
 import SiteHeader from '@/components/SiteHeader';
@@ -329,15 +329,7 @@ const LandingPage = ({ slug, preset, instance }: LandingPageProps) => {
   );
 };
 
-export const getStaticPaths: GetStaticPaths = async () => {
-  const presetSlugs = Object.keys(LANDING_PAGE_PRESETS);
-  return {
-    paths: presetSlugs.map((slug) => ({ params: { slug } })),
-    fallback: 'blocking',
-  };
-};
-
-export const getStaticProps: GetStaticProps<LandingPageProps> = async ({ params }) => {
+export const getServerSideProps: GetServerSideProps<LandingPageProps> = async ({ params }) => {
   const slugParam = params?.slug;
   const slug =
     typeof slugParam === 'string' ? slugParam : Array.isArray(slugParam) ? slugParam[0] : null;
@@ -379,7 +371,6 @@ export const getStaticProps: GetStaticProps<LandingPageProps> = async ({ params 
       preset,
       instance,
     },
-    revalidate: 60,
   };
 };
 

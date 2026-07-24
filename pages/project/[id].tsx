@@ -488,7 +488,7 @@ const ProjectDetailPage: FC<{ accessDenied?: boolean }> = ({ accessDenied }) => 
 export default ProjectDetailPage;
 
 export const getServerSideProps: GetServerSideProps<{ accessDenied?: boolean }> = async (ctx) => {
-  const session = extractAdminSessionFromHeaders({
+  const session = await extractAdminSessionFromHeaders({
     authorization: ctx.req.headers.authorization,
     cookie: ctx.req.headers.cookie,
   });

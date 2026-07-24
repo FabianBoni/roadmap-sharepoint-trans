@@ -7,6 +7,7 @@ import {
   coerceAllowedUsersPayload,
   getInstanceAdminAccessConfig,
 } from '@/utils/instanceAccess';
+import { isStableAuthorizationIdentifier } from '@/utils/authorizationIdentity';
 
 const sanitizeSlug = (value: string) => value.trim().toLowerCase();
 
@@ -62,7 +63,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'PUT') {
-    const users = coerceAllowedUsersPayload((req.body ?? {})?.users);
+    const submittedUsers = (req.body ?? {})?.users;
+    if (
+      !Array.isArray(submittedUsers) ||
+      submittedUsers.some((entry: unknown) => !isStableAuthorizationIdentifier(entry))
+    ) {
+      return res.status(400).json({
+        error: 'Every user must be tenantId:objectId, a full UPN/email, or DOMAIN\\account',
+      });
+    }
+    const users = coerceAllowedUsersPayload(submittedUsers);
     const groups = coerceAllowedGroupsPayload((req.body ?? {})?.groups);
 
     const settings = decodeSettings(record.settingsJson ?? null);

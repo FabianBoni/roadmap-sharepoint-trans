@@ -1,6 +1,7 @@
 /**
  * Admin authentication utilities for roadmap application
- * Uses JWT tokens stored in sessionStorage after Windows authentication via SharePoint
+ * The signed JWT lives only in the server-issued HttpOnly cookie. sessionStorage contains at most
+ * non-sensitive display metadata such as the current username.
  */
 
 const USERNAME_KEY = 'adminUsername';
@@ -339,7 +340,12 @@ export function logout(): void {
   if (typeof window !== 'undefined') {
     log('logout: clearing stored session');
     clearStoredSession();
-    window.location.href = buildInstanceAwareUrl('/api/auth/entra/logout');
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = buildInstanceAwareUrl('/api/auth/entra/logout');
+    form.style.display = 'none';
+    document.body.appendChild(form);
+    form.submit();
   }
 }
 

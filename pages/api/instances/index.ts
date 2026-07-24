@@ -10,6 +10,7 @@ import { normalizeSharePointStrategy } from '@/utils/sharePointStrategy';
 import { buildSettingsPayload, normalizeHosts, sanitizeSlug, serializeSettings } from './helpers';
 import { provisionSharePointForInstance } from '@/utils/sharePointProvisioning';
 import type { RoadmapInstanceHealth } from '@/types/roadmapInstance';
+import { assertSubmittedTlsPolicy } from '@/utils/tlsPolicy';
 import {
   getAllowedDepartmentsForInstanceSlugs,
   parseDepartmentsPayload,
@@ -81,6 +82,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       typeof sharePoint.trustedCaPath === 'string' && sharePoint.trustedCaPath.trim()
         ? sharePoint.trustedCaPath.trim()
         : defaultTrustedCaPath;
+    try {
+      assertSubmittedTlsPolicy(resolvedAllowSelfSigned);
+    } catch (error) {
+      return res.status(400).json({
+        error: error instanceof Error ? error.message : 'Invalid TLS configuration',
+      });
+    }
 
     const normalizedSlug = sanitizeSlug(slug);
     const existing = await getInstanceConfigBySlug(normalizedSlug);
@@ -102,8 +110,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         sharePointSiteUrlDev: sharePoint.siteUrlDev.trim(),
         sharePointSiteUrlProd: (sharePoint.siteUrlProd || sharePoint.siteUrlDev).trim(),
         sharePointStrategy: resolvedStrategy,
-        spUsername: '',
-        spPassword: '',
         allowSelfSigned: resolvedAllowSelfSigned,
         trustedCaPath: resolvedTrustedCaPath,
         deploymentEnv: deploymentEnv?.trim() || null,
@@ -135,7 +141,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           errors: { __provision: message },
         },
       };
-      // eslint-disable-next-line no-console
+
       console.error('[instances] sharepoint provisioning failed', error);
     }
 

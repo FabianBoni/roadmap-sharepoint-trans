@@ -8,20 +8,29 @@ import type {
   SupportChatRole,
   SupportChatStatus,
 } from '@/types/supportChat';
+import { consumePersistentRateLimit } from '@/utils/rateLimit';
+import prisma from '@/lib/prisma';
 
 export const SUPPORT_CHAT_COOKIE = 'roadmap-support-chat';
 export const SUPPORT_CHAT_MESSAGE_MAX_LENGTH = 2000;
 export const SUPPORT_CHAT_NAME_MAX_LENGTH = 80;
 const SUPPORT_CHAT_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+const DEFAULT_RETENTION_DAYS = 90;
+let lastRetentionCleanupAt = 0;
 
-type RateLimitBucket = { count: number; resetAt: number };
-type GlobalRateLimits = typeof globalThis & {
-  supportChatRateLimits?: Map<string, RateLimitBucket>;
+export const cleanupExpiredSupportChats = async (): Promise<number> => {
+  const now = Date.now();
+  if (now - lastRetentionCleanupAt < 60 * 60 * 1000) return 0;
+  lastRetentionCleanupAt = now;
+  const configured = Number.parseInt(process.env.SUPPORT_CHAT_RETENTION_DAYS || '', 10);
+  const retentionDays =
+    Number.isSafeInteger(configured) && configured >= 1 ? configured : DEFAULT_RETENTION_DAYS;
+  const cutoff = new Date(now - retentionDays * 24 * 60 * 60 * 1000);
+  const deleted = await prisma.supportConversation.deleteMany({
+    where: { lastMessageAt: { lt: cutoff } },
+  });
+  return deleted.count;
 };
-
-const globalForRateLimits = globalThis as GlobalRateLimits;
-const rateLimits = globalForRateLimits.supportChatRateLimits ?? new Map<string, RateLimitBucket>();
-globalForRateLimits.supportChatRateLimits = rateLimits;
 
 export const disableSupportChatCache = (res: NextApiResponse) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -64,12 +73,12 @@ export const getSupportChatInstanceSlug = (req: NextApiRequest): string | null =
 const normalizeIdentityValue = (value: unknown): string =>
   typeof value === 'string' ? value.trim() : '';
 
-export const getSupportChatIdentity = (
+export const getSupportChatIdentity = async (
   req: NextApiRequest
-): { userKey: string | null; displayName: string | null } => {
+): Promise<{ userKey: string | null; displayName: string | null }> => {
   let session: AdminSessionPayload | null = null;
   try {
-    session = extractAdminSession(req);
+    session = await extractAdminSession(req);
   } catch {
     session = null;
   }
@@ -92,37 +101,23 @@ export const getSupportAgentName = (session: AdminSessionPayload): string =>
   'Roadmap-Support';
 
 export const getSupportChatRateLimitKey = (req: NextApiRequest, scope: string): string => {
+  const remoteAddress = req.socket.remoteAddress || 'unknown';
+  const trustedProxies = new Set(
+    String(process.env.TRUSTED_PROXY_ADDRESSES || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+  );
   const forwarded = req.headers['x-forwarded-for'];
   const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  const address = forwardedValue?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+  const address = trustedProxies.has(remoteAddress)
+    ? forwardedValue?.split(',')[0]?.trim() || remoteAddress
+    : remoteAddress;
   return `${scope}:${address}`;
 };
 
-export const consumeSupportChatRateLimit = (
-  key: string,
-  limit: number,
-  windowMs: number
-): { allowed: boolean; retryAfterSeconds: number } => {
-  const now = Date.now();
-  if (rateLimits.size > 1000) {
-    for (const [bucketKey, bucket] of rateLimits) {
-      if (bucket.resetAt <= now) rateLimits.delete(bucketKey);
-    }
-  }
-  const current = rateLimits.get(key);
-  if (!current || current.resetAt <= now) {
-    rateLimits.set(key, { count: 1, resetAt: now + windowMs });
-    return { allowed: true, retryAfterSeconds: 0 };
-  }
-  if (current.count >= limit) {
-    return {
-      allowed: false,
-      retryAfterSeconds: Math.max(1, Math.ceil((current.resetAt - now) / 1000)),
-    };
-  }
-  current.count += 1;
-  return { allowed: true, retryAfterSeconds: 0 };
-};
+export const consumeSupportChatRateLimit = async (key: string, limit: number, windowMs: number) =>
+  consumePersistentRateLimit({ scope: 'support-chat', key, limit, windowMs });
 
 export const mapSupportChatMessage = (message: {
   id: number;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Project, Category, InstanceBadgeOption, ProjectLink, TeamMember } from '../types';
-import { v4 as uuidv4 } from 'uuid';
+const uuidv4 = (): string => crypto.randomUUID();
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { FaTrash, FaPlus } from 'react-icons/fa';
@@ -24,12 +24,7 @@ interface ProjectFormProps {
 }
 
 type ProjectPhase =
-  | 'initialisierung'
-  | 'konzept'
-  | 'realisierung'
-  | 'einführung'
-  | 'einfuehrung'
-  | 'abschluss';
+  'initialisierung' | 'konzept' | 'realisierung' | 'einführung' | 'einfuehrung' | 'abschluss';
 
 const normalizePhase = (val?: string): ProjectPhase => {
   if (!val) return 'initialisierung';

@@ -327,7 +327,7 @@ export const getServerSideProps: GetServerSideProps<RoadmapPageProps> = async (c
       ctx.res.setHeader('Vary', Array.from(varyValues).join(', '));
     }
 
-    const session = extractAdminSessionFromHeaders({
+    const session = await extractAdminSessionFromHeaders({
       authorization: ctx.req.headers.authorization,
       cookie: ctx.req.headers.cookie,
     });

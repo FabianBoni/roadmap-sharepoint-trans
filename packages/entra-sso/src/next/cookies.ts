@@ -10,7 +10,11 @@ export function parseCookies(header: string | undefined): Record<string, string>
     const key = part.slice(0, idx).trim();
     const value = part.slice(idx + 1).trim();
     if (!key) continue;
-    out[key] = decodeURIComponent(value);
+    try {
+      out[key] = decodeURIComponent(value);
+    } catch {
+      // Ignore malformed cookie values instead of aborting the whole request.
+    }
   }
   return out;
 }

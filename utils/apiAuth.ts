@@ -1,6 +1,14 @@
 import type { NextApiRequest } from 'next';
 import jwt from 'jsonwebtoken';
-import { getJwtSecret, isSafeCookieRequest } from '@/utils/sessionSecurity';
+import prisma from '@/lib/prisma';
+import {
+  getJwtSecret,
+  getSessionAudience,
+  getSessionIssuer,
+  getSessionTtlSeconds,
+  getSessionVersion,
+  isSafeCookieRequest,
+} from '@/utils/sessionSecurity';
 
 export interface AdminSessionPayload {
   username?: string;
@@ -11,9 +19,13 @@ export interface AdminSessionPayload {
   groups?: unknown;
   entra?: {
     id?: string;
+    tenantId?: string;
     upn?: string;
     mail?: string;
     department?: string;
+    onPremisesSamAccountName?: string;
+    onPremisesDomainName?: string;
+    onPremisesUserPrincipalName?: string;
     [key: string]: unknown;
   };
   [key: string]: unknown;
@@ -48,7 +60,7 @@ const readTokenFromCookie = (cookieHeader: string | undefined): string | null =>
   }
 };
 
-export function extractAdminSessionFromHeaders(headers: {
+export function decodeAdminSessionFromHeaders(headers: {
   authorization?: string | string[];
   cookie?: string;
 }): AdminSessionPayload | null {
@@ -61,33 +73,69 @@ export function extractAdminSessionFromHeaders(headers: {
   const finalToken = token || cookieToken;
   if (!finalToken) return null;
   try {
-    return jwt.verify(finalToken, getJwtSecret()) as AdminSessionPayload;
+    const payload = jwt.verify(finalToken, getJwtSecret(), {
+      algorithms: ['HS256'],
+      issuer: getSessionIssuer(),
+      audience: getSessionAudience(),
+      maxAge: getSessionTtlSeconds(),
+      clockTolerance: 5,
+    }) as AdminSessionPayload;
+    if (
+      typeof payload.jti !== 'string' ||
+      !payload.jti ||
+      payload.sessionVersion !== getSessionVersion()
+    ) {
+      return null;
+    }
+    return payload;
   } catch {
     return null;
   }
 }
 
-export function extractAdminSession(req: NextApiRequest): AdminSessionPayload | null {
+export async function extractAdminSessionFromHeaders(headers: {
+  authorization?: string | string[];
+  cookie?: string;
+}): Promise<AdminSessionPayload | null> {
+  const payload = decodeAdminSessionFromHeaders(headers);
+  if (!payload || typeof payload.jti !== 'string') return null;
+  try {
+    const activeSession = await prisma.authSession.findUnique({
+      where: { id: payload.jti },
+      select: { expiresAt: true, revokedAt: true },
+    });
+    if (!activeSession || activeSession.revokedAt || activeSession.expiresAt <= new Date()) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+export async function extractAdminSession(
+  req: NextApiRequest
+): Promise<AdminSessionPayload | null> {
   const hasBearer =
     typeof req.headers.authorization === 'string' &&
     req.headers.authorization.toLowerCase().startsWith('bearer ');
   if (!hasBearer && !isSafeCookieRequest(req)) return null;
-  return extractAdminSessionFromHeaders({
+  return await extractAdminSessionFromHeaders({
     authorization: req.headers.authorization,
     cookie: req.headers.cookie,
   });
 }
 
-export function requireUserSession(req: NextApiRequest): AdminSessionPayload {
-  const payload = extractAdminSession(req);
+export async function requireUserSession(req: NextApiRequest): Promise<AdminSessionPayload> {
+  const payload = await extractAdminSession(req);
   if (!payload) {
     throw new Error('Unauthorized');
   }
   return payload;
 }
 
-export function requireAdminSession(req: NextApiRequest): AdminSessionPayload {
-  const payload = extractAdminSession(req);
+export async function requireAdminSession(req: NextApiRequest): Promise<AdminSessionPayload> {
+  const payload = await extractAdminSession(req);
   if (!payload || payload.isAdmin !== true) {
     throw new Error('Unauthorized');
   }
@@ -116,8 +164,8 @@ export function isSuperAdminSession(session: AdminSessionPayload | null | undefi
   return groups.includes('superadmin');
 }
 
-export function requireSuperAdminSession(req: NextApiRequest): AdminSessionPayload {
-  const payload = requireAdminSession(req);
+export async function requireSuperAdminSession(req: NextApiRequest): Promise<AdminSessionPayload> {
+  const payload = await requireAdminSession(req);
   if (!isSuperAdminSession(payload)) {
     throw new Error('Forbidden');
   }

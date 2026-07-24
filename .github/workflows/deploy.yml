@@ -1,957 +1,202 @@
-﻿name: Build and Deploy
+name: Build and Deploy
 
 on:
   push:
     branches: ['main']
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
-  group: roadmap-shared-runner
-  cancel-in-progress: true
+  group: roadmap-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Build and deploy on self-hosted
+    name: Verified production deployment
     runs-on: [self-hosted, linux, roadmap]
+    environment: production
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
     env:
+      CI: 'true'
       NEXT_TELEMETRY_DISABLED: '1'
-      PUBLIC_PROJECTS_API_KEYS: ${{ secrets.PUBLIC_PROJECTS_API_KEYS }}
-      ROADMAP_API_KEY: ${{ secrets.ROADMAP_API_KEY }}
-      # Deployment must control the root-owned PM2 daemon so the app does not run under a stale user session.
-      PM2_RUN_AS_USER: root
 
     steps:
-      - name: Check runner permissions
+      - name: Enforce dedicated unprivileged runner
         run: |
           set -euo pipefail
-          echo "=== RUNNER ENVIRONMENT ==="
-          echo "User: $(id -un) (uid=$(id -u))"
-          echo "Groups: $(id -Gn)"
-          echo "Hostname: $(hostname)"
-          if [ "$(id -u)" -ne 0 ]; then
-            echo "[WARN] Runner is not root. Killing system processes/ports may fail if owned by other users."
-          else
-            echo "[OK] Runner is running as root."
-          fi
-          echo "=========================="
-
-      - name: Prepare workspace before checkout
-        run: |
-          set -euo pipefail
-
-          workspace="${GITHUB_WORKSPACE:-$PWD}"
-          echo "Preparing workspace before checkout: $workspace"
-
-          can_sudo=0
-          if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
-            can_sudo=1
-          fi
-
-          if [ ! -d "$workspace" ]; then
-            exit 0
-          fi
-
-          if [ "$can_sudo" -eq 1 ]; then
-            sudo -n chown -R "$(id -un)":"$(id -gn)" "$workspace" || true
-            sudo -n rm -rf \
-              "$workspace/.next" \
-              "$workspace/node_modules" \
-              "$workspace/packages/entra-sso/node_modules" || true
-          else
-            rm -rf \
-              "$workspace/.next" \
-              "$workspace/node_modules" \
-              "$workspace/packages/entra-sso/node_modules" || true
-          fi
-
-          chmod -R u+rwX "$workspace" || true
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          clean: false
-
-      - name: Reset workspace state
-        run: |
-          set -euo pipefail
-
-          can_sudo=0
-          if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
-            can_sudo=1
-          fi
-
-          dbPath=""
-          for candidate in "prisma/dev.db" "prisma/prisma/dev.db"; do
-            if [ -f "$candidate" ]; then
-              dbPath="$candidate"
-              break
-            fi
-          done
-          dbBackup=""
-          if [ -n "$dbPath" ] && [ -f "$dbPath" ]; then
-            dbBackup="${RUNNER_TEMP:-/tmp}/dev.db.backup"
-            cp -f "$dbPath" "$dbBackup"
-            echo "Backed up local dev DB ($dbPath) to $dbBackup"
-          fi
-
-          echo "Resetting workspace to HEAD commit..."
-          git reset --hard HEAD
-
-          echo "Repairing workspace permissions (best effort)..."
-          if [ "$can_sudo" -eq 1 ]; then
-            sudo -n chown -R "$(id -un)":"$(id -gn)" "$GITHUB_WORKSPACE" || true
-          fi
-          chmod -R u+rwX . || true
-
-          echo "Removing common build artifacts before git clean..."
-          if [ "$can_sudo" -eq 1 ]; then
-            sudo -n rm -rf .next node_modules || true
-          else
-            rm -rf .next node_modules || true
-          fi
-
-          echo "Removing untracked files and folders..."
-          # Keep local SQLite DB files across deploy runs.
-          git clean -ffdx \
-            -e prisma/dev.db \
-            -e prisma/prisma/dev.db
-          echo "Workspace reset complete."
-
-          if [ -n "$dbPath" ] && [ -n "$dbBackup" ] && [ -f "$dbBackup" ]; then
-            mkdir -p "$(dirname "$dbPath")"
-            cp -f "$dbBackup" "$dbPath"
-            echo "Restored local dev DB to $dbPath from backup."
-          fi
-
-      - name: Configure caches/tmp (avoid small /home)
-        run: |
-          set -euo pipefail
-
-          candidates=("${GITHUB_WORKSPACE:-}" "/opt/NextJS" "/data" "/var/tmp" "/tmp")
-          best=""
-          bestAvail=0
-
-          for d in "${candidates[@]}"; do
-            [ -n "$d" ] || continue
-            [ -d "$d" ] || continue
-            avail=$(df -Pk "$d" | awk 'NR==2{print $4}')
-            avail=${avail:-0}
-            if [ "$avail" -gt "$bestAvail" ]; then
-              bestAvail="$avail"
-              best="$d"
-            fi
-          done
-
-          if [ -z "$best" ]; then
-            echo "[FAIL] Could not determine a cache root directory." >&2
+          test "$(id -u)" -ne 0 || {
+            echo 'Deployment refuses to run as root.' >&2
             exit 1
-          fi
+          }
+          test "$(id -un)" = 'roadmap' || {
+            echo 'Deployment runner must use the dedicated roadmap account.' >&2
+            exit 1
+          }
+          umask 077
 
-          cacheRoot="$best/.ci-cache"
-          echo "Selected cache root: $cacheRoot (avail_kb=$bestAvail)"
+      - name: Checkout protected revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
 
-          mkdir -p "$cacheRoot/yarn" "$cacheRoot/xdg" "$cacheRoot/tmp"
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.20.0'
+          cache: yarn
 
-          # Clean old caches to prevent accumulation on long-lived runners
-          rm -rf "$cacheRoot/yarn" "$cacheRoot/xdg" "$cacheRoot/tmp"
-          mkdir -p "$cacheRoot/yarn" "$cacheRoot/xdg" "$cacheRoot/tmp"
+      - name: Enable package manager
+        run: |
+          set -euo pipefail
+          corepack enable
+          test "$(node --version)" = 'v22.20.0'
+          test "$(yarn --version)" = '1.22.22'
 
-          echo "CI_CACHE_ROOT=$cacheRoot" >> "$GITHUB_ENV"
-          echo "YARN_CACHE_FOLDER=$cacheRoot/yarn" >> "$GITHUB_ENV"
-          echo "XDG_CACHE_HOME=$cacheRoot/xdg" >> "$GITHUB_ENV"
-          echo "TMPDIR=$cacheRoot/tmp" >> "$GITHUB_ENV"
-
-          runnerHome="$(getent passwd "$(id -un)" | cut -d: -f6 || true)"
-          if [ -z "$runnerHome" ] || [ ! -d "$runnerHome" ] || [ ! -x "$runnerHome" ]; then
-            runnerHome="$cacheRoot/home"
-          fi
-          mkdir -p "$runnerHome"
-          echo "HOME=$runnerHome" >> "$GITHUB_ENV"
-
-          sanitizedPathEntries=()
-          IFS=':' read -r -a currentPathEntries <<< "${PATH:-}"
-          for entry in "${currentPathEntries[@]}"; do
-            [ -n "$entry" ] || continue
-            if [ "$(id -u)" -ne 0 ] && [[ "$entry" == /root/* ]]; then
-              continue
-            fi
-            sanitizedPathEntries+=("$entry")
-          done
-          sanitizedPath="$(IFS=:; echo "${sanitizedPathEntries[*]}")"
-          echo "PATH=$sanitizedPath" >> "$GITHUB_ENV"
-
-          echo "Effective HOME for following steps: $runnerHome"
-          echo "Sanitized PATH for following steps: $sanitizedPath"
-
-          echo "Disk space at cache root:" 
-          df -h "$best" || true
-
-      - name: Write environment file from secret
+      - name: Materialize protected runtime configuration
         env:
-          ENV_FILE_CONTENT: ${{ secrets.env }}
+          BASE_ENV: ${{ secrets.env }}
           ENTRA_TENANT_ID: ${{ secrets.ENTRA_TENANT_ID }}
           ENTRA_CLIENT_ID: ${{ secrets.ENTRA_CLIENT_ID }}
           ENTRA_CLIENT_SECRET: ${{ secrets.ENTRA_CLIENT_SECRET }}
           ENTRA_REDIRECT_URI: ${{ secrets.ENTRA_REDIRECT_URI }}
+          ENTRA_POST_LOGOUT_REDIRECT_URI: ${{ secrets.ENTRA_POST_LOGOUT_REDIRECT_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          INTERNAL_API_SECRET: ${{ secrets.INTERNAL_API_SECRET }}
           PUBLIC_PROJECTS_API_KEYS: ${{ secrets.PUBLIC_PROJECTS_API_KEYS }}
-          ROADMAP_API_KEY: ${{ secrets.ROADMAP_API_KEY }}
           SP_KERBEROS_SERVICE_USER: ${{ secrets.SP_KERBEROS_SERVICE_USER }}
           SP_KERBEROS_SERVICE_PASSWORD: ${{ secrets.SP_KERBEROS_SERVICE_PASSWORD }}
         run: |
           set -euo pipefail
-
-          if [ -z "${ENV_FILE_CONTENT:-}" ]; then
-            echo "Secret 'env' is not set or empty." >&2
-            exit 1
-          fi
-
-          if [ -f .env ]; then
-            echo "Removing existing .env before regeneration..."
-            rm -f .env
-          fi
-
-          echo "Writing .env file to workspace root..."
-          printf "%s" "$ENV_FILE_CONTENT" > .env
-
-          # Prevent confusing overrides when the base env secret already contains ENTRA_ keys.
-          # Next.js/dotenv will take the last assignment, so duplicates can silently flip values.
-          # We treat the explicitly injected secrets below as the source of truth.
-          tmpEnvFile="$(mktemp)"
-          grep -v -E '^(ENTRA_[A-Z0-9_]+=|JWT_SECRET=|PUBLIC_PROJECTS_API_KEYS=|ROADMAP_API_KEY=|SP_USERNAME=|SP_PASSWORD=|SP_KERBEROS_SERVICE_USER=|SP_KERBEROS_SERVICE_PASSWORD=|# Microsoft Entra ID SSO injected from GitHub Actions secrets|# JWT session secret injected from GitHub Actions|# Public projects API keys injected from GH Actions|# SharePoint auth injected from GH Actions)' .env > "$tmpEnvFile" || true
-          mv "$tmpEnvFile" .env
-
-          entraLines="$(env | grep -E '^ENTRA_[A-Z0-9_]+=' || true)"
-          if [ -n "$entraLines" ]; then
-            printf "\n# Microsoft Entra ID SSO injected from GitHub Actions secrets\n" >> .env
-            printf "%s\n" "$entraLines" >> .env
-          fi
-
-          effectivePublicProjectsApiKeys="${PUBLIC_PROJECTS_API_KEYS:-${ROADMAP_API_KEY:-}}"
-
-          if [ -n "$effectivePublicProjectsApiKeys" ] || [ -n "${ROADMAP_API_KEY:-}" ]; then
-            printf "\n# Public projects API keys injected from GH Actions\n" >> .env
-            if [ -n "$effectivePublicProjectsApiKeys" ]; then
-              printf "PUBLIC_PROJECTS_API_KEYS=%s\n" "$effectivePublicProjectsApiKeys" >> .env
-            fi
-            if [ -n "${ROADMAP_API_KEY:-}" ]; then
-              printf "ROADMAP_API_KEY=%s\n" "$ROADMAP_API_KEY" >> .env
-            fi
-          fi
-
-          read_env_value() {
-            local key="$1"
-            awk -F= -v k="$key" '
-              $0 ~ "^[[:space:]]*"k"=" {
-                sub(/^[^=]*=/, "", $0);
-                val=$0
-              }
-              END { if (val != "") print val }
-            ' .env
+          umask 077
+          node <<'NODE'
+          const fs = require('node:fs');
+          const overrideKeys = [
+            'ENTRA_TENANT_ID',
+            'ENTRA_CLIENT_ID',
+            'ENTRA_CLIENT_SECRET',
+            'ENTRA_REDIRECT_URI',
+            'ENTRA_POST_LOGOUT_REDIRECT_URI',
+            'JWT_SECRET',
+            'INTERNAL_API_SECRET',
+            'PUBLIC_PROJECTS_API_KEYS',
+            'SP_KERBEROS_SERVICE_USER',
+            'SP_KERBEROS_SERVICE_PASSWORD',
+          ];
+          const requiredOverrides = [
+            'ENTRA_TENANT_ID',
+            'ENTRA_CLIENT_ID',
+            'ENTRA_CLIENT_SECRET',
+            'ENTRA_REDIRECT_URI',
+            'JWT_SECRET',
+            'INTERNAL_API_SECRET',
+            'SP_KERBEROS_SERVICE_USER',
+            'SP_KERBEROS_SERVICE_PASSWORD',
+          ];
+          for (const key of requiredOverrides) {
+            if (!process.env[key]) throw new Error(`Required production secret is missing: ${key}`);
           }
-
-          write_quoted_env_value() {
-            local key="$1"
-            local value="$2"
-            local escaped="$value"
-            escaped="${escaped//\"/\\\"}"
-            escaped="${escaped//$'\n'/\\n}"
-            printf '%s="%s"\n' "$key" "$escaped" >> .env
+          if (process.env.JWT_SECRET.length < 32 || process.env.INTERNAL_API_SECRET.length < 32) {
+            throw new Error('JWT_SECRET and INTERNAL_API_SECRET must contain at least 32 characters');
           }
+          const keyPattern = new RegExp(`^(?:${overrideKeys.join('|')})=`);
+          const base = String(process.env.BASE_ENV || '')
+            .split(/\r?\n/)
+            .filter((line) => !keyPattern.test(line.trim()))
+            .join('\n');
+          const overrides = overrideKeys
+            .filter((key) => process.env[key])
+            .map((key) => `${key}=${JSON.stringify(process.env[key])}`)
+            .join('\n');
+          fs.writeFileSync('.env', `${base}\n${overrides}\n`, { mode: 0o600 });
+          NODE
+          chmod 600 .env
 
-          if [ -z "${JWT_SECRET:-}" ]; then
-            echo "[FAIL] GitHub Actions secret JWT_SECRET is missing." >&2
-            echo "[FAIL] Add a repository or environment secret named JWT_SECRET (at least 32 random characters)." >&2
-            exit 1
-          fi
-          if [ "${#JWT_SECRET}" -lt 32 ]; then
-            echo "[FAIL] GitHub Actions secret JWT_SECRET must contain at least 32 characters." >&2
-            exit 1
-          fi
-          case "$JWT_SECRET" in
-            roadmap-secret-change-in-production|your-secure-random-string-here-minimum-32-characters)
-              echo "[FAIL] GitHub Actions secret JWT_SECRET contains a known placeholder value." >&2
-              exit 1
-              ;;
-          esac
-
-          printf "\n# JWT session secret injected from GitHub Actions\n" >> .env
-          write_quoted_env_value "JWT_SECRET" "$JWT_SECRET"
-          echo "Effective JWT_SECRET in generated .env: <set and validated>"
-
-          # Runtime kerberos proxy and NTLM fallback both read SP_KERBEROS_SERVICE_* directly.
-          serviceUserSource="missing"
-          servicePassSource="missing"
-
-          serviceUser="${SP_KERBEROS_SERVICE_USER:-$(read_env_value SP_KERBEROS_SERVICE_USER || true)}"
-          servicePass="${SP_KERBEROS_SERVICE_PASSWORD:-$(read_env_value SP_KERBEROS_SERVICE_PASSWORD || true)}"
-
-          if [ -n "${SP_KERBEROS_SERVICE_USER:-}" ]; then
-            serviceUserSource="github-secret:SP_KERBEROS_SERVICE_USER"
-          elif [ -n "$serviceUser" ]; then
-            serviceUserSource="base-env:SP_KERBEROS_SERVICE_USER"
-          fi
-
-          if [ -n "${SP_KERBEROS_SERVICE_PASSWORD:-}" ]; then
-            servicePassSource="github-secret:SP_KERBEROS_SERVICE_PASSWORD"
-          elif [ -n "$servicePass" ]; then
-            servicePassSource="base-env:SP_KERBEROS_SERVICE_PASSWORD"
-          fi
-
-          printf "\n# SharePoint auth injected from GH Actions\n" >> .env
-          if [ -n "$serviceUser" ]; then
-            write_quoted_env_value "SP_KERBEROS_SERVICE_USER" "$serviceUser"
-          fi
-          if [ -n "$servicePass" ]; then
-            write_quoted_env_value "SP_KERBEROS_SERVICE_PASSWORD" "$servicePass"
-          fi
-
-          # Diagnostic (safe): show the effective redirect URI and auth mode that ended up in the file.
-          effectiveRedirect="$(grep -E '^ENTRA_REDIRECT_URI=' .env | tail -n 1 || true)"
-          effectiveStrategy="$(grep -E '^SP_STRATEGY=' .env | tail -n 1 || true)"
-          effectiveServiceUser="$(grep -E '^SP_KERBEROS_SERVICE_USER=' .env | tail -n 1 || true)"
-          envFingerprint="$(sha256sum .env | awk '{print $1}' | cut -c1-16)"
-          envMtime="$(stat -c '%y' .env 2>/dev/null || ls -l --time-style=full-iso .env | awk '{print $6" "$7}')"
-
-          echo "Generated .env fingerprint: ${envFingerprint:-<unavailable>}"
-          echo "Generated .env modified at: ${envMtime:-<unavailable>}"
-          echo "Effective ENTRA_REDIRECT_URI in generated .env: ${effectiveRedirect:-<not set>}"
-          echo "Effective SP_STRATEGY in generated .env: ${effectiveStrategy:-<not set>}"
-          echo "Effective SP_KERBEROS_SERVICE_USER in generated .env: ${effectiveServiceUser:-<not set>}"
-          echo "SP_KERBEROS_SERVICE_USER source: ${serviceUserSource}"
-          echo "SP_KERBEROS_SERVICE_PASSWORD source: ${servicePassSource}"
-          if grep -q -E '^SP_KERBEROS_SERVICE_USER=' .env; then
-            echo "Effective SP_KERBEROS_SERVICE_PASSWORD in generated .env: <set>"
-          else
-            echo "Effective SP_KERBEROS_SERVICE_PASSWORD in generated .env: <not set>"
-          fi
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Verify Node.js runtime
+      - name: Reject unsafe production configuration
         run: |
           set -euo pipefail
-          node -p "process.versions.node"
-          node -e "require('async_hooks'); console.log('async_hooks module available')"
+          node <<'NODE'
+          require('dotenv').config({ path: '.env' });
+          const required = [
+            'APP_ORIGIN',
+            'DATABASE_URL',
+            'ENTRA_REDIRECT_URI',
+            'INTERNAL_API_BASE_URL',
+            'CLAMAV_HOST',
+          ];
+          for (const key of required) {
+            if (!process.env[key]) throw new Error(`Required production setting is missing: ${key}`);
+          }
+          for (const key of [
+            'SP_ALLOW_SELF_SIGNED',
+            'SP_TLS_FALLBACK_INSECURE',
+            'SP_PROXY_DEBUG',
+            'SP_CURL_VERBOSE',
+            'ENABLE_SECURITY_DEBUG_ENDPOINTS',
+          ]) {
+            if (process.env[key] === 'true') throw new Error(`Unsafe production setting: ${key}`);
+          }
+          if (process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0') {
+            throw new Error('TLS certificate verification cannot be disabled');
+          }
+          const db = process.env.DATABASE_URL;
+          if (db.startsWith('file:./') || db.startsWith('file:../')) {
+            throw new Error('Production SQLite must use an absolute path outside the checkout workspace');
+          }
+          NODE
 
-      - name: Enable Corepack and verify Yarn runtime
+      - name: Install locked dependencies
+        run: yarn install --frozen-lockfile --non-interactive --production=false
+
+      - name: Apply reviewed database migrations
         run: |
           set -euo pipefail
-          corepack enable
-          yarn --version
-
-      - name: Install Linux prerequisites (RHEL)
-        run: |
-          set -euo pipefail
-
-          needPkgs=()
-          command -v curl >/dev/null 2>&1 || needPkgs+=(curl)
-          command -v lsof >/dev/null 2>&1 || needPkgs+=(lsof)
-          command -v ss   >/dev/null 2>&1 || needPkgs+=(iproute)
-
-          if [ ${#needPkgs[@]} -eq 0 ]; then
-            echo "All prerequisites already installed."
-            exit 0
-          fi
-
-          echo "Missing tools detected; will try to install: ${needPkgs[*]}"
-
-          installer=""
-          if command -v dnf >/dev/null 2>&1; then
-            installer="dnf"
-          elif command -v yum >/dev/null 2>&1; then
-            installer="yum"
-          else
-            echo "[WARN] Neither dnf nor yum found; cannot auto-install packages." >&2
-            exit 0
-          fi
-
-          if command -v sudo >/dev/null 2>&1; then
-            if ! sudo -n true 2>/dev/null; then
-              echo "[FAIL] sudo is present but not passwordless/non-interactive for this runner." >&2
-              echo "[FAIL] Configure passwordless sudo for the runner user, or run the runner as root." >&2
-              exit 1
-            fi
-            sudo -n "$installer" -y install "${needPkgs[@]}"
-          elif [ "$(id -u)" -eq 0 ]; then
-            "$installer" -y install "${needPkgs[@]}"
-          else
-            echo "[FAIL] No sudo/root available; cannot install required packages." >&2
-            echo "[FAIL] Please install manually on the runner and re-run: ${needPkgs[*]}" >&2
-            exit 1
-          fi
-
-          # Verify after install
-          missingAfter=()
-          command -v curl >/dev/null 2>&1 || missingAfter+=(curl)
-          command -v lsof >/dev/null 2>&1 || missingAfter+=(lsof)
-          command -v ss   >/dev/null 2>&1 || missingAfter+=(ss)
-          if [ ${#missingAfter[@]} -ne 0 ]; then
-            echo "[FAIL] Required tools still missing after install attempt: ${missingAfter[*]}" >&2
-            exit 1
-          fi
-
-      - name: Show disk space (before)
-        run: |
-          set -euo pipefail
-          echo "Disk space before:"
-          df -h .
-
-      - name: Clean Yarn cache
-        run: |
-          set -euo pipefail
-          yarn cache clean || true
-
-      - name: Free up disk space (caches, logs, artifacts)
-        run: |
-          set -euo pipefail
-
-          if [ -d "$HOME/.pm2/logs" ]; then
-            rm -f "$HOME/.pm2/logs"/* || true
-          fi
-
-          rm -rf .next node_modules
-          echo "Workspace artifacts removed."
-
-      - name: Verify cleanup
-        run: |
-          set -euo pipefail
-          remaining=""
-          [ -e .next ] && remaining="$remaining .next"
-          [ -e node_modules ] && remaining="$remaining node_modules"
-          if [ -n "$remaining" ]; then
-            echo "Cleanup failed, remaining paths:$remaining" >&2
-            exit 1
-          fi
-          echo "No stale workspace artifacts detected."
-
-      - name: Show disk space (after cleanup)
-        run: |
-          set -euo pipefail
-          echo "Disk space after cleanup:"
-          df -h .
-
-      - name: Force remove stale node_modules directory
-        run: |
-          set -euo pipefail
-          if [ -d node_modules ]; then
-            echo "Removing existing node_modules..."
-            rm -rf node_modules
-          else
-            echo "node_modules directory not present."
-          fi
-
-      - name: Install dependencies
-        run: |
-          set -euo pipefail
-          # Install dev dependencies even if NODE_ENV is set globally on the runner.
-          yarn install --frozen-lockfile --non-interactive --production=false
-
-      - name: Verify runtime modules are present
-        run: |
-          set -euo pipefail
-
-          test -d node_modules || { echo "[FAIL] node_modules missing after install" >&2; exit 1; }
-
-          node -e "const mods=['next','react','react-dom','@roadmap/entra-sso','@prisma/client','undici']; for (const m of mods){ try { require.resolve(m); console.log('[OK] module found:', m); } catch (e) { console.error('[FAIL] missing module:', m); process.exit(1); } }"
-
-      - name: Prepare Prisma database
-        env:
-          NODE_ENV: production
-        run: |
-          set -euo pipefail
-
-          echo "Running prisma migrate deploy..."
-
-          dbUrl="${DATABASE_URL:-}"
-          if [ -z "$dbUrl" ] && [ -f .env ]; then
-            dbUrl="$(grep -E '^\s*DATABASE_URL\s*=' .env | head -n 1 | sed -E 's/^\s*DATABASE_URL\s*=\s*//')"
-            dbUrl="${dbUrl%$'\r'}"
-            dbUrl="${dbUrl#\"}"
-            dbUrl="${dbUrl%\"}"
-            dbUrl="${dbUrl#\'}"
-            dbUrl="${dbUrl%\'}"
-          fi
-
-          isFileDb="false"
-          dbFilePath=""
-          if [[ "$dbUrl" == file:* ]]; then
-            isFileDb="true"
-            dbFilePath="${dbUrl#file:}"
-            dbFilePath="${dbFilePath#./}"
-            if [[ "$dbFilePath" != /* ]]; then
-              dbFilePath="${GITHUB_WORKSPACE:-$(pwd)}/$dbFilePath"
-            fi
-            mkdir -p "$(dirname "$dbFilePath")"
-            if [ ! -f "$dbFilePath" ]; then
-              echo "SQLite DB file not found. Creating empty DB at $dbFilePath"
-              : > "$dbFilePath"
-            fi
-          fi
-
-          deployOutput=""
-          if ! deployOutput="$(yarn prisma migrate deploy 2>&1)"; then
-            echo "$deployOutput" >&2
-
-            if [ "$isFileDb" = "true" ]; then
-              if echo "$deployOutput" | grep -q "P3005"; then
-                echo "[WARN] P3005: SQLite DB exists without migration history. Aligning schema via db push and baselining migrations..." >&2
-
-                # Ensure the schema matches the current Prisma schema first.
-                yarn prisma db push --accept-data-loss
-
-                # Then baseline migration history so future deploys can use migrate deploy.
-                for migDir in prisma/migrations/*/; do
-                  migName="$(basename "$migDir")"
-                  yarn prisma migrate resolve --applied "$migName" || true
-                done
-
-                # No-op (should be up-to-date), but keeps logs consistent.
-                yarn prisma migrate deploy || true
-              else
-                echo "[WARN] prisma migrate deploy failed. Trying prisma db push --accept-data-loss (SQLite fallback)." >&2
-                yarn prisma db push --accept-data-loss
-              fi
-            else
-              echo "prisma migrate deploy failed and no safe fallback is available." >&2
-              exit 1
-            fi
-          else
-            echo "$deployOutput"
-            echo "Prisma migrations applied successfully."
-          fi
-
-          echo "Generating Prisma client..."
           yarn prisma generate
+          yarn prisma migrate deploy
 
-      - name: Build application
+      - name: Run verification gates
+        run: |
+          set -euo pipefail
+          yarn tsc --noEmit
+          yarn lint --max-warnings 100
+          yarn test:security
+          yarn audit --groups dependencies --level low
+
+      - name: Build production bundle
         env:
           NODE_ENV: production
-        run: |
-          set -euo pipefail
-          yarn build
+        run: yarn build
 
-      - name: Verify Next.js build output exists
-        run: |
-          set -euo pipefail
-          if [ ! -d .next ]; then
-            echo "Error: .next build directory not found. Build likely failed." >&2
-            exit 1
-          fi
-          if [ ! -f .next/BUILD_ID ]; then
-            echo "Error: .next/BUILD_ID missing. Build output is incomplete." >&2
-            find .next -maxdepth 3 -type f | head -n 120 || true
-            exit 1
-          fi
-          if [ ! -f .next/server/pages/_error.js ]; then
-            echo "Error: .next/server/pages/_error.js missing. Build output is incomplete/corrupted." >&2
-            find .next -maxdepth 5 -type f | head -n 200 || true
-            exit 1
-          fi
-          echo "Found complete .next build artifacts (BUILD_ID + _error.js)."
-
-      - name: Set PM2 HOME and environment
-        run: |
-          set -euo pipefail
-          requestedPm2User="${PM2_RUN_AS_USER:-}"
-          currentUser="$(id -un)"
-          canSudo=0
-          if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
-            canSudo=1
-          fi
-
-          pm2User="$requestedPm2User"
-          if [ -z "$pm2User" ]; then
-            echo "[FAIL] PM2_RUN_AS_USER must be set for deployment." >&2
-            exit 1
-          fi
-
-          if [ "$pm2User" = "root" ] && [ "$(id -u)" -ne 0 ] && [ "$canSudo" -ne 1 ]; then
-            echo "[FAIL] Root PM2 management requires either a root runner or passwordless sudo." >&2
-            exit 1
-          fi
-
-          if [ -n "$pm2User" ] && [ "$pm2User" != "$currentUser" ] && [ "$(id -u)" -ne 0 ] && [ "$canSudo" -ne 1 ]; then
-            echo "[FAIL] PM2_RUN_AS_USER=$pm2User requires passwordless sudo on this runner." >&2
-            exit 1
-          fi
-
-          if [ "$pm2User" = "$currentUser" ]; then
-            pm2Home="${HOME:-${GITHUB_WORKSPACE:-$(pwd)}}/.pm2"
-          elif [ "$pm2User" = "root" ]; then
-            pm2Home="/root/.pm2"
-          else
-            pm2Home="/home/$pm2User/.pm2"
-          fi
-
-          echo "PM2_RUN_AS_USER=$pm2User" >> "$GITHUB_ENV"
-          echo "Setting PM2_HOME to: $pm2Home"
-
-          if [ -n "$pm2User" ]; then
-            if [ "$(id -u)" -eq 0 ]; then
-              mkdir -p "$pm2Home"
-              if [ "$pm2User" != "root" ]; then
-                chown -R "$pm2User":"$pm2User" "$pm2Home" || true
-              fi
-            else
-              sudo -n mkdir -p "$pm2Home"
-              if [ "$pm2User" != "root" ]; then
-                sudo -n chown -R "$pm2User":"$pm2User" "$pm2Home" || true
-              fi
-            fi
-          else
-            mkdir -p "$pm2Home"
-          fi
-          echo "PM2_HOME=$pm2Home" >> "$GITHUB_ENV"
-
-      - name: Install PM2 in executable workspace
-        run: |
-          set -euo pipefail
-
-          pm2ToolDir="$GITHUB_WORKSPACE/.ci-tools/pm2"
-          rm -rf "$pm2ToolDir"
-          mkdir -p "$pm2ToolDir"
-
-          npm install \
-            --prefix "$pm2ToolDir" \
-            --no-audit \
-            --no-fund \
-            --package-lock=false \
-            pm2@6.0.14
-
-          nodeBin="$(command -v node)"
-          pm2Script="$pm2ToolDir/node_modules/pm2/bin/pm2"
-          pm2Bin="$pm2ToolDir/pm2-wrapper"
-
-          if [ ! -x "$nodeBin" ]; then
-            echo "[FAIL] Node.js binary not found." >&2
-            exit 1
-          fi
-
-          if [ ! -f "$pm2Script" ]; then
-            echo "[FAIL] PM2 script not found at $pm2Script" >&2
-            find "$pm2ToolDir" -maxdepth 5 -type f -name 'pm2*' -print || true
-            exit 1
-          fi
-
-          printf '#!/bin/bash\nexec %q %q "$@"\n' \
-            "$nodeBin" \
-            "$pm2Script" \
-            > "$pm2Bin"
-
-          chmod 755 "$pm2Bin"
-
-          echo "Node binary: $nodeBin"
-          echo "PM2 script: $pm2Script"
-          echo "PM2 wrapper: $pm2Bin"
-
-                    installedVersion="$(
-            "$nodeBin" \
-              -e 'console.log(require(process.argv[1]).version)' \
-              "$pm2ToolDir/node_modules/pm2/package.json"
-          )"
-
-          if [ "$installedVersion" != "6.0.14" ]; then
-            echo "[FAIL] Unexpected PM2 version: $installedVersion" >&2
-            exit 1
-          fi
-
-          echo "PM2_BIN=$pm2Bin" >> "$GITHUB_ENV"
-          echo "[OK] PM2 installed and executable."
-
-      - name: Stop existing instance and free port 3000
-        run: |
-          set -euo pipefail
-
-          pm2cmd() {
-            pm2Bin="${PM2_BIN:-pm2}"
-            targetUser="${PM2_RUN_AS_USER:-}"
-            currentUser="$(id -un)"
-            if [ -n "$targetUser" ] && [ "$targetUser" != "$currentUser" ]; then
-              sudo -n -u "$targetUser" -H env PM2_HOME="$PM2_HOME" "$pm2Bin" "$@"
-            else
-              "$pm2Bin" "$@"
-            fi
-          }
-
-          appName="roadmap-app"
-
-          describe_port_3000() {
-            echo "Port 3000 listeners (lsof):"
-            lsof -nP -iTCP:3000 -sTCP:LISTEN || true
-            echo "Port 3000 listeners (ss):"
-            ss -ltnp 2>/dev/null | grep ':3000' || true
-          }
-
-          echo "=== STOPPING ONLY: $appName ==="
-          if pm2cmd describe "$appName" >/dev/null 2>&1; then
-            pm2cmd stop "$appName" || true
-            pm2cmd delete "$appName" || true
-          else
-            echo "PM2 app '$appName' not found; nothing to stop."
-          fi
-
-          echo "Verifying port 3000 is free (will NOT kill other processes)..."
-          # If something else is listening on 3000, fail fast rather than killing unrelated services.
-          if ss -ltnp 2>/dev/null | grep -q ':3000'; then
-            echo "[FAIL] Port 3000 is still in use after stopping '$appName'." >&2
-            describe_port_3000
-            exit 1
-          fi
-
-          echo "=== APP STOP COMPLETE ==="
-
-      - name: Verify PM2 environment
-        run: |
-          set -euo pipefail
-          echo "PM2_HOME: ${PM2_HOME:-}"
-          echo "HOME: ${HOME:-}"
-          echo "PM2_RUN_AS_USER: ${PM2_RUN_AS_USER:-}"
-          echo "Checking PM2 home directory..."
-          if [ -z "${PM2_HOME:-}" ]; then
-            echo "[FAIL] PM2_HOME is not set." >&2
-            exit 1
-          fi
-
-          targetUser="${PM2_RUN_AS_USER:-}"
-          currentUser="$(id -un)"
-
-          if [ -n "$targetUser" ] && [ "$targetUser" != "$currentUser" ]; then
-            if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
-              echo "[FAIL] PM2_RUN_AS_USER=$targetUser requires passwordless sudo on this runner." >&2
-              exit 1
-            fi
-            if sudo -n test -d "$PM2_HOME" 2>/dev/null; then
-              echo "[OK] PM2_HOME exists (via sudo): $PM2_HOME"
-              sudo -n ls -la "$PM2_HOME" || true
-            else
-              echo "Creating PM2_HOME (via sudo): $PM2_HOME"
-              sudo -n mkdir -p "$PM2_HOME"
-              sudo -n ls -la "$PM2_HOME" || true
-            fi
-          else
-            if [ -d "$PM2_HOME" ]; then
-              echo "[OK] PM2_HOME exists: $PM2_HOME"
-              ls -la "$PM2_HOME" || true
-            else
-              echo "Creating PM2_HOME: $PM2_HOME"
-              mkdir -p "$PM2_HOME"
-            fi
-          fi
-
-      - name: Start app on port 3000 with PM2
+      - name: Restart only the roadmap service
         env:
-          RUNNER_TRACKING_ID: ''
           NODE_ENV: production
-          PORT: 3000
+          PORT: '3000'
         run: |
           set -euo pipefail
-          pm2cmd() {
-            pm2Bin="${PM2_BIN:-pm2}"
-            targetUser="${PM2_RUN_AS_USER:-}"
-            currentUser="$(id -un)"
-            if [ -n "$targetUser" ] && [ "$targetUser" != "$currentUser" ]; then
-              sudo -n -u "$targetUser" -H env PM2_HOME="$PM2_HOME" "$pm2Bin" "$@"
-            else
-              "$pm2Bin" "$@"
-            fi
+          test -x node_modules/.bin/pm2 || {
+            echo 'Locked PM2 binary is missing.' >&2
+            exit 1
           }
-          echo "=== STARTING APPLICATION ==="
-          echo "PM2_HOME: ${PM2_HOME:-}"
+          export PM2_HOME="$HOME/.pm2"
+          node_modules/.bin/pm2 startOrRestart ecosystem.config.js --only roadmap-app --update-env
+          node_modules/.bin/pm2 save
 
-          echo "(Re)starting only roadmap-app via ecosystem config..."
-          pm2cmd start ecosystem.config.js --only roadmap-app --update-env
-
-          echo "Waiting 10 seconds for app to initialize..."
-          sleep 10
-          echo "=== START COMPLETE ==="
-
-      - name: Save PM2 process list
+      - name: Verify local readiness
         run: |
           set -euo pipefail
-          currentUser="$(id -un)"
-          if [ -n "${PM2_RUN_AS_USER:-}" ] && [ "${PM2_RUN_AS_USER}" != "$currentUser" ]; then
-            pm2Bin="${PM2_BIN:-pm2}"
-            sudo -n -u "$PM2_RUN_AS_USER" -H env PM2_HOME="$PM2_HOME" "$pm2Bin" save
-          else
-            pm2Bin="${PM2_BIN:-pm2}"
-            "$pm2Bin" save
-          fi
-
-      - name: Show PM2 status and recent logs
-        run: |
-          set -euo pipefail
-          pm2cmd() {
-            pm2Bin="${PM2_BIN:-pm2}"
-            targetUser="${PM2_RUN_AS_USER:-}"
-            currentUser="$(id -un)"
-            if [ -n "$targetUser" ] && [ "$targetUser" != "$currentUser" ]; then
-              sudo -n -u "$targetUser" -H env PM2_HOME="$PM2_HOME" "$pm2Bin" "$@"
-            else
-              "$pm2Bin" "$@"
+          for attempt in $(seq 1 24); do
+            code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 5 http://127.0.0.1:3000/api/health/ready || true)"
+            if [ "$code" != '000' ] && [ -n "$code" ]; then
+              echo "Roadmap is reachable (HTTP $code)."
+              exit 0
             fi
-          }
-
-          pm2cmd status
-          pm2cmd describe roadmap-app
-          echo -e "\nRecent logs:"
-          pm2cmd logs roadmap-app --lines 100 --nostream
-          echo -e "\nChecking port 3000..."
-          ss -ltnp 2>/dev/null | grep ':3000' || true
-
-      - name: Ensure app is online
-        run: |
-          set -euo pipefail
-          pm2cmd() {
-            pm2Bin="${PM2_BIN:-pm2}"
-            targetUser="${PM2_RUN_AS_USER:-}"
-            currentUser="$(id -un)"
-            if [ -n "$targetUser" ] && [ "$targetUser" != "$currentUser" ]; then
-              sudo -n -u "$targetUser" -H env PM2_HOME="$PM2_HOME" "$pm2Bin" "$@"
-            else
-              "$pm2Bin" "$@"
-            fi
-          }
-          echo "Checking if app is online (PM2 status + local HTTP/TCP readiness)..."
-
-          read_env_value() {
-            local key="$1"
-            if [ ! -f .env ]; then
-              return 0
-            fi
-            awk -F= -v k="$key" '
-              $0 ~ "^[[:space:]]*"k"=" {
-                sub(/^[^=]*=/, "", $0);
-                val=$0
-              }
-              END { if (val != "") print val }
-            ' .env
-          }
-
-          sanitize_env_value() {
-            local v="$1"
-            v="${v%\"}"
-            v="${v#\"}"
-            v="${v%\'}"
-            v="${v#\'}"
-            echo "$v"
-          }
-
-          get_pm2_status() {
-            pm2cmd jlist 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{try{const arr=JSON.parse(s);const app=arr.find(x=>x && x.name==='roadmap-app');process.stdout.write((app && app.pm2_env && app.pm2_env.status) ? String(app.pm2_env.status) : '');}catch(_){process.stdout.write('');}})"
-          }
-
-          get_pm2_pid() {
-            pm2cmd jlist 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>{try{const arr=JSON.parse(s);const app=arr.find(x=>x && x.name==='roadmap-app');const pid=(app && typeof app.pid !== 'undefined') ? app.pid : '';process.stdout.write(String(pid || ''));}catch(_){process.stdout.write('');}})"
-          }
-
-          get_listener_pid() {
-            lsof -tiTCP:3000 -sTCP:LISTEN 2>/dev/null | head -n 1 || true
-          }
-
-          describe_port_3000() {
-            echo "Port 3000 listeners (lsof):"
-            lsof -nP -iTCP:3000 -sTCP:LISTEN || true
-            echo "Port 3000 listeners (ss):"
-            ss -ltnp 2>/dev/null | grep ':3000' || true
-          }
-
-          check_http_ready() {
-            local path
-            for path in "$@"; do
-              local url="http://127.0.0.1:3000${path}"
-              local code
-              code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "$url" || true)"
-              # Any HTTP code except 000 means the app process is reachable.
-              if [ -n "$code" ] && [ "$code" != "000" ]; then
-                echo "[OK] HTTP reachable at $url (status=$code)"
-                return 0
-              fi
-            done
-            return 1
-          }
-
-          deploymentEnv="$(sanitize_env_value "${NEXT_PUBLIC_DEPLOYMENT_ENV:-$(read_env_value NEXT_PUBLIC_DEPLOYMENT_ENV || true)}")"
-          if [ -z "$deploymentEnv" ]; then
-            deploymentEnv="${NODE_ENV:-production}"
-          fi
-          deploymentEnv="$(echo "$deploymentEnv" | tr '[:upper:]' '[:lower:]')"
-
-          if [ "$deploymentEnv" = "production" ]; then
-            rawBasePath="$(sanitize_env_value "$(read_env_value NEXT_PUBLIC_BASE_PATH_PROD || true)")"
-          else
-            rawBasePath="$(sanitize_env_value "$(read_env_value NEXT_PUBLIC_BASE_PATH_DEV || true)")"
-          fi
-
-          basePath="${rawBasePath%/}"
-          if [ -n "$basePath" ] && [ "${basePath#/}" = "$basePath" ]; then
-            basePath="/$basePath"
-          fi
-
-          candidatePaths=("/api/health/ready" "/" "/api/health/sharepoint")
-          if [ -n "$basePath" ] && [ "$basePath" != "/" ]; then
-            candidatePaths=("$basePath/api/health/ready" "$basePath" "$basePath/" "$basePath/api/health/sharepoint" "/api/health/ready" "/" "/api/health/sharepoint")
-          fi
-
-          echo "Resolved deployment env: $deploymentEnv"
-          echo "Resolved base path: ${basePath:-<none>}"
-
-          maxAttempts=24
-          attempt=0
-          isOnline=false
-          printedErrorLogs=false
-
-          while [ "$attempt" -lt "$maxAttempts" ] && [ "$isOnline" != "true" ]; do
-            attempt=$((attempt + 1))
-            status="$(get_pm2_status)"
-            pm2Pid="$(get_pm2_pid)"
-            listenerPid="$(get_listener_pid)"
-            echo "Health check attempt $attempt/$maxAttempts (pm2 status: ${status:-unknown}, pm2 pid: ${pm2Pid:-<none>}, listener pid: ${listenerPid:-<none>})"
-
-            if ss -ltn 2>/dev/null | grep -q ':3000'; then
-              if check_http_ready "${candidatePaths[@]}"; then
-                isOnline=true
-                echo "[OK] App is reachable on local HTTP readiness paths."
-                if [ "$status" = "online" ]; then
-                  echo "[OK] App is online under PM2 and reachable on port 3000."
-                elif [ -n "$pm2Pid" ] && [ "$pm2Pid" != "0" ] && [ -n "$listenerPid" ] && [ "$listenerPid" = "$pm2Pid" ]; then
-                  echo "[OK] App is reachable on port 3000 and the listener matches the PM2 process PID."
-                else
-                  echo "[WARN] App is reachable, but PM2 status/PID correlation is not strict yet. Continuing with successful readiness."
-                  describe_port_3000
-                fi
-                break
-              fi
-            fi
-
-            if [ "$printedErrorLogs" = "false" ] && [[ "$status" =~ ^(stopped|stopping|errored)$ ]]; then
-              echo "[WARN] PM2 reports '$status', showing logs once for diagnostics..."
-              pm2cmd logs roadmap-app --lines 80 --nostream || true
-              printedErrorLogs=true
-            fi
-
-            if [ "$attempt" -lt "$maxAttempts" ]; then
-              sleep 5
-            fi
+            sleep 5
           done
-
-          if [ "$isOnline" != "true" ]; then
-            echo "[FAIL] App failed to come online after $maxAttempts attempts" >&2
-            echo -e "\nFinal PM2 status:"
-            pm2cmd status || true
-            echo -e "\nFull PM2 describe:"
-            pm2cmd describe roadmap-app || true
-            echo -e "\nRecent logs:"
-            pm2cmd logs roadmap-app --lines 200 --nostream || true
-            echo -e "\nPort check:"
-            describe_port_3000
-            exit 1
-          fi
-
-          echo -e "\n[OK] Deployment successful!"
+          echo 'Roadmap failed its local readiness check.' >&2
+          exit 1

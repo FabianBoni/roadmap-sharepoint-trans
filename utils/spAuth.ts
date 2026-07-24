@@ -1,6 +1,4 @@
 ﻿import https from 'https';
-import path from 'path';
-import fs from 'fs';
 import crypto from 'crypto';
 import { Buffer } from 'buffer';
 
@@ -8,6 +6,7 @@ import { resolveSharePointSiteUrl } from './sharepointEnv';
 import { normalizeSharePointStrategy } from './sharePointStrategy';
 import { getPrimaryCredentials } from './userCredentials';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
+import { assertInstanceTlsPolicy } from './tlsPolicy';
 
 export interface SharePointAuthContext {
   headers: Record<string, string>;
@@ -32,41 +31,11 @@ const buildCacheKey = (params: { siteUrl: string; strategy: string; username?: s
     .digest('hex');
 };
 
-const getTrustedCaPath = (instance?: RoadmapInstanceConfig | null): string | undefined => {
-  const candidate = instance?.sharePoint?.trustedCaPath || process.env.SP_TRUSTED_CA_PATH;
-  if (!candidate) return undefined;
-  return candidate.trim() || undefined;
-};
-
-const applyTlsSettings = (instance?: RoadmapInstanceConfig | null) => {
-  const allowSelfSigned =
-    instance?.sharePoint?.allowSelfSigned === true ||
-    process.env.SP_ALLOW_SELF_SIGNED === 'true' ||
-    process.env.SP_TLS_FALLBACK_INSECURE === 'true';
-
-  if (allowSelfSigned) {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    return;
-  }
-
-  const trustedCa = getTrustedCaPath(instance);
-  if (!trustedCa) {
-    delete process.env.NODE_EXTRA_CA_CERTS;
-    return;
-  }
-
-  const baseDir = typeof process.cwd === 'function' ? process.cwd() : '.';
-  const caPath = path.isAbsolute(trustedCa) ? trustedCa : path.join(baseDir, trustedCa);
-  if (fs.existsSync(caPath)) {
-    process.env.NODE_EXTRA_CA_CERTS = caPath;
-  }
-};
-
 export async function getSharePointAuthHeaders(
   instance?: RoadmapInstanceConfig | null
 ): Promise<SharePointAuthContext> {
   const inst = instance || null;
-  applyTlsSettings(inst);
+  assertInstanceTlsPolicy(inst);
 
   const siteUrl = resolveSharePointSiteUrl(inst || undefined);
   const strategy = normalizeSharePointStrategy(inst?.sharePoint?.strategy, process.env.SP_STRATEGY);

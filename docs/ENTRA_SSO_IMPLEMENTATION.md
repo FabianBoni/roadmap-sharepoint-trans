@@ -1,5 +1,9 @@
 # Microsoft Entra SSO Implementation
 
+> Für eine neue Implementierung oder die Übergabe an eine KI ist
+> [`SSO_PORTING_SPEC.md`](./SSO_PORTING_SPEC.md) der kanonische technische Vertrag. Diese Datei
+> ergänzt ihn um Architekturkontext und die historische Herleitung der Sicherheitsmaßnahmen.
+
 Diese Datei beschreibt, wie Microsoft Entra SSO in diesem Repo umgesetzt ist und welche Teile du fuer andere Repos direkt uebernehmen kannst.
 
 ## Zielbild
@@ -29,7 +33,7 @@ Die wichtigsten Bausteine darin:
 - [`packages/entra-sso/src/core/pkce.ts`](../packages/entra-sso/src/core/pkce.ts): erzeugt PKCE `verifier` und `challenge`.
 - [`packages/entra-sso/src/core/graph.ts`](../packages/entra-sso/src/core/graph.ts): liest `/me` und optional Gruppen aus Microsoft Graph.
 - [`packages/entra-sso/src/next/cookies.ts`](../packages/entra-sso/src/next/cookies.ts): Cookie-Parsing und `Set-Cookie`-Builder.
-- [`packages/entra-sso/src/next/redirectUri.ts`](../packages/entra-sso/src/next/redirectUri.ts): berechnet die Callback-URL aus Forwarded-Headern und Base Path.
+- [`packages/entra-sso/src/next/redirectUri.ts`](../packages/entra-sso/src/next/redirectUri.ts): verwendet in Produktion ausschließlich die explizite Redirect-URI und vertraut keinen Request-Host-Headern.
 
 Das Paket wird in [`next.config.mjs`](../next.config.mjs) ueber `transpilePackages: ['@roadmap/entra-sso']` eingebunden.
 
@@ -77,15 +81,8 @@ Diese Routen bilden den eigentlichen Entra-Login fuer die Anwendung.
 
 Der Client prueft zunaechst [`pages/api/auth/entra/status.ts`](../pages/api/auth/entra/status.ts).
 
-Die Route liefert unter anderem:
-
-- ob `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` und `ENTRA_CLIENT_SECRET` gesetzt sind
-- die berechnete Redirect-URI
-- ob `ENTRA_REDIRECT_URI` gesetzt ist und plausibel auf `/api/auth/entra/callback` zeigt
-
-Ausserdem liefert sie derzeit fest `allowlistConfigured: true`. Das bedeutet nicht, dass eine
-echte Allowlist konfiguriert ist; die lokale Zulassungsregel ist offen (siehe oben). Die Route gibt
-keine Secrets aus.
+Die öffentliche Route liefert ausschließlich `{ "enabled": boolean }`. Redirect-URI,
+Konfigurationsdetails und Allowlist-Metadaten bleiben serverseitig.
 
 Das Ergebnis wird im Frontend genutzt, um SSO-Buttons nur dann anzuzeigen, wenn die
 Grundkonfiguration vollstaendig ist.
@@ -177,7 +174,9 @@ Das trennt Login-Identitaet sauber von den eigentlichen Fachrechten.
 
 Signiert wird mit `JWT_SECRET`. Fehlt die Variable, ist sie kuerzer als 32 Zeichen oder enthaelt sie
 einen bekannten Platzhalter, verweigert die Authentifizierung den Betrieb. Die JWT-Laufzeit kommt
-aus `JWT_EXPIRES_IN` und betraegt standardmaessig `24h`. Es werden keine Entra-Tokens in das App-JWT
+aus `JWT_EXPIRES_IN` und betraegt standardmaessig `8h` (maximal `12h`). Das Token ist auf `HS256`,
+Issuer und Audience festgelegt und enthaelt eine zufaellige `jti` sowie `JWT_SESSION_VERSION`.
+Es werden keine Entra-Tokens in das App-JWT
 aufgenommen.
 
 ### 5. Rueckgabe an den Browser
@@ -198,8 +197,9 @@ Zusatzinfo:
 - Die temporaeren Cookies fuer `state`, PKCE-Verifier, Ruecksprungziel und Popup-Modus leben zehn
   Minuten. `state` und Verifier sind `HttpOnly`, Ruecksprungziel und Popup-Flag nicht.
 
-Schreibende Requests mit Cookie-Session werden zentral ueber ihren `Origin` gegen die erwartete
-Proxy-Origin geprueft. Das ergaenzt `SameSite=Lax` um einen CSRF-Schutz.
+Schreibende Requests mit Cookie-Session werden zentral ueber ihren `Origin` gegen die feste
+`APP_ORIGIN` beziehungsweise `ENTRA_REDIRECT_URI` geprueft. Request-Host- und Forwarded-Header sind
+keine Vertrauensanker. Das ergaenzt `SameSite=Lax` um einen CSRF-Schutz.
 
 ### 6. Client-Session persistieren
 
@@ -225,8 +225,9 @@ Der letzte Punkt ist in diesem Repo wichtig, weil Rechte nicht nur benutzerbezog
 
 Der zentrale Extractor ist `extractAdminSession()`.
 
-Er prueft Signatur und Ablaufzeit mit `jwt.verify(..., JWT_SECRET)`. Ein Bearer-Token hat Vorrang
-vor dem Cookie. Eine fehlende, ungueltige oder abgelaufene Session ergibt `null`; die aufrufende
+Er prueft Signatur, Algorithmus, Issuer, Audience, Ablaufzeit und `JWT_SESSION_VERSION` mit
+`jwt.verify(...)`. Danach muss die `jti` als aktive Zeile in `AuthSession` vorhanden sein. Ein
+Bearer-Token hat Vorrang vor dem Cookie. Eine fehlende, widerrufene, ungueltige oder abgelaufene Session ergibt `null`; die aufrufende
 Route entscheidet daraus ueber 401/403. `check-admin-session` liefert bei fehlendem Token konkret
 HTTP 403, bei gueltigem Token HTTP 200 mit `authenticated`, `isAdmin`, `isSuperAdmin`, Benutzer,
 Department und Gruppen.
@@ -305,7 +306,9 @@ Zusaetzlich wichtig:
   - empfohlen als explizite absolute Callback-URL
   - muss auf `/api/auth/entra/callback` zeigen
 - `JWT_EXPIRES_IN`
-  - optional, Default: `24h`
+  - optional, Default: `8h`, Maximum: `12h`
+- `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_SESSION_VERSION`
+  - binden Tokens an diese Anwendung; eine Erhoehung der Session-Version widerruft alle Sessions
 - `NEXT_PUBLIC_ENTRA_AUTO_LOGIN`
   - optional fuer automatischen Redirect ins SSO
 - `NEXT_PUBLIC_DEPLOYMENT_ENV`
@@ -324,14 +327,17 @@ vorab genehmigt sein; sie wird nicht explizit als Scope in dieser Login-URL ange
 
 ## Logout und Session-Ende
 
-`logout()` in [`utils/auth.ts`](../utils/auth.ts) navigiert zur serverseitigen Logout-Route. Diese
+`logout()` in [`utils/auth.ts`](../utils/auth.ts) sendet ein Same-Origin-POST an die serverseitige
+Logout-Route. Diese
 loescht das `HttpOnly`-App-Cookie und leitet anschliessend zum tenant-spezifischen Microsoft-
 Logout-Endpunkt weiter. Danach geht es zur konfigurierten `ENTRA_POST_LOGOUT_REDIRECT_URI` oder zur
-lokalen Login-Seite zurueck. Mit `?local=1` kann bewusst nur die lokale App-Session beendet werden.
+lokalen Login-Seite zurueck. GET-Logout und damit Logout-CSRF werden abgewiesen.
 
-Es gibt in diesem Repo keine Refresh-Token-Speicherung, keine serverseitige Session-Datenbank und
-keine Token-Revocation-Liste. Eine bereits ausgestellte App-Session endet durch Logout im Browser,
-durch Ablauf des JWT oder durch Wechsel von `JWT_SECRET`; nachtraegliche Rechteaenderungen wirken
+Es gibt keine Refresh-Token-Speicherung. Jede App-Session besitzt jedoch eine serverseitige
+`AuthSession`-Zeile. Logout markiert ihre `jti` vor dem Loeschen des Cookies als widerrufen; ein
+kopiertes Token wird damit beim naechsten Request abgewiesen. Globale Invalidierung ist zusaetzlich
+durch Wechsel von `JWT_SECRET` oder Erhoehung von `JWT_SESSION_VERSION` moeglich;
+nachtraegliche Rechteaenderungen wirken
 bei den live aufgeloesten DB-/SharePoint-Rechten bereits beim naechsten Request.
 
 ## Auditierte Sicherheits- und Implementierungsgrenzen
@@ -509,23 +515,43 @@ Token-Laufzeiten oder serverseitig widerrufbare Sessions beziehungsweise eine Re
 
 ## CI/CD und Deployment
 
-Die Workflows injizieren Entra-Secrets explizit in die erzeugte `.env` Datei:
+Der produktive Workflow injiziert die SSO-Werte explizit aus den geschuetzten GitHub Environment
+Secrets in die erzeugte `.env`-Datei:
 
 - [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
-- [`.github/workflows/branch-build.yml`](../.github/workflows/branch-build.yml)
 
-Wichtige Details aus den Workflows:
+Die folgenden Secrets muessen unter **Repository Settings > Environments > production >
+Environment secrets** gepflegt werden:
 
-- Bereits vorhandene `ENTRA_*` Werte werden vor dem Anhaengen entfernt.
-- Dadurch gibt es keine stillen Doppeldefinitionen in `.env`.
-- `deploy.yml` nutzt `ENTRA_REDIRECT_URI`.
-- `branch-build.yml` nutzt `TEST_ENTRA_REDIRECT_URI`.
-- Beide Workflows erwarten zusaetzlich das GitHub Actions Secret `JWT_SECRET`, entfernen einen
-  eventuell im allgemeinen `env`-Secret enthaltenen Wert und schreiben ausschliesslich das
-  explizite Secret in die Laufzeit-`.env`.
+| GitHub Environment Secret        | Status       | Zweck                                               |
+| -------------------------------- | ------------ | --------------------------------------------------- |
+| `ENTRA_TENANT_ID`                | erforderlich | Tenant der Single-Tenant-App-Registration           |
+| `ENTRA_CLIENT_ID`                | erforderlich | Application/Client ID                               |
+| `ENTRA_CLIENT_SECRET`            | erforderlich | serverseitiges Client Secret                        |
+| `ENTRA_REDIRECT_URI`             | erforderlich | exakte absolute Callback-URL                        |
+| `JWT_SECRET`                     | erforderlich | Signatur der kurzlebigen Anwendungssession          |
+| `ENTRA_POST_LOGOUT_REDIRECT_URI` | optional     | explizites Ziel nach dem zentralen Microsoft-Logout |
+
+Wichtige Details:
+
+- Bereits im allgemeinen `env`-Secret vorhandene gleichnamige SSO-Werte werden entfernt.
+- Danach schreibt `deploy.yml` ausschliesslich die einzeln referenzierten GitHub Environment
+  Secrets in die Laufzeit-`.env`; dadurch gibt es keine stillen Doppeldefinitionen.
+- Die erzeugte `.env` hat Dateimodus `0600`. Secret-Werte werden nicht protokolliert.
+- Die fuenf erforderlichen Secrets werden vor Migration, Build und PM2-Neustart auf Vorhandensein
+  geprueft.
 - `JWT_SECRET` muss mindestens 32 Zeichen lang sein und darf keinem bekannten Placeholder
   entsprechen. Fehlt es oder ist es ungueltig, bricht das Deployment vor Build und PM2-Neustart
   ab, ohne den Wert zu protokollieren.
+- `ENTRA_POST_LOGOUT_REDIRECT_URI` ist optional, muss bei Verwendung aber als absolute HTTP(S)-URL
+  konfiguriert und in der Entra App Registration zugelassen sein.
+- Nicht geheime SSO-Einstellungen wie `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_SESSION_VERSION`,
+  `NEXT_PUBLIC_ENTRA_AUTO_LOGIN` und die Base-Path-Werte koennen im geschuetzten allgemeinen
+  `env`-Secret beziehungsweise als kontrollierte Deployment-Konfiguration gepflegt werden.
+
+Der untrusted [Branch-Security-Workflow](../.github/workflows/branch-build.yml) erhaelt absichtlich
+keine GitHub Secrets und keine produktiven Entra-Zugangsdaten. Fuer Build und Tests verwendet er
+nur feste, nicht produktive CI-Platzhalter fuer `JWT_SECRET` und `INTERNAL_API_SECRET`.
 
 Das ist wichtig, weil die Redirect-URI in Reverse-Proxy-Setups schnell die haeufigste Fehlerquelle ist.
 
@@ -577,7 +603,8 @@ Diese Schutzmassnahmen aus dem Repo solltest du mitnehmen:
 - `state` und PKCE immer serverseitig pruefen
 - Gruppenabruf nur "best effort" behandeln
 - Duplicate-Env-Werte in CI bereinigen
-- `x-forwarded-proto` und `x-forwarded-host` fuer Redirects und Secure Cookies beruecksichtigen
+- Redirects und CSRF ausschließlich an feste konfigurierte Origins binden; Request-Host- und
+  Forwarded-Header sind keine Vertrauensanker
 
 ## Was repo-spezifisch ist
 

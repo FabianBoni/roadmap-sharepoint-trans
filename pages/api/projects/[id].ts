@@ -11,6 +11,7 @@ import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { getSampleProjectById, isSampleDataInstance } from '@/utils/sampleInstanceData';
 import { sanitizeProjectRichTextFields } from '@/utils/richText';
 import { getMirroredProjectById, parseMirroredProjectId } from '@/utils/instanceMirroring';
+import { requireAllowedExternalUrl, UnsafeExternalUrlError } from '@/utils/safeUrl';
 
 const normalizeTeamMembers = (value: unknown): Array<{ name: string; role: string }> => {
   if (!Array.isArray(value)) return [];
@@ -34,9 +35,9 @@ const normalizeProjectLinks = (value: unknown): Array<{ title: string; url: stri
       if (!link || typeof link !== 'object') return null;
       const record = link as Record<string, unknown>;
       const title = typeof record.title === 'string' ? record.title.trim() : '';
-      const url = typeof record.url === 'string' ? record.url.trim() : '';
-      if (!title || !url) return null;
-      return { title, url };
+      const rawUrl = typeof record.url === 'string' ? record.url.trim() : '';
+      if (!title || !rawUrl) return null;
+      return { title, url: requireAllowedExternalUrl(rawUrl) };
     })
     .filter((link): link is { title: string; url: string } => Boolean(link));
 };
@@ -107,7 +108,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // GET - Fetch a single project
   if (req.method === 'GET') {
     try {
-      const session = requireUserSession(req);
+      const session = await requireUserSession(req);
       if (
         !(await isReadSessionAllowedForInstance({
           session,
@@ -153,7 +154,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(501).json({ error: 'Sample data instance is read-only' });
       }
 
-      const session = requireUserSession(req);
+      const session = await requireUserSession(req);
 
       if (
         !(await isAdminSessionAllowedForInstance({
@@ -185,6 +186,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       res.status(200).json(updatedProject ?? { success: true });
     } catch (error) {
+      if (error instanceof UnsafeExternalUrlError) {
+        return res.status(400).json({ error: error.message });
+      }
       console.error('Error updating project:', error);
       res.status(500).json({ error: 'Failed to update project' });
     }
@@ -200,7 +204,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(501).json({ error: 'Sample data instance is read-only' });
       }
 
-      const session = requireUserSession(req);
+      const session = await requireUserSession(req);
 
       if (
         !(await isAdminSessionAllowedForInstance({

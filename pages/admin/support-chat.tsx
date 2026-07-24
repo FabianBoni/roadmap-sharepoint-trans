@@ -312,6 +312,7 @@ const SupportChatAdminPage = () => {
                             (message.senderRole === 'SUPPORT' ? 'Support' : 'Roadmap-Nutzer'),
                           direction: messageDirection(message),
                           position: 'single',
+                          type: 'text',
                         }}
                       >
                         <Message.Footer

@@ -13,8 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let instance: RoadmapInstanceConfig | null = null;
   try {
     instance = await getInstanceConfigFromRequest(req);
-  } catch (error) {
-    console.error('[api/categories/[id]] failed to resolve instance', error);
+  } catch {
+    console.error('[api/categories/[id]] failed to resolve instance');
     return res.status(500).json({ error: 'Failed to resolve roadmap instance' });
   }
   if (!instance) {
@@ -34,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // GET - Fetch a single category
   if (req.method === 'GET') {
     try {
-      const session = requireUserSession(req);
+      const session = await requireUserSession(req);
       if (
         !(await isReadSessionAllowedForInstance({
           session,
@@ -55,15 +55,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       res.status(200).json(category);
-    } catch (error) {
-      console.error('Error fetching category:', error);
+    } catch {
+      console.error('Error fetching category');
       res.status(500).json({ error: 'Failed to fetch category' });
     }
   }
   // PUT - Update a category
   else if (req.method === 'PUT') {
     try {
-      const session = requireUserSession(req);
+      const session = await requireUserSession(req);
 
       if (
         !(await isAdminSessionAllowedForInstance({
@@ -92,15 +92,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
 
       res.status(200).json(updatedCategory);
-    } catch (error) {
-      console.error('Error updating category:', error);
+    } catch {
+      console.error('Error updating category');
       res.status(500).json({ error: 'Failed to update category' });
     }
   }
   // DELETE - Delete a category
   else if (req.method === 'DELETE') {
     try {
-      const session = requireUserSession(req);
+      const session = await requireUserSession(req);
 
       if (
         !(await isAdminSessionAllowedForInstance({
@@ -117,8 +117,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
 
       res.status(204).end();
-    } catch (error) {
-      console.error('Error deleting category:', error);
+    } catch {
+      console.error('Error deleting category');
       res.status(500).json({ error: 'Failed to delete category' });
     }
   } else {

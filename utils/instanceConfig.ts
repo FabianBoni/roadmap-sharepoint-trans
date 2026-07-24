@@ -3,6 +3,7 @@ import type { IncomingMessage } from 'http';
 import type { RoadmapInstance as PrismaRoadmapInstance, RoadmapInstanceHost } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { normalizeSharePointStrategy } from '@/utils/sharePointStrategy';
+import { assertInstanceTlsPolicy } from '@/utils/tlsPolicy';
 import type {
   RoadmapInstanceConfig,
   RoadmapInstanceFeatureFlags,
@@ -181,6 +182,7 @@ export const mapInstanceRecord = (record: PrismaInstanceWithHosts): RoadmapInsta
     allowSelfSigned: record.allowSelfSigned ?? envAllowSelfSigned,
     trustedCaPath: record.trustedCaPath || envTrustedCaPath,
   };
+  assertInstanceTlsPolicy({ slug: record.slug, sharePoint } as RoadmapInstanceConfig);
 
   const theme =
     settingsObj?.theme && typeof settingsObj.theme === 'object'

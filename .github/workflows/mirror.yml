@@ -1,64 +1,61 @@
-name: Mirror to JSD-IT/REPO-NAME
+name: Publish sanitized snapshot
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   mirror:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       TARGET_REPO: JSD-IT/Roadmap
       TARGET_DEFAULT_BRANCH: main
       TARGET_REPO_PAT: ${{ secrets.TARGET_REPO_PAT }}
       TARGET_HOST: ${{ secrets.TARGET_HOST != '' && secrets.TARGET_HOST || 'github.com' }}
-    steps:
-      - name: Fail if PAT is missing
-        run: |
-          if [ -z "$TARGET_REPO_PAT" ]; then
-            echo "TARGET_REPO_PAT secret is missing. Add a PAT with repo access to this repo's secrets." >&2
-            exit 1
-          fi
-          if [ -z "$TARGET_HOST" ]; then
-            echo "TARGET_HOST secret is missing. Set TARGET_HOST to your GitHub Enterprise hostname (no protocol)." >&2
-            exit 1
-          fi
 
-      - name: Checkout full history
-        uses: actions/checkout@v4
+    steps:
+      - name: Validate target configuration
+        run: |
+          set -euo pipefail
+          test -n "$TARGET_REPO_PAT" || { echo 'TARGET_REPO_PAT is missing' >&2; exit 1; }
+          [[ "$TARGET_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || { echo 'Invalid TARGET_HOST' >&2; exit 1; }
+          [[ "$TARGET_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo 'Invalid TARGET_REPO' >&2; exit 1; }
+
+      - name: Checkout current protected revision only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
 
-      - name: Configure git
+      - name: Build history-free sanitized repository
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Remove default GITHUB_TOKEN extraheader so we use the PAT in the remote URL
-          git config --global --unset-all http.https://github.com/.extraheader || true
+          set -euo pipefail
+          snapshot="$RUNNER_TEMP/sanitized-snapshot"
+          mkdir -p "$snapshot"
+          git archive HEAD | tar -x -C "$snapshot"
+          rm -rf "$snapshot/.github/workflows"
+          find "$snapshot" -type f \( -name '*.db' -o -name '*.sqlite' -o -name '*.sqlite3' -o -name '.env' -o -name '.env.*' \) ! -name '.env.example' -delete
+          cd "$snapshot"
+          git init --initial-branch="$TARGET_DEFAULT_BRANCH"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git commit -m "Sanitized snapshot of ${GITHUB_SHA}"
 
-      - name: Create filtered clone without workflows
+      - name: Push sanitized snapshot
+        env:
+          GIT_PASSWORD: ${{ secrets.TARGET_REPO_PAT }}
         run: |
-          FILTER_DIR="$(mktemp -d)"
-          echo "Using temp dir: ${FILTER_DIR}"
-          git clone --no-local --no-hardlinks . "${FILTER_DIR}"
-          cd "${FILTER_DIR}"
-          # Drop workflow files from history
-          git filter-branch --force --tree-filter 'rm -rf .github/workflows' -- --all
-          # Configure git and push from filtered repo
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --global --unset-all http.https://github.com/.extraheader || true
-          TARGET_URL="https://x-access-token:${TARGET_REPO_PAT}@${TARGET_HOST}/${TARGET_REPO}.git"
-          echo "Pushing filtered mirror to https://${TARGET_HOST}/${TARGET_REPO}.git (workflows removed)"
-          git remote add mirror "$TARGET_URL"
-          git push --mirror mirror
-
-      - name: Diagnostics (ls-remote)
-        if: failure()
-        run: |
-          TARGET_URL="https://x-access-token:${TARGET_REPO_PAT}@${TARGET_HOST}/${TARGET_REPO}.git"
-          echo "Diagnosing with: git ls-remote https://${TARGET_HOST}/${TARGET_REPO}.git"
-          git ls-remote "$TARGET_URL" || true
+          set -euo pipefail
+          snapshot="$RUNNER_TEMP/sanitized-snapshot"
+          askpass="$RUNNER_TEMP/git-askpass.sh"
+          printf '%s\n' '#!/bin/sh' 'case "$1" in *Username*) printf "%s" "x-access-token";; *) printf "%s" "$GIT_PASSWORD";; esac' > "$askpass"
+          chmod 700 "$askpass"
+          cd "$snapshot"
+          git remote add mirror "https://${TARGET_HOST}/${TARGET_REPO}.git"
+          GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 git push --force mirror "HEAD:refs/heads/${TARGET_DEFAULT_BRANCH}"

@@ -12,6 +12,9 @@ import { SHAREPOINT_LIST_DEFINITIONS } from '@/utils/sharePointLists';
 import { buildInstanceAwareUrl } from '@/utils/auth';
 import { INSTANCE_COOKIE_NAME, INSTANCE_QUERY_PARAM } from '@/utils/instanceConfig';
 import { prefixBasePath } from '@/utils/nextBasePath';
+import { normalizeAllowedExternalUrl } from '@/utils/safeUrl';
+import { escapeODataStringLiteral } from '@/utils/odata';
+import { getInternalApiBaseUrl } from '@/utils/internalApiBaseUrl';
 
 type NodeRequireFn = typeof require;
 type AsyncLocalStorageCtor = new <T>() => AsyncLocalStorage<T>;
@@ -185,9 +188,7 @@ class ClientDataService {
 
       try {
         const base =
-          typeof window !== 'undefined'
-            ? window.location.origin
-            : (process.env.INTERNAL_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+          typeof window !== 'undefined' ? window.location.origin : getInternalApiBaseUrl();
         const urlObj = new URL(finalUrl, base);
         if (!urlObj.searchParams.has(INSTANCE_QUERY_PARAM)) {
           urlObj.searchParams.set(INSTANCE_QUERY_PARAM, activeSlug);
@@ -203,11 +204,28 @@ class ClientDataService {
     }
 
     if (typeof window === 'undefined' && !/^https?:\/\//i.test(finalUrl)) {
-      const base = (process.env.INTERNAL_API_BASE_URL || 'http://localhost:3000').replace(
-        /\/$/,
-        ''
-      );
+      const base = getInternalApiBaseUrl();
       finalUrl = finalUrl.startsWith('/') ? `${base}${finalUrl}` : `${base}/${finalUrl}`;
+    }
+
+    if (typeof window === 'undefined') {
+      const secret = String(process.env.INTERNAL_API_SECRET || process.env.JWT_SECRET || '');
+      const req = nodeRequire();
+      if (secret.length >= 32 && req) {
+        const { createHmac } = req('node:crypto') as typeof import('node:crypto');
+        const timestamp = String(Date.now());
+        const method = String(prepared.method || 'GET').toUpperCase();
+        const parsedTarget = new URL(finalUrl);
+        const apiIndex = parsedTarget.pathname.indexOf('/api/');
+        const canonicalTarget = `${
+          apiIndex >= 0 ? parsedTarget.pathname.slice(apiIndex) : parsedTarget.pathname
+        }${parsedTarget.search}`;
+        const signature = createHmac('sha256', secret)
+          .update(`${timestamp}.${method}.${canonicalTarget}`)
+          .digest('hex');
+        headers.set('x-roadmap-internal-timestamp', timestamp);
+        headers.set('x-roadmap-internal-signature', signature);
+      }
     }
 
     prepared.headers = headers;
@@ -221,10 +239,7 @@ class ClientDataService {
 
   private getWebUrl(): string {
     if (typeof window === 'undefined') {
-      const base = (process.env.INTERNAL_API_BASE_URL || 'http://localhost:3000').replace(
-        /\/$/,
-        ''
-      );
+      const base = getInternalApiBaseUrl();
       return base + prefixBasePath('/api/sharepoint');
     }
     return prefixBasePath('/api/sharepoint');
@@ -653,13 +668,9 @@ class ClientDataService {
       });
 
       if (!response.ok) {
-        // Try to get the response text for better error messages
-        const errorText = await response.text();
         console.error('Request Digest Error Response:', {
           status: response.status,
           statusText: response.statusText,
-          url: response.url,
-          body: errorText,
         });
         throw new Error(`Failed to get request digest: ${response.statusText}`);
       }
@@ -744,12 +755,10 @@ class ClientDataService {
                 });
                 return items;
               } else {
-                const atomText = await atomResp.text();
+                await atomResp.body?.cancel().catch(() => undefined);
                 console.error('SharePoint API Error Response (atom fallback):', {
                   status: atomResp.status,
                   statusText: atomResp.statusText,
-                  url: atomResp.url,
-                  body: atomText,
                 });
                 throw new Error(`SharePoint request failed (atom): ${atomResp.statusText}`);
               }
@@ -757,8 +766,6 @@ class ClientDataService {
               console.error('SharePoint API Error Response (verbose retry):', {
                 status: response.status,
                 statusText: response.statusText,
-                url: response.url,
-                body: secondText,
               });
               throw new Error(`SharePoint request failed: ${response.statusText}`);
             }
@@ -775,8 +782,6 @@ class ClientDataService {
           console.error('SharePoint API Error Response (first attempt):', {
             status: response.status,
             statusText: response.statusText,
-            url: response.url,
-            body: firstText,
           });
           throw new Error(`SharePoint request failed: ${response.statusText}`);
         }
@@ -816,13 +821,9 @@ class ClientDataService {
       });
 
       if (!response.ok) {
-        // Try to get the response text for better error messages
-        const errorText = await response.text();
         console.error('List Metadata Error Response:', {
           status: response.status,
           statusText: response.statusText,
-          url: response.url,
-          body: errorText,
         });
         throw new Error(`Failed to get list metadata: ${response.statusText}`);
       }
@@ -1035,7 +1036,10 @@ class ClientDataService {
         } else if (isInvalidArg(testRes)) {
           console.warn(`[clientDataService] Field excluded due to invalid query: ${f}`);
         } else {
-          console.warn(`[clientDataService] Field ${f} excluded due to unexpected error`, testRes);
+          console.warn(`[clientDataService] Field ${f} excluded due to unexpected error`, {
+            status: 'status' in testRes ? testRes.status : undefined,
+            type: testRes.error,
+          });
         }
       }
       // Always ensure required base fields present
@@ -1046,7 +1050,10 @@ class ClientDataService {
     }
 
     if (!Array.isArray(initialResult)) {
-      console.error('Error fetching projects (after fallback if any):', initialResult);
+      console.error('Error fetching projects (after fallback if any):', {
+        status: initialResult.status,
+        type: initialResult.error,
+      });
       // Final defensive fallback using generic helper (handles Atom/XML etc.)
       try {
         const minimal = await this.fetchFromSharePoint(resolvedProjects, buildSelect(fieldsToUse));
@@ -1439,12 +1446,10 @@ class ClientDataService {
             credentials: 'same-origin',
           });
           if (!response.ok) {
-            const second = await response.text();
+            await response.body?.cancel().catch(() => undefined);
             console.error('Project Fetch Error Response (verbose retry):', {
               status: response.status,
               statusText: response.statusText,
-              url: response.url,
-              body: second,
             });
             return null;
           }
@@ -1461,8 +1466,6 @@ class ClientDataService {
           console.error('Project Fetch Error Response:', {
             status: response.status,
             statusText: response.statusText,
-            url: response.url,
-            body: firstBody,
           });
           return null;
         }
@@ -1632,13 +1635,9 @@ class ClientDataService {
       });
 
       if (!response.ok) {
-        // Try to get the response text for better error messages
-        const errorText = await response.text();
         console.error('Project Delete Error Response:', {
           status: response.status,
           statusText: response.statusText,
-          url: response.url,
-          body: errorText,
         });
         throw new Error(`Failed to delete project: ${response.statusText}`);
       }
@@ -1739,7 +1738,6 @@ class ClientDataService {
         const catVal = projectData.category || existingProject.category || '';
         const num = parseInt(String(catVal).trim(), 10);
         if (!isNaN(num)) {
-          console.log('[updateProject] Available fields:', Array.from(fields));
           let choseLookup = false;
           const catType = fieldTypes['Category'];
           // Prefer lookup if Category is a lookup-type (Lookup/LookupMulti)
@@ -1748,24 +1746,14 @@ class ClientDataService {
             delete body['Category'];
             choseLookup = true;
           }
-          if (choseLookup) {
-            console.log('[updateProject] Using CategoryId (lookup) for category value', num);
-          } else {
+          if (!choseLookup) {
             // Use Category for Number/Text-based columns and match type
             if (catType && /number/i.test(catType)) body['Category'] = num;
             else body['Category'] = String(num);
             delete body['CategoryId'];
-            console.log(
-              '[updateProject] Using Category (',
-              catType || 'text',
-              ') for category value',
-              body['Category']
-            );
           }
         }
       } catch {}
-
-      console.log('Data being sent to SharePoint:', JSON.stringify(body));
 
       // Send the update request to SharePoint
       const response = await this.spFetch(endpoint, {
@@ -1782,24 +1770,11 @@ class ClientDataService {
       });
 
       if (!response.ok) {
-        // Enhanced error logging
-        let errorDetails = '';
-        try {
-          const errorText = await response.text();
-          errorDetails = errorText;
-          console.error('SharePoint Error Response:', {
-            status: response.status,
-            statusText: response.statusText,
-            url: response.url,
-            body: errorText,
-          });
-        } catch {
-          errorDetails = 'Could not read error details';
-        }
-
-        throw new Error(
-          `Failed to update project: ${response.statusText}. Details: ${errorDetails}`
-        );
+        console.error('SharePoint update failed:', {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        throw new Error(`Failed to update project: ${response.statusText}`);
       }
 
       // Create the updated project object to return
@@ -1828,14 +1803,12 @@ class ClientDataService {
           credentials: 'same-origin',
         });
         if (!v.ok) {
-          const txt = await v.text().catch(() => '');
-          console.warn('[updateProject] read-back failed', { status: v.status, body: txt });
+          console.warn('[updateProject] read-back failed', { status: v.status });
         } else {
           const j = await v.json();
           let cat: any = j?.Category;
           if (cat && typeof cat === 'object') cat = cat.Id ?? cat.ID ?? '';
           if (cat !== undefined && cat !== null) updatedProject.category = String(cat).trim();
-          console.log('[updateProject] read-back Category =', updatedProject.category);
         }
       } catch (vbErr) {
         console.warn('[updateProject] read-back threw', vbErr);
@@ -2291,12 +2264,19 @@ class ClientDataService {
       const data = await response.json();
       const items = data.value || [];
 
-      return items.map((item: any) => ({
-        id: item.Id.toString(),
-        title: item.Title,
-        url: item.Url,
-        projectId: item.ProjectId,
-      }));
+      return items
+        .map((item: any) => {
+          const url = normalizeAllowedExternalUrl(item.Url);
+          return url
+            ? {
+                id: item.Id.toString(),
+                title: item.Title,
+                url,
+                projectId: item.ProjectId,
+              }
+            : null;
+        })
+        .filter((item: ProjectLink | null): item is ProjectLink => Boolean(item));
     } catch (error) {
       console.error(`Error fetching links for project ${projectId}:`, error);
       return [];
@@ -2317,12 +2297,19 @@ class ClientDataService {
       if (!response.ok) return [];
       const data = await response.json();
       const items = data.value || [];
-      return items.map((i: any) => ({
-        id: i.Id.toString(),
-        title: i.Title,
-        url: i.Url,
-        projectId: i.ProjectId,
-      }));
+      return items
+        .map((i: any) => {
+          const url = normalizeAllowedExternalUrl(i.Url);
+          return url
+            ? {
+                id: i.Id.toString(),
+                title: i.Title,
+                url,
+                projectId: i.ProjectId,
+              }
+            : null;
+        })
+        .filter((item: ProjectLink | null): item is ProjectLink => Boolean(item));
     } catch {
       return [];
     }
@@ -2420,8 +2407,6 @@ class ClientDataService {
         };
       }
 
-      console.log('Creating project link with data:', JSON.stringify(requestBody));
-
       const response = await this.spFetch(endpoint, {
         method: 'POST',
         headers: {
@@ -2434,25 +2419,11 @@ class ClientDataService {
       });
 
       if (!response.ok) {
-        // Enhanced error logging
-        let errorDetails = '';
-        try {
-          const errorText = await response.text();
-          errorDetails = errorText;
-          console.error('SharePoint Error Response for createProjectLink:', {
-            status: response.status,
-            statusText: response.statusText,
-            url: response.url,
-            body: errorText,
-            requestBody: requestBody,
-          });
-        } catch {
-          errorDetails = 'Could not read error details';
-        }
-
-        throw new Error(
-          `Failed to create project link: ${response.statusText}. Details: ${errorDetails}`
-        );
+        console.error('SharePoint project-link creation failed:', {
+          status: response.status,
+          statusText: response.statusText,
+        });
+        throw new Error(`Failed to create project link: ${response.statusText}`);
       }
 
       const newItem = await response.json();
@@ -2682,7 +2653,6 @@ class ClientDataService {
         const catVal = projectData.category || '';
         const num = parseInt(String(catVal).trim(), 10);
         if (!isNaN(num)) {
-          console.log('[saveProject] Available fields:', Array.from(fields));
           let choseLookup = false;
           const catType = fieldTypes['Category'];
           if (catType && /lookup/i.test(catType) && fields.has('CategoryId')) {
@@ -2690,23 +2660,13 @@ class ClientDataService {
             delete body['Category'];
             choseLookup = true;
           }
-          if (choseLookup) {
-            console.log('[saveProject] Using CategoryId (lookup) for category value', num);
-          } else {
+          if (!choseLookup) {
             if (catType && /number/i.test(catType)) body['Category'] = num;
             else body['Category'] = String(num);
             delete body['CategoryId'];
-            console.log(
-              '[saveProject] Using Category (',
-              catType || 'text',
-              ') for category value',
-              body['Category']
-            );
           }
         }
       } catch {}
-
-      console.log('[saveProject] Body payload:', body);
 
       // Send the request
       const response = await this.spFetch(endpoint, {
@@ -2717,12 +2677,9 @@ class ClientDataService {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
         console.error('Project Save Error Response:', {
           status: response.status,
           statusText: response.statusText,
-          url: response.url,
-          body: errorText,
         });
         throw new Error(`Failed to save project: ${response.statusText}`);
       }
@@ -2782,14 +2739,12 @@ class ClientDataService {
           credentials: 'same-origin',
         });
         if (!v.ok) {
-          const txt = await v.text().catch(() => '');
-          console.warn('[saveProject] read-back failed', { status: v.status, body: txt });
+          console.warn('[saveProject] read-back failed', { status: v.status });
         } else {
           const j = await v.json();
           let cat: any = j?.Category;
           if (cat && typeof cat === 'object') cat = cat.Id ?? cat.ID ?? '';
           if (cat !== undefined && cat !== null) savedProject.category = String(cat).trim();
-          console.log('[saveProject] read-back Category =', savedProject.category);
         }
       } catch (vbErr) {
         console.warn('[saveProject] read-back threw', vbErr);
@@ -3115,7 +3070,8 @@ class ClientDataService {
     try {
       const webUrl = this.getWebUrl();
       const resolvedSettings = await this.resolveListTitle(SP_LISTS.SETTINGS, ['Roadmap Settings']);
-      const endpoint = `${webUrl}/_api/web/lists/getByTitle('${resolvedSettings}')/items?$filter=Title eq '${key}'&$select=Id,Title,Value,Description`;
+      const escapedKey = escapeODataStringLiteral(key);
+      const endpoint = `${webUrl}/_api/web/lists/getByTitle('${resolvedSettings}')/items?$filter=Title eq '${escapedKey}'&$select=Id,Title,Value,Description`;
 
       const response = await this.spFetch(endpoint, {
         method: 'GET',
@@ -3386,7 +3342,8 @@ class ClientDataService {
       username?: string | null;
       upn?: string | null;
       mail?: string | null;
-      displayName?: string | null;
+      onPremisesUserPrincipalName?: string | null;
+      onPremisesAccountName?: string | null;
     }
   ): Promise<boolean> {
     try {
@@ -3396,17 +3353,18 @@ class ClientDataService {
 
       const candidates = Array.from(
         new Set(
-          [identifiers.username, identifiers.upn, identifiers.mail, identifiers.displayName]
+          [
+            identifiers.username,
+            identifiers.upn,
+            identifiers.mail,
+            identifiers.onPremisesUserPrincipalName,
+            identifiers.onPremisesAccountName,
+          ]
             .map((v) => this.normalizeIdentifier(v))
             .filter(Boolean)
         )
       );
       if (candidates.length === 0) return false;
-
-      const nameCandidates = candidates
-        .filter((c) => c && !c.includes('@'))
-        .map((c) => c.replace(/\s+/g, ' ').trim())
-        .filter(Boolean);
 
       const fetchPayload = async (url: string, accept: string): Promise<unknown> => {
         const resp = await this.spFetch(url, {
@@ -3459,13 +3417,12 @@ class ClientDataService {
       const normalizeLogin = (login: string): string[] => {
         const normalized = this.normalizeIdentifier(login);
         if (!normalized) return [];
-        const parts = normalized
-          .split(/[|\\]/)
+        const pipeParts = normalized
+          .split('|')
           .map((p) => p.trim())
           .filter(Boolean);
-        const last = parts.length ? parts[parts.length - 1] : normalized;
-        const beforeAt = normalized.includes('@') ? normalized.split('@')[0] : '';
-        return Array.from(new Set([normalized, last, beforeAt].filter(Boolean)));
+        const finalClaimValue = pipeParts.length > 1 ? pipeParts[pipeParts.length - 1] : '';
+        return Array.from(new Set([normalized, finalClaimValue].filter(Boolean)));
       };
 
       const matchesDirectEntry = (u: Record<string, unknown>): boolean => {
@@ -3473,21 +3430,8 @@ class ClientDataService {
           typeof (u as any).Email === 'string' ? this.normalizeIdentifier((u as any).Email) : '';
         const login = typeof (u as any).LoginName === 'string' ? String((u as any).LoginName) : '';
         const logins = login ? normalizeLogin(login) : [];
-        const title =
-          typeof (u as any).Title === 'string' ? this.normalizeIdentifier((u as any).Title) : '';
-
         if (email && candidates.includes(email)) return true;
         if (logins.some((l) => candidates.includes(l))) return true;
-        if (title) {
-          const normalizedTitle = title.replace(/\s+/g, ' ').trim();
-          if (candidates.includes(title) || nameCandidates.includes(normalizedTitle)) return true;
-        }
-
-        const localParts = candidates
-          .filter((c) => c.includes('@'))
-          .map((c) => c.split('@')[0])
-          .filter(Boolean);
-        if (localParts.length > 0 && logins.some((l) => localParts.includes(l))) return true;
 
         return false;
       };
@@ -3510,11 +3454,6 @@ class ClientDataService {
           : null) ||
         candidates.find((c) => c.includes('@')) ||
         null;
-      const displayNameCandidate =
-        typeof identifiers.displayName === 'string' && identifiers.displayName.trim()
-          ? identifiers.displayName.trim()
-          : null;
-
       const tryParseId = (rawValue: unknown): number | null => {
         if (typeof rawValue === 'number' && Number.isFinite(rawValue)) return rawValue;
         if (typeof rawValue === 'string') {
@@ -3522,12 +3461,6 @@ class ClientDataService {
           return Number.isFinite(n) ? n : null;
         }
         return null;
-      };
-
-      const tryListUsers = async (filter: string): Promise<Array<Record<string, unknown>>> => {
-        const url = `${webUrl}/_api/web/siteusers?$select=Id,Email,LoginName,Title&$filter=${filter}`;
-        const rawUser = await fetchAny(url);
-        return this.extractSharePointUsersArray(rawUser);
       };
 
       const tryEnsureUser = async (logonName: string): Promise<number | null> => {
@@ -3599,41 +3532,15 @@ class ClientDataService {
           }
         }
 
-        // 2) Search by LoginName substring (UPN/mail commonly appears in claims login)
-        if (emailCandidate) {
-          const escaped = this.escapeODataStringLiteral(emailCandidate);
-          try {
-            const list = await tryListUsers(`substringof('${escaped}', LoginName)`);
-            if (list.length === 1) {
-              const id = tryParseId((list[0] as any)?.Id);
-              if (id) return id;
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-
-        // 3) Search by display name (last resort; may be ambiguous)
-        if (displayNameCandidate) {
-          const escaped = this.escapeODataStringLiteral(displayNameCandidate);
-          try {
-            const list = await tryListUsers(`Title eq '${escaped}'`);
-            if (list.length === 1) {
-              const id = tryParseId((list[0] as any)?.Id);
-              if (id) return id;
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-
-        // 4) Ensure user by known login identifiers (works when $filter on siteusers is not supported)
+        // 2) Ensure user by exact known login identifiers.
         const ensureCandidates = Array.from(
           new Set(
             [
               identifiers.upn,
               identifiers.mail,
               identifiers.username,
+              identifiers.onPremisesUserPrincipalName,
+              identifiers.onPremisesAccountName,
               emailCandidate,
               ...candidates,
               ...(emailCandidate ? [`i:0#.f|membership|${emailCandidate}`] : []),
@@ -3648,7 +3555,7 @@ class ClientDataService {
           if (ensured) return ensured;
         }
 
-        // 5) Last fallback: list site users without filter and match locally
+        // 3) Last fallback: list site users without filter and match exact identifiers locally.
         try {
           const allUsersUrl = `${webUrl}/_api/web/siteusers?$select=Id,Email,LoginName,Title`;
           const rawUsers = await fetchAny(allUsersUrl);
@@ -3683,42 +3590,33 @@ class ClientDataService {
     username?: string | null;
     upn?: string | null;
     mail?: string | null;
-    displayName?: string | null;
+    onPremisesUserPrincipalName?: string | null;
+    onPremisesAccountName?: string | null;
   }): Promise<string | null> {
     try {
       const webUrl = this.getWebUrl();
       const candidates = Array.from(
         new Set(
-          [identifiers.username, identifiers.upn, identifiers.mail, identifiers.displayName]
+          [
+            identifiers.username,
+            identifiers.upn,
+            identifiers.mail,
+            identifiers.onPremisesUserPrincipalName,
+            identifiers.onPremisesAccountName,
+          ]
             .map((v) => (typeof v === 'string' ? v.trim() : ''))
             .filter(Boolean)
         )
       );
 
-      const onPremDomainRaw =
-        typeof process.env.SP_ONPREM_DOMAIN === 'string' ? process.env.SP_ONPREM_DOMAIN : '';
-      const onPremDomain = onPremDomainRaw.trim();
-
-      const localPartCandidates = Array.from(
+      const exactOnPremLogins = Array.from(
         new Set(
-          [identifiers.upn, identifiers.mail, identifiers.username]
+          [identifiers.onPremisesUserPrincipalName, identifiers.onPremisesAccountName]
             .map((v) => (typeof v === 'string' ? v.trim() : ''))
-            .filter((v) => v.includes('@'))
-            .map((v) => v.split('@')[0])
             .filter(Boolean)
+            .flatMap((value) => [value, value.includes('\\') ? `i:0#.w|${value}` : value])
         )
       );
-
-      const derivedOnPremLogins = onPremDomain
-        ? Array.from(
-            new Set(
-              localPartCandidates.flatMap((local) => [
-                `${onPremDomain}\\${local}`,
-                `i:0#.w|${onPremDomain}\\${local}`,
-              ])
-            )
-          )
-        : [];
 
       const emailCandidate =
         (typeof identifiers.mail === 'string' && identifiers.mail.includes('@')
@@ -3880,7 +3778,7 @@ class ClientDataService {
             identifiers.mail,
             identifiers.username,
             ...candidates,
-            ...derivedOnPremLogins,
+            ...exactOnPremLogins,
             ...(emailCandidate ? [`i:0#.f|membership|${emailCandidate}`] : []),
           ]
             .map((v) => (typeof v === 'string' ? v.trim() : ''))
@@ -3899,7 +3797,7 @@ class ClientDataService {
         new Set(
           [
             ...ensureCandidates,
-            ...derivedOnPremLogins,
+            ...exactOnPremLogins,
             ...(emailCandidate ? [`i:0#.f|membership|${emailCandidate}`] : []),
             ...(typeof identifiers.username === 'string' && identifiers.username.includes('\\')
               ? [`i:0#.w|${identifiers.username.trim()}`]
@@ -4252,8 +4150,7 @@ class ClientDataService {
         clientPeoplePickerData = Array.isArray(parsed) ? parsed : [];
       } catch (parseError) {
         console.warn('[clientDataService.searchUsers] failed to parse People Picker payload', {
-          error: parseError instanceof Error ? parseError.message : String(parseError),
-          preview: pickerPayload.slice(0, 200),
+          error: parseError instanceof Error ? parseError.message : 'parse-failed',
         });
         return [];
       }

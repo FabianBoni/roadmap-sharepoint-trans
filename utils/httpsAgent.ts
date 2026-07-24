@@ -3,14 +3,16 @@ import fs from 'fs';
 import path from 'path';
 import { Agent as UndiciAgent, Dispatcher } from 'undici';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import { assertGlobalTlsPolicy } from './tlsPolicy';
 
-// Optional HTTPS agent to allow custom CA or self-signed certs for on-prem SharePoint
+// Optional HTTPS agent for a custom CA used by on-prem SharePoint.
 // Environment variables:
 //   SP_TRUSTED_CA_PATH: Absolute (or relative to project root) path to a PEM file containing the trusted CA chain.
-//   SP_ALLOW_SELF_SIGNED: 'true' to disable TLS verification (NOT recommended for production).
 
 let agent: https.Agent | undefined;
 let dispatcher: Dispatcher | undefined;
+
+assertGlobalTlsPolicy();
 
 function resolvePathMaybe(p: string | undefined) {
   if (!p) return undefined;
@@ -29,17 +31,12 @@ try {
     // Use proxy agent (handles Windows auth via CNTLM/Px proxy)
     agent = new HttpsProxyAgent(proxyUrl) as unknown as https.Agent;
     dispatcher = new UndiciAgent({
-      connect: { rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0' },
+      connect: { rejectUnauthorized: true },
     });
-    // eslint-disable-next-line no-console
-    console.log('[httpsAgent] Using custom proxy agent:', proxyUrl);
+    console.log('[httpsAgent] Using configured custom proxy agent');
   } else if (proxyUrl) {
     // Proxy configured but not creating custom agent - let libraries handle it via env vars
-    // eslint-disable-next-line no-console
-    console.log(
-      '[httpsAgent] Proxy detected but not creating custom agent (libraries will use HTTP_PROXY env var):',
-      proxyUrl
-    );
+    console.log('[httpsAgent] Proxy configured; HTTP client environment handling remains active');
   } else if (caPath && fs.existsSync(caPath)) {
     const ca = fs.readFileSync(caPath, 'utf8');
     agent = new https.Agent({ ca });
@@ -48,22 +45,12 @@ try {
     if (!process.env.NODE_EXTRA_CA_CERTS) {
       process.env.NODE_EXTRA_CA_CERTS = caPath;
     }
-    // eslint-disable-next-line no-console
-    console.log('[httpsAgent] Using custom CA from', caPath);
-  } else if (process.env.SP_ALLOW_SELF_SIGNED === 'true') {
-    agent = new https.Agent({ rejectUnauthorized: false });
-    dispatcher = new UndiciAgent({ connect: { rejectUnauthorized: false } });
-    // eslint-disable-next-line no-console
-    console.warn(
-      '[httpsAgent] SP_ALLOW_SELF_SIGNED=true -> TLS certificate verification DISABLED. Do not use in production.'
-    );
+    console.log('[httpsAgent] Using configured custom CA');
   } else {
-    // eslint-disable-next-line no-console
     console.log('[httpsAgent] No custom CA configured; relying on system trust store');
   }
-} catch (e) {
-  // eslint-disable-next-line no-console
-  console.warn('[httpsAgent] Failed to configure HTTPS agent', e);
+} catch {
+  console.warn('[httpsAgent] Failed to configure HTTPS agent');
 }
 
 export const sharePointHttpsAgent = agent;

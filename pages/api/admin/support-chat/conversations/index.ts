@@ -1,6 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { disableSupportChatCache, mapSupportChatMessage } from '@/lib/supportChat';
+import {
+  cleanupExpiredSupportChats,
+  disableSupportChatCache,
+  mapSupportChatMessage,
+} from '@/lib/supportChat';
 import type { SupportChatSummary } from '@/types/supportChat';
 import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
 
@@ -8,6 +12,7 @@ type ApiResponse = { conversations: SupportChatSummary[] } | { error: string };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse>) {
   disableSupportChatCache(res);
+  await cleanupExpiredSupportChats().catch(() => 0);
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });

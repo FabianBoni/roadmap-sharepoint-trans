@@ -43,13 +43,12 @@ test('support chat text normalization preserves plain text and normalizes line e
   assert.equal(normalizeSupportChatText(null), '');
 });
 
-test('support chat rate limiter rejects requests after the configured limit', () => {
-  const key = `test-${Date.now()}-${Math.random()}`;
-  assert.equal(consumeSupportChatRateLimit(key, 2, 60_000).allowed, true);
-  assert.equal(consumeSupportChatRateLimit(key, 2, 60_000).allowed, true);
-  const rejected = consumeSupportChatRateLimit(key, 2, 60_000);
-  assert.equal(rejected.allowed, false);
-  assert.ok(rejected.retryAfterSeconds > 0);
+test('support chat uses the persistent rate limiter and explicit trusted proxy list', () => {
+  assert.equal(typeof consumeSupportChatRateLimit, 'function');
+  const source = readFileSync(resolve(process.cwd(), 'lib/supportChat.ts'), 'utf8');
+  assert.match(source, /consumePersistentRateLimit/);
+  assert.match(source, /TRUSTED_PROXY_ADDRESSES/);
+  assert.doesNotMatch(source, /supportChatRateLimits|new Map<string, RateLimitBucket>/);
 });
 
 test('support inbox is restricted to superadmins in UI and API', () => {
@@ -69,6 +68,9 @@ test('support inbox is restricted to superadmins in UI and API', () => {
   );
 
   assert.match(page, /withSuperAdminAuth\(SupportChatAdminPage\)/);
+  assert.match(page, /type:\s*'text'/);
+  const widget = readFileSync(resolve(process.cwd(), 'components/SupportChatWidget.tsx'), 'utf8');
+  assert.match(widget, /type:\s*'text'/);
   for (const apiSource of [listApi, detailApi]) {
     assert.match(apiSource, /await requireSuperAdminAccess\(req\)/);
     assert.doesNotMatch(apiSource, /requireAdminSession/);

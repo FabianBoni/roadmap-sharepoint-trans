@@ -60,22 +60,25 @@ export async function loadThemeSettings(): Promise<ThemeSettings> {
     if (typeof window !== 'undefined') {
       const slug = getInstanceSlug();
       const query = slug ? `?${INSTANCE_QUERY_PARAM}=${encodeURIComponent(slug)}` : '';
-      const resp = await fetch(`${prefixBasePath('/api/settings')}${query}`, {
-        credentials: 'same-origin',
-        headers: { Accept: 'application/json' },
-      });
-
-      if (resp.ok) {
-        const payload = await resp.json().catch(() => null);
-        const list = Array.isArray(payload) ? payload : [];
-        for (const entry of list) {
+      const responses = await Promise.all(
+        keys.map((key) =>
+          fetch(`${prefixBasePath(`/api/settings/key/${encodeURIComponent(key)}`)}${query}`, {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+          })
+        )
+      );
+      await Promise.all(
+        responses.map(async (resp) => {
+          if (!resp.ok) return;
+          const entry = await resp.json().catch(() => null);
           const key = typeof entry?.key === 'string' ? entry.key : '';
           const value = typeof entry?.value === 'string' ? entry.value : '';
           if (isThemeKey(key) && value) {
             valueByKey[key] = value;
           }
-        }
-      }
+        })
+      );
     } else {
       const results = await Promise.all(keys.map((k) => clientDataService.getSettingByKey(k)));
       keys.forEach((k, i) => {

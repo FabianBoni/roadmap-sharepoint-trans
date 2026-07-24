@@ -4,6 +4,9 @@ export type EntraUserProfile = {
   userPrincipalName?: string;
   mail?: string;
   department?: string;
+  onPremisesSamAccountName?: string;
+  onPremisesDomainName?: string;
+  onPremisesUserPrincipalName?: string;
 };
 
 export type EntraGroupProfile = {
@@ -13,7 +16,7 @@ export type EntraGroupProfile = {
 
 export async function fetchGraphMe(accessToken: string): Promise<EntraUserProfile> {
   const resp = await fetch(
-    'https://graph.microsoft.com/v1.0/me?$select=id,displayName,userPrincipalName,mail,department',
+    'https://graph.microsoft.com/v1.0/me?$select=id,displayName,userPrincipalName,mail,department,onPremisesSamAccountName,onPremisesDomainName,onPremisesUserPrincipalName',
     {
       headers: { Authorization: `Bearer ${accessToken}` },
     }

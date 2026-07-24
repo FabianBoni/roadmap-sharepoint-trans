@@ -10,6 +10,7 @@ import {
 } from '@/utils/instanceAccess';
 import { isAdminSessionAllowedForInstance } from '@/utils/instanceAccessServer';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
+import { isStableAuthorizationIdentifier } from '@/utils/authorizationIdentity';
 
 const decodeSettings = (settingsJson: string | null): Record<string, unknown> => {
   if (!settingsJson) return {};
@@ -27,7 +28,7 @@ const decodeSettings = (settingsJson: string | null): Record<string, unknown> =>
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   let session;
   try {
-    session = requireUserSession(req);
+    session = await requireUserSession(req);
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -35,8 +36,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let instance: RoadmapInstanceConfig | null = null;
   try {
     instance = await getInstanceConfigFromRequest(req);
-  } catch (error) {
-    console.error('[instance-admin-users] failed to resolve instance', error);
+  } catch {
+    console.error('[instance-admin-users] failed to resolve instance');
     return res.status(500).json({ error: 'Failed to resolve roadmap instance' });
   }
 
@@ -90,6 +91,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!usernameRaw.trim()) {
     return res.status(400).json({ error: 'username is required' });
+  }
+  if (!isStableAuthorizationIdentifier(usernameRaw)) {
+    return res.status(400).json({
+      error: 'Use tenantId:objectId, a full UPN/email, or an exact DOMAIN\\account identity',
+    });
   }
 
   if (req.method === 'POST') {

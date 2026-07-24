@@ -16,8 +16,6 @@ model RoadmapInstance {
   sharePointSiteUrlDev  String
   sharePointSiteUrlProd String?
   sharePointStrategy    String                @default("kerberos")
-  spUsername            String
-  spPassword            String
   allowSelfSigned       Boolean               @default(false)
   trustedCaPath         String?
   deploymentEnv         String?
@@ -116,4 +114,26 @@ model SupportMessage {
   conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
+}
+
+model RateLimitBucket {
+  scope     String
+  keyHash   String
+  count     Int      @default(0)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@id([scope, keyHash])
+  @@index([resetAt])
+}
+
+model AuthSession {
+  id        String    @id
+  userKey   String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@index([userKey, revokedAt])
 }

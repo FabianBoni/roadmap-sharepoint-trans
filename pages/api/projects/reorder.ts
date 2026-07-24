@@ -45,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   };
 
   try {
-    const session = requireUserSession(req);
+    const session = await requireUserSession(req);
 
     if (
       !(await isAdminSessionAllowedForInstance({

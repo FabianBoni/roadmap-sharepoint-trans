@@ -181,6 +181,7 @@ const SupportChatWidget = () => {
                         (message.senderRole === 'SUPPORT' ? 'Roadmap-Support' : 'Sie'),
                       direction: message.senderRole === 'VISITOR' ? 'outgoing' : 'incoming',
                       position: 'single',
+                      type: 'text',
                     }}
                   >
                     <Message.Footer

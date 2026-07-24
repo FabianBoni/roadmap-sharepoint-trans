@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const session = extractAdminSession(req);
+    const session = await extractAdminSession(req);
     if (!session) {
       return res
         .status(403)
@@ -74,12 +74,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       isSuperAdmin,
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    console.error('[check-admin-session] Error:', error);
+    console.error('[check-admin-session] request failed', {
+      type: error instanceof Error ? error.name : 'UnknownError',
+    });
     return res.status(500).json({
       authenticated: false,
       isAdmin: false,
-      error: errorMessage,
+      error: 'Internal server error',
     });
   }
 }

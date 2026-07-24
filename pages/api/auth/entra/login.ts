@@ -55,32 +55,18 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const redirectUri = getEntraRedirectUri({ req, env: process.env as EntraRedirectEnv });
   if (!redirectUri || !/^https?:\/\//i.test(redirectUri)) {
-    res.status(500).json({
-      error:
-        'Invalid redirect URI. Set ENTRA_REDIRECT_URI explicitly (must be an absolute http/https URL).',
-      computedRedirectUri: redirectUri,
-    });
+    res.status(500).json({ error: 'Invalid SSO redirect configuration' });
     return;
   }
 
   const envRedirectUri = String(process.env.ENTRA_REDIRECT_URI || '').trim();
   if (envRedirectUri && isRedirectUriLikelyMisconfigured(envRedirectUri)) {
-    // Compute the expected callback URL (ignore the override).
-    const envWithoutOverride = {
-      ...(process.env as EntraRedirectEnv),
-      ENTRA_REDIRECT_URI: undefined,
-    };
-    const expected = getEntraRedirectUri({ req, env: envWithoutOverride });
-
     const returnUrl = normalizeLocalReturnUrl(
       typeof req.query.returnUrl === 'string' ? req.query.returnUrl : null,
       '/admin'
     );
 
-    const msg =
-      `ENTRA_REDIRECT_URI is misconfigured. ` +
-      `It must point to the callback route (/api/auth/entra/callback), not "${envRedirectUri}". ` +
-      `Fix .env and Entra App Registration redirect URI to: ${expected}`;
+    const msg = 'SSO redirect configuration is invalid. Contact an administrator.';
 
     res.redirect(
       302,
@@ -126,8 +112,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     buildSetCookie(COOKIE_STATE, state, common),
     buildSetCookie(COOKIE_NONCE, nonce, common),
     buildSetCookie(COOKIE_VERIFIER, verifier, common),
-    buildSetCookie(COOKIE_RETURN_URL, returnUrlRaw, { ...common, httpOnly: false }),
-    buildSetCookie(COOKIE_POPUP, popup ? '1' : '0', { ...common, httpOnly: false }),
+    buildSetCookie(COOKIE_RETURN_URL, returnUrlRaw, common),
+    buildSetCookie(COOKIE_POPUP, popup ? '1' : '0', common),
   ]);
 
   res.redirect(302, authorizeUrl);

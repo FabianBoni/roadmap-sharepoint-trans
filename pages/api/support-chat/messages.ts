@@ -4,6 +4,7 @@ import {
   SUPPORT_CHAT_MESSAGE_MAX_LENGTH,
   SUPPORT_CHAT_NAME_MAX_LENGTH,
   consumeSupportChatRateLimit,
+  cleanupExpiredSupportChats,
   createSupportChatToken,
   disableSupportChatCache,
   getSupportChatIdentity,
@@ -30,6 +31,7 @@ const loadConversation = async (token: string | null) => {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse>) {
   disableSupportChatCache(res);
+  await cleanupExpiredSupportChats().catch(() => 0);
 
   if (req.method === 'GET') {
     const conversation = await loadConversation(readSupportChatToken(req));
@@ -48,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   }
 
   const existingToken = readSupportChatToken(req);
-  const rateLimit = consumeSupportChatRateLimit(
+  const rateLimit = await consumeSupportChatRateLimit(
     getSupportChatRateLimitKey(
       req,
       existingToken
@@ -69,7 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     return res.status(400).json({ error: 'Die Nachricht ist zu lang.' });
   }
 
-  const identity = getSupportChatIdentity(req);
+  const identity = await getSupportChatIdentity(req);
   const requestedName = normalizeSupportChatText(req.body?.visitorName);
   if (requestedName.length > SUPPORT_CHAT_NAME_MAX_LENGTH) {
     return res.status(400).json({ error: 'Der Name ist zu lang.' });

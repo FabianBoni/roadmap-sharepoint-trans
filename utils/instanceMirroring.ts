@@ -31,10 +31,7 @@ export const normalizeInstanceBadge = (value: unknown): string | null => {
 
 export const getInstanceBadge = (
   instanceOrMetadata:
-    | Pick<RoadmapInstanceConfig, 'metadata'>
-    | Record<string, unknown>
-    | null
-    | undefined
+    Pick<RoadmapInstanceConfig, 'metadata'> | Record<string, unknown> | null | undefined
 ): string | null => {
   const source =
     instanceOrMetadata && 'metadata' in instanceOrMetadata
@@ -189,12 +186,8 @@ export async function getMirroredProjectsForInstance(opts: {
               mirroredProjects,
             }
           : null;
-      } catch (error) {
-        console.warn('[instanceMirroring] failed to load mirrored projects', {
-          sourceSlug: sourceInstance.slug,
-          targetSlug: opts.instance.slug,
-          error,
-        });
+      } catch {
+        console.warn('[instanceMirroring] failed to load mirrored projects');
         return null;
       }
     })

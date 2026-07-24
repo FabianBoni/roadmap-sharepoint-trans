@@ -29,7 +29,7 @@ const disableCache = (res: NextApiResponse) => {
 const normalizeUserKey = (value: unknown): string =>
   typeof value === 'string' ? value.trim().toLowerCase() : '';
 
-const getSessionUser = (session: ReturnType<typeof requireUserSession>) => {
+const getSessionUser = (session: Awaited<ReturnType<typeof requireUserSession>>) => {
   const entra = session.entra && typeof session.entra === 'object' ? session.entra : null;
   const userKey =
     normalizeUserKey(entra?.upn) ||
@@ -83,7 +83,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   let userKey = '';
   let displayName = '';
   try {
-    const session = requireUserSession(req);
+    const session = await requireUserSession(req);
     const user = getSessionUser(session);
     userKey = user.userKey;
     displayName = user.displayName;

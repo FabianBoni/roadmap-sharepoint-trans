@@ -10,6 +10,7 @@ import {
 import { buildSettingsPayload, normalizeHosts, sanitizeSlug, serializeSettings } from './helpers';
 import { provisionSharePointForInstance } from '@/utils/sharePointProvisioning';
 import type { RoadmapInstanceHealth } from '@/types/roadmapInstance';
+import { assertSubmittedTlsPolicy } from '@/utils/tlsPolicy';
 import {
   deleteDepartmentAccessForInstance,
   getAllowedDepartmentsForInstanceSlugs,
@@ -85,6 +86,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       process.env.SP_ALLOW_SELF_SIGNED === 'true' ||
       process.env.SP_TLS_FALLBACK_INSECURE === 'true';
     const defaultTrustedCaPath = process.env.SP_TRUSTED_CA_PATH?.trim() || null;
+    const submittedAllowSelfSigned =
+      typeof sharePoint.allowSelfSigned === 'boolean'
+        ? sharePoint.allowSelfSigned
+        : (existing.allowSelfSigned ?? defaultAllowSelfSigned);
+    try {
+      assertSubmittedTlsPolicy(submittedAllowSelfSigned);
+    } catch (error) {
+      return res.status(400).json({
+        error: error instanceof Error ? error.message : 'Invalid TLS configuration',
+      });
+    }
 
     if (req.body.displayName && typeof req.body.displayName === 'string') {
       data.displayName = req.body.displayName.trim();
@@ -153,9 +165,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       data.settingsJson = serializeSettings(settings);
     }
 
-    data.spUsername = '';
-    data.spPassword = '';
-
     let updated = (await prisma.roadmapInstance.update({
       where: { slug },
       data,
@@ -196,7 +205,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           errors: { __provision: message },
         },
       };
-      // eslint-disable-next-line no-console
+
       console.error('[instances] sharepoint provisioning failed', error);
     }
 

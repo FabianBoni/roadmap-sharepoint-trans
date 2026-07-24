@@ -1,5 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
+import prisma from '@/lib/prisma';
 import {
   exchangeCodeForTokens,
   fetchGraphMe,
@@ -16,7 +18,10 @@ import {
 import { isEntraUserAllowed } from '@/utils/entraSso';
 import {
   getJwtSecret,
+  getSessionAudience,
+  getSessionIssuer,
   getSessionTtlSeconds,
+  getSessionVersion,
   normalizeLocalReturnUrl,
 } from '@/utils/sessionSecurity';
 
@@ -38,19 +43,16 @@ const COOKIE_RETURN_URL = 'entra_return_url';
 const COOKIE_POPUP = 'entra_popup';
 const COOKIE_ADMIN_TOKEN = 'roadmap-admin-token';
 
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+const serializeInlineJson = (value: unknown): string =>
+  JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 
 function renderPopupResultHtml(args: { ok: boolean; username?: string; error?: string }) {
   const payload = args.ok
-    ? `({ type: 'AUTH_SUCCESS', username: '${escapeHtml(args.username || '')}' })`
-    : `({ type: 'AUTH_ERROR', error: '${escapeHtml(args.error || 'SSO fehlgeschlagen')}' })`;
+    ? { type: 'AUTH_SUCCESS', username: args.username || '' }
+    : { type: 'AUTH_ERROR', error: args.error || 'SSO fehlgeschlagen' };
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -64,7 +66,7 @@ function renderPopupResultHtml(args: { ok: boolean; username?: string; error?: s
   <script>
     try {
       if (window.opener) {
-        window.opener.postMessage(${payload}, window.location.origin);
+        window.opener.postMessage(${serializeInlineJson(payload)}, window.location.origin);
       }
     } catch (e) {
       // ignore
@@ -78,10 +80,6 @@ function renderPopupResultHtml(args: { ok: boolean; username?: string; error?: s
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  if (!entraSsoEnabled()) {
-    return res.status(400).send('Entra SSO is not configured');
   }
 
   const cookies = parseCookies(req.headers.cookie);
@@ -98,32 +96,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }),
     buildSetCookie(COOKIE_RETURN_URL, '', {
       maxAgeSeconds: 0,
-      httpOnly: false,
+      httpOnly: true,
       sameSite: 'Lax',
       secure,
     }),
     buildSetCookie(COOKIE_POPUP, '', {
       maxAgeSeconds: 0,
-      httpOnly: false,
+      httpOnly: true,
       sameSite: 'Lax',
       secure,
     }),
   ];
 
+  if (!entraSsoEnabled()) {
+    res.setHeader('Set-Cookie', clearCookies);
+    return res.status(400).send('Entra SSO is not configured');
+  }
+
   const popup = cookies[COOKIE_POPUP] === '1';
   const returnUrl = normalizeLocalReturnUrl(cookies[COOKIE_RETURN_URL], '/admin');
 
   const error = typeof req.query.error === 'string' ? req.query.error : '';
-  const errorDesc =
-    typeof req.query.error_description === 'string' ? req.query.error_description : '';
   if (error) {
     res.setHeader('Set-Cookie', clearCookies);
     if (popup) {
       res.setHeader('Content-Type', 'text/html');
-      return res.status(200).send(renderPopupResultHtml({ ok: false, error: errorDesc || error }));
+      return res
+        .status(200)
+        .send(renderPopupResultHtml({ ok: false, error: 'SSO-Anmeldung fehlgeschlagen' }));
     }
     const target = `/admin/login?returnUrl=${encodeURIComponent(returnUrl)}&error=${encodeURIComponent(
-      errorDesc || error
+      'SSO-Anmeldung fehlgeschlagen'
     )}`;
     return res.redirect(302, target);
   }
@@ -183,11 +186,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let groupNames: string[] = [];
     try {
       groupNames = await fetchGraphMyGroupDisplayNames(tokens.accessToken);
-    } catch (e: unknown) {
+    } catch {
       // Not fatal: many tenants don't grant GroupMember.Read.All.
-      const msg = e instanceof Error ? e.message : 'unknown';
-      // eslint-disable-next-line no-console
-      console.warn('[entra] group fetch skipped/failed:', msg);
+      console.warn('[entra] group fetch skipped/failed');
       groupNames = [];
     }
 
@@ -216,28 +217,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       (typeof me.department === 'string' && me.department.trim() ? me.department : null) ||
       departmentFromClaims;
 
+    const sessionTtlSeconds = getSessionTtlSeconds();
+    const sessionId = randomUUID();
     const appToken = jwt.sign(
       {
         username,
         displayName,
         isAdmin: false,
         source: 'entra',
+        sessionVersion: getSessionVersion(),
         groups: groupNames,
         entra: {
           id: me.id,
+          tenantId,
           upn: me.userPrincipalName,
           mail: me.mail,
           department: resolvedDepartment,
+          onPremisesSamAccountName: me.onPremisesSamAccountName,
+          onPremisesDomainName: me.onPremisesDomainName,
+          onPremisesUserPrincipalName: me.onPremisesUserPrincipalName,
         },
       },
       getJwtSecret(),
-      { expiresIn: getSessionTtlSeconds() }
+      {
+        algorithm: 'HS256',
+        issuer: getSessionIssuer(),
+        audience: getSessionAudience(),
+        jwtid: sessionId,
+        expiresIn: sessionTtlSeconds,
+      }
     );
+
+    await prisma.$transaction([
+      prisma.authSession.deleteMany({ where: { expiresAt: { lte: new Date() } } }),
+      prisma.authSession.create({
+        data: {
+          id: sessionId,
+          userKey: me.id ? `${tenantId}:${me.id}`.toLowerCase() : username.toLowerCase(),
+          expiresAt: new Date(Date.now() + sessionTtlSeconds * 1000),
+        },
+      }),
+    ]);
 
     res.setHeader('Set-Cookie', [
       ...clearCookies,
       buildSetCookie(COOKIE_ADMIN_TOKEN, appToken, {
-        maxAgeSeconds: getSessionTtlSeconds(),
+        maxAgeSeconds: sessionTtlSeconds,
         httpOnly: true,
         sameSite: 'Lax',
         secure,
@@ -253,7 +278,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // This guarantees a full page load on the target route and avoids client-side hash timing.
     return res.redirect(302, returnUrl);
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'SSO fehlgeschlagen';
+    const msg = 'SSO-Anmeldung fehlgeschlagen';
+    const errorType = e instanceof Error ? e.name : 'UnknownError';
+    // OAuth, Graph and database details are server-only diagnostics.
+    console.error('[entra] callback failed:', errorType);
     res.setHeader('Set-Cookie', clearCookies);
     if (popup) {
       res.setHeader('Content-Type', 'text/html');

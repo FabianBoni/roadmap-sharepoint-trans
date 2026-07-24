@@ -652,7 +652,7 @@ const InstancesPage = ({ instances }: LandingPageProps) => {
 };
 
 export const getServerSideProps: GetServerSideProps<LandingPageProps> = async (ctx) => {
-  const session = extractAdminSessionFromHeaders({
+  const session = await extractAdminSessionFromHeaders({
     authorization: ctx.req.headers.authorization,
     cookie: ctx.req.headers.cookie,
   });

@@ -2,6 +2,10 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
+import {
+  isStableAuthorizationIdentifier,
+  normalizeAuthorizationIdentifier,
+} from '@/utils/authorizationIdentity';
 
 type SuperAdminRecord = {
   id: number;
@@ -19,8 +23,7 @@ type ApiResponse =
   | { success: true }
   | { error: string };
 
-const normalize = (value: unknown): string =>
-  typeof value === 'string' ? value.trim().toLowerCase() : '';
+const normalize = normalizeAuthorizationIdentifier;
 
 const disableCache = (res: NextApiResponse) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -88,8 +91,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
     const username = typeof usernameRaw === 'string' ? usernameRaw.trim() : '';
     const normalizedUsername = normalize(username);
-    if (!normalizedUsername) {
-      return res.status(400).json({ error: 'username is required' });
+    if (!isStableAuthorizationIdentifier(username)) {
+      return res.status(400).json({
+        error: 'Use tenantId:objectId, a full UPN/email, or an exact DOMAIN\\account identity',
+      });
     }
 
     const note = typeof noteRaw === 'string' && noteRaw.trim() ? noteRaw.trim() : null;

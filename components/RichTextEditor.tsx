@@ -1,31 +1,5 @@
 import clsx from 'clsx';
-import dynamic from 'next/dynamic';
 import React, { useMemo } from 'react';
-
-const ReactQuill = dynamic(async () => (await import('react-quill')).default, {
-  ssr: false,
-  loading: () => <div className="rich-text-editor-loading">Editor wird geladen…</div>,
-});
-
-const toolbarOptions = [
-  [{ header: [2, 3, false] }],
-  ['bold', 'italic', 'underline', 'strike'],
-  [{ list: 'ordered' }, { list: 'bullet' }],
-  ['blockquote', 'link'],
-  ['clean'],
-];
-
-const formats = [
-  'header',
-  'bold',
-  'italic',
-  'underline',
-  'strike',
-  'list',
-  'bullet',
-  'blockquote',
-  'link',
-];
 
 interface RichTextEditorProps {
   id?: string;
@@ -37,6 +11,20 @@ interface RichTextEditorProps {
   className?: string;
 }
 
+const htmlToPlainText = (value: string): string =>
+  value
+    .replace(/<br\s*\/?\s*>/gi, '\n')
+    .replace(/<\/(?:p|div|li|blockquote|h[1-6])\s*>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
   id,
   value,
@@ -46,19 +34,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   error = false,
   className,
 }) => {
-  const modules = useMemo(
-    () => ({
-      toolbar: toolbarOptions,
-      history: {
-        delay: 400,
-        maxStack: 100,
-        userOnly: true,
-      },
-      clipboard: {
-        matchVisual: false,
-      },
-    }),
-    []
+  const plainValue = useMemo(
+    () => (/<[a-z][\s\S]*>/i.test(value) ? htmlToPlainText(value) : value),
+    [value]
   );
 
   return (
@@ -70,17 +48,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         className
       )}
     >
-      <ReactQuill
+      <textarea
         id={id}
-        theme="snow"
-        value={value}
-        onChange={(nextValue: string) => {
-          onChange(nextValue === '<p><br></p>' ? '' : nextValue);
-        }}
-        modules={modules}
-        formats={formats}
+        value={plainValue}
+        onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        readOnly={disabled}
+        disabled={disabled}
+        rows={8}
+        className="min-h-48 w-full resize-y rounded-md border border-slate-600 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
       />
     </div>
   );

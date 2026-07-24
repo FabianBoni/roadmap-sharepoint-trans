@@ -1,7 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { clientDataService } from '@/utils/clientDataService';
 import { requireUserSession } from '@/utils/apiAuth';
-import { isAdminSessionAllowedForInstance } from '@/utils/instanceAccessServer';
+import {
+  isAdminSessionAllowedForInstance,
+  isReadSessionAllowedForInstance,
+} from '@/utils/instanceAccessServer';
 import { getInstanceConfigFromRequest } from '@/utils/instanceConfig';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { sanitizeSettingRichTextFields } from '@/utils/richText';
@@ -10,8 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let instance: RoadmapInstanceConfig | null = null;
   try {
     instance = await getInstanceConfigFromRequest(req);
-  } catch (error) {
-    console.error('[api/settings] failed to resolve instance', error);
+  } catch {
+    console.error('[api/settings] failed to resolve instance');
     return res.status(500).json({ message: 'Failed to resolve roadmap instance' });
   }
   if (!instance) {
@@ -24,23 +27,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     cookie: typeof req.headers.cookie === 'string' ? req.headers.cookie : undefined,
   };
 
-  // Check authentication for write operations
-  if (req.method !== 'GET') {
-    try {
-      const session = requireUserSession(req);
-      if (
-        !(await isAdminSessionAllowedForInstance({
-          session,
-          instance,
-          requestHeaders: forwardedHeaders,
-        }))
-      ) {
-        return res.status(403).json({ message: 'Forbidden' });
-      }
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
+  try {
+    const session = await requireUserSession(req);
+    const allowed =
+      req.method === 'GET'
+        ? await isReadSessionAllowedForInstance({
+            session,
+            instance,
+            requestHeaders: forwardedHeaders,
+          })
+        : await isAdminSessionAllowedForInstance({
+            session,
+            instance,
+            requestHeaders: forwardedHeaders,
+          });
+    if (!allowed) return res.status(403).json({ message: 'Forbidden' });
+  } catch {
+    return res.status(401).json({ message: 'Unauthorized' });
   }
 
   if (req.method === 'GET') {
@@ -49,8 +52,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         clientDataService.getAppSettings()
       );
       return res.status(200).json(settings);
-    } catch (error) {
-      console.error('Error fetching settings:', error);
+    } catch {
+      console.error('Error fetching settings');
       return res.status(500).json({ message: 'Error fetching settings' });
     }
   } else if (req.method === 'POST') {
@@ -73,8 +76,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
 
       return res.status(201).json(newSetting);
-    } catch (error) {
-      console.error('Error creating setting:', error);
+    } catch {
+      console.error('Error creating setting');
       return res.status(500).json({ message: 'Error creating setting' });
     }
   } else {

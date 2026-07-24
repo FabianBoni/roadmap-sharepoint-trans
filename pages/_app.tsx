@@ -3,11 +3,11 @@ import { useRouter } from 'next/router';
 import { clientDataService } from '@/utils/clientDataService';
 import { initializeIcons } from '@fluentui/react/lib/Icons';
 import type { AppProps } from 'next/app';
+import App, { type AppContext } from 'next/app';
 import type { Category, Project } from '@/types';
 import '@chatscope/chat-ui-kit-styles/dist/default/styles.min.css';
 import './css/design-system.css';
 import './css/globals.css';
-import 'react-quill/dist/quill.snow.css';
 import { INSTANCE_COOKIE_NAME, INSTANCE_QUERY_PARAM } from '@/utils/instanceConfig';
 import SiteFooter from '@/components/SiteFooter';
 import SiteHeader from '@/components/SiteHeader';
@@ -165,5 +165,9 @@ function RoadmapApp({ Component, pageProps }: AppProps): JSX.Element {
     </>
   );
 }
+
+// A nonce must be unique per HTTP response. Disabling automatic static optimization here ensures
+// that _document.tsx generates a fresh CSP nonce for pages that do not define their own data hook.
+RoadmapApp.getInitialProps = async (context: AppContext) => App.getInitialProps(context);
 
 export default RoadmapApp;

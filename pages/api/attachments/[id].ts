@@ -14,16 +14,16 @@ import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import {
   AttachmentValidationError,
   buildStorageFileName,
-  MAX_ATTACHMENT_CHUNK_BYTES,
   toAttachmentDocument,
   validateAttachmentName,
   validateDeclaredSize,
   validateDocumentId,
   validateInitialFileContent,
   validateProjectId,
-  validateUploadId,
 } from '@/utils/attachmentDocuments';
 import { randomUUID } from 'crypto';
+import { getInternalApiBaseUrl } from '@/utils/internalApiBaseUrl';
+import { MalwareScanError, scanBufferForMalware } from '@/utils/malwareScan';
 
 export const config = {
   api: {
@@ -154,9 +154,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: message });
   }
 
-  let session: ReturnType<typeof requireUserSession>;
+  let session: Awaited<ReturnType<typeof requireUserSession>>;
   try {
-    session = requireUserSession(req);
+    session = await requireUserSession(req);
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -165,8 +165,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let instance: RoadmapInstanceConfig | null = null;
     try {
       instance = await getInstanceConfigFromRequest(req);
-    } catch (error) {
-      console.error('[api/attachments] failed to resolve instance', error);
+    } catch {
+      console.error('[api/attachments] failed to resolve instance');
       return res.status(500).json({ error: 'Failed to resolve roadmap instance' });
     }
     if (!instance) {
@@ -204,9 +204,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Project not found in this roadmap instance' });
     }
 
-    const baseUrl =
-      (process.env.INTERNAL_API_BASE_URL || '').replace(/\/$/, '') ||
-      `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}`;
+    const baseUrl = getInternalApiBaseUrl();
 
     const withSlug = (rawUrl: string) => {
       try {
@@ -301,28 +299,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return `${folderUrl}/${fileName}`;
     };
 
-    const ensureEmptyFile = async (fileUrl: string) => {
-      const addUrl = withSlug(
-        `${baseUrl}/api/sharepoint/_api/web/GetFolderByServerRelativeUrl('${encodeServerRelativeUrl(
-          fileUrl.slice(0, fileUrl.lastIndexOf('/'))
-        )}')/Files/add(url='${encodeURIComponent(fileUrl.slice(fileUrl.lastIndexOf('/') + 1)).replace(/'/g, "''")}',overwrite=true)`
-      );
-      const r = await fetch(addUrl, {
-        method: 'POST',
-        headers: attachHeaders({
-          Accept: 'application/json;odata=nometadata',
-          'Content-Type': 'application/octet-stream',
-        }),
-        body: new Uint8Array(0),
-      });
-      if (!r.ok && r.status !== 409) {
-        const body = await r.text();
-        if (!/already exists|bereits vorhanden|duplicate|same name/i.test(body)) {
-          throw new Error(`attachment-file-init-failed:${r.status}:${body}`);
-        }
-      }
-    };
-
     const deleteFile = async (rootFolderUrl: string, fileName: string) => {
       const fileUrl = fileUrlFor(rootFolderUrl, fileName);
       const url = withSlug(
@@ -386,12 +362,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         body: JSON.stringify(metadata),
       });
       if (!response.ok) {
-        const detail = await response.text().catch(() => '');
+        await response.body?.cancel().catch(() => undefined);
         console.warn('[api/attachments] file uploaded but metadata update failed', {
           status: response.status,
           projectId,
           documentId,
-          detail: detail.slice(0, 300),
         });
       }
     };
@@ -425,7 +400,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
         const atomText = await atomResp.text();
         if (!atomResp.ok) {
-          return res.status(atomResp.status).json({ error: 'sp-error', payload: atomText });
+          return res.status(atomResp.status).json({ error: 'SharePoint request failed' });
         }
         try {
           const entries = atomText.match(/<entry[\s\S]*?<\/entry>/gi) || [];
@@ -451,7 +426,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (!attempt.r.ok) {
         if (attempt.r.status === 404) return res.status(200).json([]);
-        return res.status(attempt.r.status).json({ error: 'sp-error', payload: attempt.payload });
+        return res.status(attempt.r.status).json({ error: 'SharePoint request failed' });
       }
 
       const files = extractFileArray(attempt.payload, folderUrl);
@@ -473,80 +448,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const isChunked = String(req.query.chunked || '').toLowerCase() === '1';
       if (isChunked) {
-        const actionRaw = req.query.action;
-        const action = Array.isArray(actionRaw) ? actionRaw[0] : actionRaw;
-        const uploadId = validateUploadId(req.query.uploadId);
-        const offsetRaw = req.query.offset;
-        const offset = Number(Array.isArray(offsetRaw) ? offsetRaw[0] : offsetRaw || 0);
-
-        if (!action || !Number.isSafeInteger(offset) || offset < 0) {
-          return res.status(400).json({ error: 'Missing chunked upload parameters' });
-        }
-
-        if ((action === 'start' && offset !== 0) || (action !== 'start' && offset === 0)) {
-          return res.status(400).json({ error: 'Invalid chunk offset' });
-        }
-
-        const storageName = buildStorageFileName(uploadId, originalName);
-        const fileUrl = fileUrlFor(rootFolderUrl, storageName);
-        const encodedFileUrl = encodeServerRelativeUrl(fileUrl);
-        const filePath = `${baseUrl}/api/sharepoint/_api/web/GetFileByServerRelativeUrl('${encodedFileUrl}')`;
-        const binary = await readRawBody(req, MAX_ATTACHMENT_CHUNK_BYTES);
-        if (offset + binary.byteLength > totalSize) {
-          return res.status(400).json({ error: 'Chunk exceeds declared file size' });
-        }
-        if (action === 'finish' && offset + binary.byteLength !== totalSize) {
-          return res.status(400).json({ error: 'Final chunk does not match declared file size' });
-        }
-        if (action === 'start') {
-          validateInitialFileContent(originalName, binary);
-          try {
-            await ensureEmptyFile(fileUrl);
-          } catch (error: unknown) {
-            const msg = error instanceof Error ? error.message : 'attachment-file-init-error';
-            return res.status(500).json({ error: msg });
-          }
-        }
-
-        let spEndpoint = '';
-        if (action === 'start') {
-          spEndpoint = `${filePath}/StartUpload(uploadId=guid'${uploadId}')`;
-        } else if (action === 'continue') {
-          spEndpoint = `${filePath}/ContinueUpload(uploadId=guid'${uploadId}',fileOffset=${offset})`;
-        } else if (action === 'finish') {
-          spEndpoint = `${filePath}/FinishUpload(uploadId=guid'${uploadId}',fileOffset=${offset})`;
-        } else {
-          return res.status(400).json({ error: 'Invalid chunked action' });
-        }
-
-        const r = await fetch(withSlug(spEndpoint), {
-          method: 'POST',
-          headers: attachHeaders({
-            Accept: 'application/json;odata=nometadata',
-            'Content-Type': 'application/octet-stream',
-          }),
-          body: toArrayBuffer(binary),
-        });
-        const bodyText = await r.text();
-        if (!r.ok) {
-          return res.status(r.status).json({ error: 'sp-upload-failed', body: bodyText });
-        }
-
-        const payload = extractJsonPayload(bodyText, r.headers.get('content-type') || '');
-        const nextOffset =
-          getNested(payload, ['value']) ??
-          getNested(payload, ['d', 'StartUpload']) ??
-          getNested(payload, ['d', 'ContinueUpload']) ??
-          getNested(payload, ['d', 'FinishUpload']) ??
-          undefined;
-
-        if (action === 'finish') {
-          await writeFileMetadata(fileUrl, uploadId, originalName);
-        }
-        return res.status(200).json({
-          ok: true,
-          nextOffset,
-          document: toAttachmentDocument(storageName, fileUrl),
+        return res.status(400).json({
+          error: 'Chunked uploads are disabled because files must be scanned before storage',
         });
       }
 
@@ -555,6 +458,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Upload size does not match declared file size' });
       }
       validateInitialFileContent(originalName, binary);
+      await scanBufferForMalware(binary);
       const documentId = randomUUID();
       const storageName = buildStorageFileName(documentId, originalName);
       const fileUrl = fileUrlFor(rootFolderUrl, storageName);
@@ -569,8 +473,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }),
         body: toArrayBuffer(binary),
       });
-      const body = await r.text();
-      if (!r.ok) return res.status(r.status).json({ error: 'sp-upload-failed', body });
+      await r.body?.cancel().catch(() => undefined);
+      if (!r.ok) return res.status(r.status).json({ error: 'SharePoint upload failed' });
       await writeFileMetadata(fileUrl, documentId, originalName);
       return res.status(200).json({
         ok: true,
@@ -620,7 +524,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (error instanceof AttachmentValidationError) {
       return res.status(error.status).json({ error: error.message });
     }
-    const message = error instanceof Error ? error.message : 'attachments error';
-    return res.status(500).json({ error: message });
+    if (error instanceof MalwareScanError) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    console.error('[api/attachments] request failed', {
+      type: error instanceof Error ? error.name : 'UnknownError',
+    });
+    return res.status(500).json({ error: 'Attachment request failed' });
   }
 }

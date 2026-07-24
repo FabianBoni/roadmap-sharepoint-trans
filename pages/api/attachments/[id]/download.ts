@@ -17,6 +17,7 @@ import {
 } from '@/utils/attachmentDocuments';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
+import { getInternalApiBaseUrl } from '@/utils/internalApiBaseUrl';
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : null;
@@ -167,9 +168,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  let session: ReturnType<typeof requireUserSession>;
+  let session: Awaited<ReturnType<typeof requireUserSession>>;
   try {
-    session = requireUserSession(req);
+    session = await requireUserSession(req);
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -188,8 +189,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let instance: RoadmapInstanceConfig | null = null;
     try {
       instance = await getInstanceConfigFromRequest(req);
-    } catch (error) {
-      console.error('[attachments:download] failed to resolve instance', error);
+    } catch {
+      console.error('[attachments:download] failed to resolve instance');
       return res.status(500).json({ error: 'Failed to resolve roadmap instance' });
     }
     if (!instance) {
@@ -221,9 +222,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Project not found in this roadmap instance' });
     }
 
-    const baseUrl =
-      (process.env.INTERNAL_API_BASE_URL || '').replace(/\/$/, '') ||
-      `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers['x-forwarded-host'] || req.headers.host}`;
+    const baseUrl = getInternalApiBaseUrl();
 
     const withSlug = (rawUrl: string) => {
       try {

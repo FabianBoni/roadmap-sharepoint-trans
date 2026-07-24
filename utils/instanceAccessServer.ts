@@ -28,11 +28,26 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 
 const extractIdentifiers = (session: AdminSessionPayload | null | undefined) => {
   const username = typeof session?.username === 'string' ? session.username : null;
-  const displayName = typeof session?.displayName === 'string' ? session.displayName : null;
   const sessionRecord = asRecord(session);
   const entra = asRecord(session?.entra);
+  const objectId = entra && typeof entra.id === 'string' ? entra.id : null;
+  const tenantId = entra && typeof entra.tenantId === 'string' ? entra.tenantId : null;
   const upn = entra && typeof entra.upn === 'string' ? entra.upn : null;
   const mail = entra && typeof entra.mail === 'string' ? entra.mail : null;
+  const onPremisesUserPrincipalName =
+    entra && typeof entra.onPremisesUserPrincipalName === 'string'
+      ? entra.onPremisesUserPrincipalName
+      : null;
+  const onPremisesSamAccountName =
+    entra && typeof entra.onPremisesSamAccountName === 'string'
+      ? entra.onPremisesSamAccountName
+      : null;
+  const onPremisesDomainName =
+    entra && typeof entra.onPremisesDomainName === 'string' ? entra.onPremisesDomainName : null;
+  const onPremisesAccountName =
+    onPremisesDomainName && onPremisesSamAccountName
+      ? `${onPremisesDomainName}\\${onPremisesSamAccountName}`
+      : null;
   const department =
     (entra && typeof entra.department === 'string' ? entra.department : null) ||
     (sessionRecord && typeof sessionRecord.department === 'string'
@@ -41,7 +56,17 @@ const extractIdentifiers = (session: AdminSessionPayload | null | undefined) => 
   const groups = Array.isArray(session?.groups)
     ? session.groups.filter((g): g is string => typeof g === 'string')
     : [];
-  return { username, upn, mail, displayName, department, groups };
+  return {
+    username,
+    objectId,
+    tenantId,
+    upn,
+    mail,
+    onPremisesUserPrincipalName,
+    onPremisesAccountName,
+    department,
+    groups,
+  };
 };
 
 async function resolveDepartmentForIdentifiers(opts: {
@@ -55,7 +80,8 @@ async function resolveDepartmentForIdentifiers(opts: {
         username: opts.identifiers.username,
         upn: opts.identifiers.upn,
         mail: opts.identifiers.mail,
-        displayName: opts.identifiers.displayName,
+        onPremisesUserPrincipalName: opts.identifiers.onPremisesUserPrincipalName,
+        onPremisesAccountName: opts.identifiers.onPremisesAccountName,
       })
     )
   );
@@ -118,15 +144,19 @@ async function isSessionAllowedForInstance(
   }
 
   const principal: Principal = {
-    username:
-      (typeof session?.username === 'string' && session.username) ||
-      (typeof session?.displayName === 'string' && session.displayName) ||
-      null,
+    username: (typeof session?.username === 'string' && session.username) || null,
     groups: session?.groups,
   };
 
   const ids = extractIdentifiers(session);
-  const directUserCandidates = [ids.username, ids.upn, ids.mail, ids.displayName];
+  const directUserCandidates = [
+    ids.tenantId && ids.objectId ? `${ids.tenantId}:${ids.objectId}` : null,
+    ids.username,
+    ids.upn,
+    ids.mail,
+    ids.onPremisesUserPrincipalName,
+    ids.onPremisesAccountName,
+  ];
   if (
     directUserCandidates.some((candidate) =>
       isAdminUserAllowedForInstance(candidate, effectiveInstance)

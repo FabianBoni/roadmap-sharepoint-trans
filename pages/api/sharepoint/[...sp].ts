@@ -8,7 +8,11 @@ import { getInstanceConfigFromRequest, INSTANCE_QUERY_PARAM } from '@/utils/inst
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { sharePointHttpsAgent, sharePointDispatcher } from '@/utils/httpsAgent';
 import { requireUserSession } from '@/utils/apiAuth';
-import { isAdminSessionAllowedForInstance } from '@/utils/instanceAccessServer';
+import {
+  isAdminSessionAllowedForInstance,
+  isReadSessionAllowedForInstance,
+} from '@/utils/instanceAccessServer';
+import { isTrustedInternalApiRequest } from '@/utils/internalApiAuth';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 
@@ -19,62 +23,111 @@ export const config = {
   },
 };
 
-// Fallback constructors for insecure TLS retry when allowed
-// @ts-ignore builtin without node types in some build envs
-const https = require('https');
-// @ts-ignore import undici Agent dynamically to avoid hard dep in some analyzers
-const { Agent: UndiciAgent } = require('undici');
 // @ts-ignore child_process without node types in some build envs
 const { execFile } = require('child_process');
+const fsPromises = require('fs/promises');
+const os = require('os');
+const nodePath = require('path');
 
-function runCurl(
-  args: string[],
-  options: { timeout?: number; input?: Buffer | string; maxBuffer?: number } = {}
-): Promise<{ stdout: string; stderr: string }> {
-  const { timeout = 20000, input, maxBuffer = 50 * 1024 * 1024 } = options;
-  return new Promise((resolve, reject) => {
-    const child = execFile(
-      'curl',
-      args,
-      { timeout, maxBuffer },
-      (err: any, stdout: string, stderr: string) => {
-        if (err) return reject(Object.assign(err, { stderr }));
-        resolve({ stdout, stderr });
-      }
-    );
-    if (input !== undefined && input !== null && child && child.stdin) {
-      child.stdin.on('error', () => {
-        /* ignore broken pipe */
-      });
-      child.stdin.end(input);
-    }
+const quoteCurlConfigValue = (value: string): string =>
+  `"${value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')}"`;
+
+async function prepareCurlCredentialConfig(
+  originalArgs: string[],
+  credentials?: string
+): Promise<{ args: string[]; cleanup: () => Promise<void> }> {
+  if (credentials === undefined) {
+    return { args: [...originalArgs], cleanup: async () => undefined };
+  }
+
+  const directory = await fsPromises.mkdtemp(nodePath.join(os.tmpdir(), 'roadmap-curl-'));
+  const configPath = nodePath.join(directory, 'credentials.conf');
+  await fsPromises.writeFile(configPath, `user = ${quoteCurlConfigValue(credentials)}\n`, {
+    encoding: 'utf8',
+    mode: 0o600,
   });
+  await fsPromises.chmod(directory, 0o700).catch(() => undefined);
+
+  return {
+    args: ['--config', configPath, ...originalArgs],
+    cleanup: () => fsPromises.rm(directory, { recursive: true, force: true }),
+  };
 }
 
-function runCurlBuffer(
+async function runCurl(
   args: string[],
-  options: { timeout?: number; input?: Buffer | string; maxBuffer?: number } = {}
-): Promise<{ stdout: Buffer; stderr: string }> {
-  const { timeout = 20000, input, maxBuffer = 50 * 1024 * 1024 } = options;
-  return new Promise((resolve, reject) => {
-    const child = execFile(
-      'curl',
-      args,
-      { timeout, maxBuffer, encoding: 'buffer' as BufferEncoding },
-      (err: any, stdout: Buffer | string, stderr: Buffer | string) => {
-        const stdoutBuffer = Buffer.isBuffer(stdout) ? stdout : Buffer.from(String(stdout || ''));
-        const stderrText = Buffer.isBuffer(stderr) ? stderr.toString('utf8') : String(stderr || '');
-        if (err) return reject(Object.assign(err, { stderr: stderrText }));
-        resolve({ stdout: stdoutBuffer, stderr: stderrText });
+  options: {
+    timeout?: number;
+    input?: Buffer | string;
+    maxBuffer?: number;
+    credentials?: string;
+  } = {}
+): Promise<{ stdout: string; stderr: string }> {
+  const { timeout = 20000, input, maxBuffer = 50 * 1024 * 1024, credentials } = options;
+  const prepared = await prepareCurlCredentialConfig(args, credentials);
+  try {
+    return await new Promise((resolve, reject) => {
+      const child = execFile(
+        'curl',
+        prepared.args,
+        { timeout, maxBuffer },
+        (err: any, stdout: string, stderr: string) => {
+          if (err) return reject(Object.assign(err, { stderr }));
+          resolve({ stdout, stderr });
+        }
+      );
+      if (input !== undefined && input !== null && child && child.stdin) {
+        child.stdin.on('error', () => {
+          /* ignore broken pipe */
+        });
+        child.stdin.end(input);
       }
-    );
-    if (input !== undefined && input !== null && child && child.stdin) {
-      child.stdin.on('error', () => {
-        /* ignore broken pipe */
-      });
-      child.stdin.end(input);
-    }
-  });
+    });
+  } finally {
+    await prepared.cleanup();
+  }
+}
+
+async function runCurlBuffer(
+  args: string[],
+  options: {
+    timeout?: number;
+    input?: Buffer | string;
+    maxBuffer?: number;
+    credentials?: string;
+  } = {}
+): Promise<{ stdout: Buffer; stderr: string }> {
+  const { timeout = 20000, input, maxBuffer = 50 * 1024 * 1024, credentials } = options;
+  const prepared = await prepareCurlCredentialConfig(args, credentials);
+  try {
+    return await new Promise((resolve, reject) => {
+      const child = execFile(
+        'curl',
+        prepared.args,
+        { timeout, maxBuffer, encoding: 'buffer' as BufferEncoding },
+        (err: any, stdout: Buffer | string, stderr: Buffer | string) => {
+          const stdoutBuffer = Buffer.isBuffer(stdout) ? stdout : Buffer.from(String(stdout || ''));
+          const stderrText = Buffer.isBuffer(stderr)
+            ? stderr.toString('utf8')
+            : String(stderr || '');
+          if (err) return reject(Object.assign(err, { stderr: stderrText }));
+          resolve({ stdout: stdoutBuffer, stderr: stderrText });
+        }
+      );
+      if (input !== undefined && input !== null && child && child.stdin) {
+        child.stdin.on('error', () => {
+          /* ignore broken pipe */
+        });
+        child.stdin.end(input);
+      }
+    });
+  } finally {
+    await prepared.cleanup();
+  }
 }
 
 // Simple in-memory cache for curl mode GET responses
@@ -203,7 +256,7 @@ const isAllowedRoadmapDocumentLibraryPath = (serverRelativePathRaw: string): boo
 };
 
 // Allow /_api/contextinfo for digest retrieval
-export function isAllowedPath(path: string) {
+export function isAllowedPath(path: string, method = 'GET', trustedInternal = false) {
   // Normalize trailing slashes (except root) so /_api/contextinfo/ is treated like /_api/contextinfo
   const cleaned = path.endsWith('/') ? path.replace(/\/+$/, '') : path;
   if (cleaned === '/_api/contextinfo') return true;
@@ -255,9 +308,9 @@ export function isAllowedPath(path: string) {
     )
   )
     return true;
-  // Optional debug allowance to enumerate lists (avoids needing a specific list) ONLY when SP_PROXY_DEBUG enabled
-  // @ts-ignore
-  if (process.env.SP_PROXY_DEBUG === 'true' && cleaned === '/_api/web/lists') return true;
+  if (cleaned === '/_api/web/ensureuser') return trustedInternal && method === 'POST';
+  if (/^\/_api\/web\/siteusers(?:\/getByEmail\('[^']+'\))?$/i.test(cleaned)) return true;
+  if (/^\/_api\/web\/getuserbyid\(\d+\)(?:\/groups)?$/i.test(cleaned)) return true;
 
   // Allow attachment operations by server-relative URL, but only inside whitelisted Roadmap list paths.
   // Covers folder creation and chunked upload/download endpoints.
@@ -291,8 +344,9 @@ export function isAllowedPath(path: string) {
     );
   }
 
-  if (!cleaned.startsWith('/_api/web/lists')) return false;
-  const match = cleaned.match(/getByTitle\('([^']+)'\)/);
+  if (cleaned === '/_api/web/lists') return trustedInternal && method === 'POST';
+  if (!cleaned.startsWith('/_api/web/lists/getByTitle')) return false;
+  const match = cleaned.match(/^\/_api\/web\/lists\/getByTitle\('([^']+)'\)(.*)$/i);
   if (!match) return false;
   const rawTitle = match[1];
   let decodedTitle = rawTitle;
@@ -301,7 +355,17 @@ export function isAllowedPath(path: string) {
   } catch {
     /* ignore decode errors */
   }
-  return ALLOWED_LISTS.has(decodedTitle) || ALLOWED_LISTS.has(rawTitle);
+  if (!ALLOWED_LISTS.has(decodedTitle) && !ALLOWED_LISTS.has(rawTitle)) return false;
+  const operation = match[2] || '';
+  return (
+    operation === '' ||
+    /^\/items(?:\(\d+\))?$/i.test(operation) ||
+    /^\/fields$/i.test(operation) ||
+    /^\/fields\(guid'[0-9a-f-]{36}'\)$/i.test(operation) ||
+    /^\/fields\/getByInternalNameOrTitle\('[^']+'\)$/i.test(operation) ||
+    /^\/fields\/CreateFieldAsXml$/i.test(operation) ||
+    /^\/RootFolder(?:\/Properties)?$/i.test(operation)
+  );
 }
 
 // Basic in-process digest cache (optional, improves performance for writes)
@@ -323,36 +387,15 @@ async function getDigest(site: string, auth: SharePointAuthContext): Promise<str
     'Content-Length': '0',
     ...auth.headers,
   };
-  const makeFetchOpts = (insecure = false) => ({
+  const makeFetchOpts = () => ({
     method: 'POST',
     headers,
     // @ts-ignore undici fetch supports dispatcher
-    dispatcher: insecure
-      ? new UndiciAgent({ connect: { rejectUnauthorized: false } })
-      : (sharePointDispatcher ?? undefined),
+    dispatcher: sharePointDispatcher ?? undefined,
     // @ts-ignore optional legacy agent
-    agent: insecure ? new https.Agent({ rejectUnauthorized: false }) : sharePointHttpsAgent,
+    agent: sharePointHttpsAgent,
   });
-  let r: Response;
-  try {
-    r = await fetch(url, makeFetchOpts(false) as any);
-  } catch (e: any) {
-    const allowInsecure =
-      process.env.SP_ALLOW_SELF_SIGNED === 'true' ||
-      process.env.SP_TLS_FALLBACK_INSECURE === 'true';
-    const msg = String(e?.cause?.message || e?.message || '').toLowerCase();
-    if (
-      allowInsecure &&
-      (e?.cause?.code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
-        /self-signed|certificate in certificate chain/.test(msg))
-    ) {
-      // eslint-disable-next-line no-console
-      console.warn('[sharepoint proxy] contextinfo TLS error; retrying insecure due to env flag');
-      r = await fetch(url, makeFetchOpts(true) as any);
-    } else {
-      throw e;
-    }
-  }
+  const r = await fetch(url, makeFetchOpts() as any);
   if (!r.ok) throw new Error('Failed to get contextinfo');
   const j = await r.json();
   digestCache[cacheKey] = {
@@ -430,10 +473,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const requestMethod = String(req.method || 'GET').toUpperCase();
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(requestMethod)) {
+  if (requestMethod === 'OPTIONS') {
+    res.setHeader('Allow', ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']);
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const trustedInternalRequest = isTrustedInternalApiRequest(req);
+  if (!trustedInternalRequest) {
     try {
-      const session = requireUserSession(req);
-      const allowed = await isAdminSessionAllowedForInstance({
+      const session = await requireUserSession(req);
+      const checkAccess = ['GET', 'HEAD'].includes(requestMethod)
+        ? isReadSessionAllowedForInstance
+        : isAdminSessionAllowedForInstance;
+      const allowed = await checkAccess({
         session,
         instance,
         requestHeaders: {
@@ -449,7 +501,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   res.setHeader('X-Roadmap-Instance', instance.slug);
-  res.setHeader('X-SharePoint-Site', resolveSharePointSiteUrl(instance));
 
   const site = resolveSharePointSiteUrl(instance);
   const segments = (req.query.sp as string[] | undefined) || [];
@@ -489,7 +540,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'Path not allowed' });
   }
 
-  if (!isAllowedPath(apiPath)) {
+  if (!isAllowedPath(apiPath, requestMethod, trustedInternalRequest)) {
     return res.status(400).json({ error: 'Path not allowed' });
   }
 
@@ -519,10 +570,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
     const useCurlKerberos = strategy === 'kerberos';
     const effectiveCredentials = getPrimaryCredentials();
-    const allowSelfSigned =
-      instance?.sharePoint?.allowSelfSigned === true ||
-      process.env.SP_ALLOW_SELF_SIGNED === 'true' ||
-      process.env.SP_TLS_FALLBACK_INSECURE === 'true';
     const caPath = (
       instance?.sharePoint?.trustedCaPath ||
       process.env.SP_TRUSTED_CA_PATH ||
@@ -537,22 +584,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const delegatedUser = delegatedUserCandidates
       .map((v) => (Array.isArray(v) ? v[0] : v))
       .find((v) => typeof v === 'string' && v.trim()) as string | undefined;
+    const trustedProxyAddresses = new Set(
+      String(process.env.TRUSTED_PROXY_ADDRESSES || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    );
+    const delegatedProxyTrusted =
+      process.env.SP_TRUST_DELEGATED_PROXY === 'true' &&
+      trustedProxyAddresses.has(req.socket.remoteAddress || '');
 
-    if (strategy === 'delegated' && process.env.SP_TRUST_DELEGATED_PROXY !== 'true') {
-      return res.status(503).json({
-        error: 'Delegated authentication is disabled',
-        detail:
-          'Set SP_TRUST_DELEGATED_PROXY=true only when a trusted reverse proxy strips client-supplied identity headers and injects authenticated identity.',
-        instance: instance.slug,
-      });
+    if (strategy === 'delegated' && !delegatedProxyTrusted) {
+      return res.status(503).json({ error: 'Delegated authentication is disabled' });
     }
     if (strategy === 'delegated' && !delegatedUser) {
-      return res.status(401).json({
-        error: 'Delegated identity missing',
-        detail:
-          'Expected one of x-remote-user, remote-user, x-forwarded-user, x-authenticated-user from reverse proxy.',
-        instance: instance.slug,
-      });
+      return res.status(401).json({ error: 'Delegated identity missing' });
     }
     if (strategy === 'delegated' && delegatedUser) {
       res.setHeader('x-sp-delegated-user', delegatedUser);
@@ -567,12 +613,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const serviceUserRaw = (effectiveCredentials?.username || '').trim();
       const serviceUser = serviceUserRaw.replace(/\\+/g, '\\');
       const servicePass = effectiveCredentials?.password || '';
-      const kerberosIdentity = serviceUser || '<process-default-kerberos-identity>';
       if (process.env.SP_PROXY_DEBUG === 'true') {
         // eslint-disable-next-line no-console
         console.info('[sharepoint proxy] kerberos identity', {
           instance: instance.slug,
-          kerberosIdentity,
           userNormalized: serviceUser !== serviceUserRaw,
           credentialMode: serviceUser ? 'env-service-user' : 'process-identity',
           passwordConfigured: Boolean(servicePass),
@@ -600,8 +644,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const headArgs: string[] = [
             '-sS',
             '--negotiate',
-            '--user',
-            cred,
             '--noproxy',
             '*',
             '-I',
@@ -609,27 +651,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             `Accept: ${clientAccept}`,
             targetUrl,
           ];
-          if (allowSelfSigned) headArgs.unshift('-k');
-          else if (caPath) headArgs.unshift('--cacert', caPath);
+          if (caPath) headArgs.unshift('--cacert', caPath);
           if (process.env.SP_CURL_VERBOSE === 'true') headArgs.unshift('-v');
           try {
-            await new Promise((resolveExec, rejectExec) => {
-              execFile(
-                'curl',
-                headArgs,
-                { timeout: 15000 },
-                (err: any, stdout: string, stderr: string) => {
-                  if (err) return rejectExec(Object.assign(err, { stderr }));
-                  resolveExec({ stdout, stderr });
-                }
-              );
-            });
+            await runCurl(headArgs, { timeout: 15000, credentials: cred });
             res.setHeader('x-sp-proxy-mode', 'curl');
             return res.status(200).json({ ok: true });
           } catch (e: any) {
-            return res
-              .status(500)
-              .json({ error: 'curl-head-failed', detail: e.message, stderr: e.stderr });
+            return res.status(502).json({ error: 'SharePoint request failed' });
           }
         }
         // Prepare common args
@@ -640,8 +669,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const args: string[] = [
             '-sS',
             authScheme === 'ntlm' ? '--ntlm' : '--negotiate',
-            '--user',
-            cred,
             '--noproxy',
             '*',
             '-X',
@@ -651,8 +678,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             '-H',
             `Accept: ${clientAccept}`,
           ];
-          if (allowSelfSigned) args.unshift('-k');
-          else if (caPath) args.unshift('--cacert', caPath);
+          if (caPath) args.unshift('--cacert', caPath);
           if (process.env.SP_CURL_VERBOSE === 'true') args.unshift('-v');
           return args;
         };
@@ -735,6 +761,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const output = await runCurl(args, {
             timeout: 20000,
             input,
+            credentials: cred,
           });
           const status = extractCurlStatusAndBody(output.stdout);
           const payload = parseWritePayload(status.payloadText);
@@ -875,27 +902,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           if (writeAttempt.authFailure) {
             return res.status(writeAttempt.authFailure.status).json({
-              error:
-                writeAttempt.authFailure.status === 403
-                  ? 'Forbidden (curl)'
-                  : 'Unauthorized (curl)',
-              snippet: writeAttempt.authFailure.snippet,
-              instance: instance.slug,
-              targetUrl,
-              method,
-              ntlmEligible: Boolean(canUseNtlmFallback),
-              ntlmEnabled: ntlmFallbackEnabled,
+              error: writeAttempt.authFailure.status === 403 ? 'Forbidden' : 'Unauthorized',
             });
           }
 
           if (writeAttempt.status.statusCode >= 400) {
             return res.status(writeAttempt.status.statusCode).json({
               error: 'SharePoint write failed',
-              snippet:
-                summarizePayload(writeAttempt.payload) || `http ${writeAttempt.status.statusCode}`,
-              instance: instance.slug,
-              targetUrl,
-              method,
             });
           }
 
@@ -904,17 +917,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           invalidateCurlCache();
           return res.status(200).json(parsed);
         } catch (e: any) {
-          return res
-            .status(500)
-            .json({ error: 'curl-post-failed', detail: e.message, stderr: e.stderr });
+          return res.status(502).json({ error: 'SharePoint request failed' });
         }
       }
       const makeReadCurlArgs = (authScheme: 'negotiate' | 'ntlm'): string[] => {
         const args = [
           '-sS',
           authScheme === 'ntlm' ? '--ntlm' : '--negotiate',
-          '--user',
-          cred,
           '--noproxy',
           '*',
           '--connect-timeout',
@@ -927,8 +936,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           `Accept: ${clientAccept}`,
           targetUrl,
         ];
-        if (allowSelfSigned) args.unshift('-k');
-        else if (caPath) args.unshift('--cacert', caPath);
+        if (caPath) args.unshift('--cacert', caPath);
         if (process.env.SP_CURL_VERBOSE === 'true') args.unshift('-v');
         return args;
       };
@@ -1123,7 +1131,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               '\n__SP_HTTP_STATUS__:%{http_code}\n__SP_CONTENT_TYPE__:%{content_type}\n__SP_CONTENT_LENGTH__:%{size_download}';
           }
 
-          const output = await runCurlBuffer(args, { timeout: 15000 });
+          const output = await runCurlBuffer(args, { timeout: 15000, credentials: cred });
           const status = extractCurlBinaryStatusAndBody(output.stdout);
           return {
             authScheme,
@@ -1134,7 +1142,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           };
         }
 
-        const output = await runCurl(makeReadCurlArgs(authScheme), { timeout: 15000 });
+        const output = await runCurl(makeReadCurlArgs(authScheme), {
+          timeout: 15000,
+          credentials: cred,
+        });
         const status = extractCurlStatusAndBody(output.stdout);
         const payload = parseCurlPayload(status.payloadText);
         return {
@@ -1306,18 +1317,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           );
         } else {
           return res.status(status).json({
-            error: status === 403 ? 'Forbidden (curl)' : 'Unauthorized (curl)',
-            snippet: finalAuthFailure.snippet,
-            instance: instance.slug,
-            targetUrl,
-            authScope: getTargetAuthScope(targetUrl),
-            ntlmAttempted,
-            ntlmEligible: Boolean(canUseNtlmFallback),
-            ntlmEnabled: ntlmFallbackEnabled,
-            fallbackThreshold: ntlmFallbackThreshold,
-            ntlmFailureStatus,
-            ntlmFailureSnippet,
-            stderr: process.env.SP_CURL_VERBOSE === 'true' ? effectiveOutput.stderr : undefined,
+            error: status === 403 ? 'Forbidden' : 'Unauthorized',
           });
         }
       }
@@ -1378,10 +1378,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!/^Negotiate\s+\S+/i.test(incomingAuthorization)) {
         return res.status(401).json({
           error: 'Delegated auth material missing',
-          detail:
-            'A trusted reverse proxy must forward a Negotiate Authorization header. Application cookies are never forwarded to SharePoint.',
-          instance: instance.slug,
-          delegatedUser: delegatedUser || null,
         });
       }
       authHeaders = {
@@ -1490,10 +1486,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.debug('[sharepoint proxy] outgoing headers', redacted);
     };
 
-    const sendSharePointRequest = async (
-      acceptOverride?: string,
-      insecure = false
-    ): Promise<Response> => {
+    const sendSharePointRequest = async (acceptOverride?: string): Promise<Response> => {
       const h = { ...headers };
       if (acceptOverride) h['Accept'] = acceptOverride;
       logOutgoingHeaders(h);
@@ -1505,11 +1498,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         dispatcher:
           process.env.SP_DISABLE_DISPATCHER === 'true'
             ? undefined
-            : insecure
-              ? new UndiciAgent({ connect: { rejectUnauthorized: false } })
-              : (sharePointDispatcher ?? undefined),
+            : (sharePointDispatcher ?? undefined),
         // @ts-ignore optional legacy agent
-        agent: insecure ? new https.Agent({ rejectUnauthorized: false }) : sharePointHttpsAgent,
+        agent: sharePointHttpsAgent,
       });
     };
 
@@ -1519,30 +1510,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } catch (primaryErr: any) {
       const msg = String(primaryErr?.message || '').toLowerCase();
       const isInvalidArg = msg.includes('invalid argument');
-      const isSelfSigned =
-        primaryErr?.cause?.code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
-        /self-signed|certificate in certificate chain/.test(
-          String(primaryErr?.cause?.message || primaryErr?.message || '').toLowerCase()
-        );
       if (isInvalidArg) {
         // Retry with Atom Accept which worked manually for user
-        // eslint-disable-next-line no-console
+
         console.warn(
           '[sharepoint proxy] primary fetch threw Invalid argument; retrying with application/atom+xml'
         );
         spResp = await sendSharePointRequest(
           'application/atom+xml,application/json;q=0.9,*/*;q=0.8'
         );
-      } else if (
-        isSelfSigned &&
-        (process.env.SP_ALLOW_SELF_SIGNED === 'true' ||
-          process.env.SP_TLS_FALLBACK_INSECURE === 'true')
-      ) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          '[sharepoint proxy] TLS self-signed error; retrying with insecure TLS due to env flag'
-        );
-        spResp = await sendSharePointRequest(undefined, true);
       } else {
         throw primaryErr;
       }
@@ -1571,18 +1547,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const buffer = Buffer.from(await spResp.arrayBuffer());
     if (msts) res.setHeader('microsoftsharepointteamservices', msts);
     if (spResp.status === 401 || spResp.status === 403) {
-      try {
-        const snippet = buffer.toString('utf8', 0, Math.min(buffer.length, 500));
-        // eslint-disable-next-line no-console
-        console.error('[sharepoint proxy] auth failure from SharePoint', {
-          status: spResp.status,
-          instance: instance.slug,
-          targetUrl,
-          snippet,
-        });
-      } catch {
-        // ignore logging errors
-      }
+      console.error('[sharepoint proxy] authorization rejected', { status: spResp.status });
+    }
+    if (!spResp.ok) {
+      return res.status(spResp.status).json({
+        error:
+          spResp.status === 401
+            ? 'Unauthorized'
+            : spResp.status === 403
+              ? 'Forbidden'
+              : 'SharePoint request failed',
+      });
     }
     const isJson = /application\/json|text\/json/i.test(ct);
     const isXml = /application\/atom\+xml|text\/xml|application\/xml/i.test(ct);
@@ -1628,19 +1603,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     res.status(spResp.status).json(payload);
   } catch (err: any) {
-    // Enhanced logging for TLS issues
     const cause: any = err?.cause || {};
-    const errorPayload = {
-      error: err.message || 'Proxy error',
+    const diagnostic = {
       code: (err as any).code,
-      causeMessage: cause.message,
       causeCode: cause.code,
-      targetUrl: buildSharePointTargetUrl(site, fullPath),
     };
-    // eslint-disable-next-line no-console
-    console.error('[sharepoint proxy] error stack:', err?.stack);
-    // eslint-disable-next-line no-console
-    console.error('[sharepoint proxy] network/fetch error', errorPayload);
-    res.status(500).json(errorPayload);
+    console.error('[sharepoint proxy] network/fetch error', diagnostic);
+    res.status(502).json({ error: 'SharePoint proxy request failed' });
   }
 }

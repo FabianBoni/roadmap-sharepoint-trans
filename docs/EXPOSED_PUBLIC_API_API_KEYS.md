@@ -8,10 +8,13 @@ The intent is to allow read-only consumption (e.g. dashboards, integrations) wit
 
 ### API key sources
 
-The API key can be provided either via:
+The API key is accepted only in a header:
 
-- Header: `X-API-Key: <key>` (preferred)
-- Query string: `?apiKey=<key>` (supported for simple clients)
+- `X-API-Key: <key>` (preferred), or
+- `Authorization: Bearer <key>`.
+
+Query parameters are deliberately not accepted because URLs commonly reach browser history,
+reverse-proxy logs and monitoring systems.
 
 ### Configuration
 
@@ -24,16 +27,15 @@ Allowed keys are configured via environment variables:
   - Optional single-key alias
   - Useful when you want to store one key as a dedicated GitHub Actions secret
 
-If no keys are configured, the endpoint returns `500` with `{"error":"API keys not configured"}`.
-
-GitHub Actions support both names in `.github/workflows/deploy.yml` and `.github/workflows/branch-build.yml`.
-If only `ROADMAP_API_KEY` is set as a secret, the workflow also writes it into `PUBLIC_PROJECTS_API_KEYS` inside the generated runtime `.env` for compatibility.
+If no keys are configured, the endpoint fails closed with HTTP `503`. The production deployment
+materializes `PUBLIC_PROJECTS_API_KEYS` from the protected production environment. Untrusted branch
+builds receive no production API key.
 
 ### Rate limiting
 
 The endpoint rate-limits per API key:
 
-- Limit: **500 requests per minute** per key
+- Limit: **500 requests per minute** per key, enforced through the persistent database limiter
 - Exceeded: HTTP `429` with header `Retry-After: 60`
 
 Returned rate-limit headers:
@@ -74,10 +76,10 @@ curl -s \
   "https://<host>/api/public/projects?instance=bdm-projekte"
 ```
 
-Query-string based:
+Bearer-header based:
 
 ```bash
-curl -s "https://<host>/api/public/projects?instance=bdm-projekte&apiKey=$PUBLIC_KEY"
+curl -s -H "Authorization: Bearer $PUBLIC_KEY" "https://<host>/api/public/projects?instance=bdm-projekte"
 ```
 
 Filter example:
@@ -92,12 +94,9 @@ curl -s \
 
 ```json
 {
-  "projects": [
-    /* Project[] */
-  ],
+  "projects": [/* Project[] */],
   "count": 123,
-  "instance": "bdm-projekte",
-  "sharePointSiteUrl": "https://..."
+  "instance": "bdm-projekte"
 }
 ```
 
@@ -106,20 +105,14 @@ curl -s \
 - `401` `{"error":"Invalid API key"}`
 - `404` `{"error":"Instance not found"}`
 - `429` `{"error":"Rate limit exceeded (500/min)"}`
-- `500` `{"error":"API keys not configured"}` or `{"error":"Failed to fetch projects"}`
+- `503` `{"error":"Public API unavailable"}`
+- `500` `{"error":"Failed to fetch projects"}`
 
-### POST `/api/public/projects`
-
-This endpoint also accepts POST, but it is **not** a data-creation API.
-
-It responds with a `303` redirect to the admin UI project creation page for the resolved instance.
-
-- Response header: `Location: /admin/projects/new?...`
-
-This is mainly for convenience when a client wants to jump into the admin UI.
+All methods except `GET` return HTTP `405`.
 
 ## Notes / Operational considerations
 
 - Reverse proxy base paths: if this app is deployed under a Next.js `basePath`, the effective URL becomes `/<basePath>/api/public/projects`.
-- API keys are currently stored as plaintext in env; rotate keys by updating `PUBLIC_PROJECTS_API_KEYS` or `ROADMAP_API_KEY` and redeploying.
+- API keys are supplied through the runtime secret store. Comparisons use SHA-256 digests and
+  timing-safe equality; keys are never written into the rate-limit table in plaintext.
 - This API is read-only and uses the existing SharePoint-backed data layer (`clientDataService.getAllProjects()`).

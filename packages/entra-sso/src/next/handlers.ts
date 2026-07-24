@@ -11,14 +11,11 @@ import {
 import { buildSetCookie, parseCookies, shouldUseSecureCookies } from './cookies';
 import { getEntraRedirectUri, type EntraRedirectEnv } from './redirectUri';
 
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+const serializeInlineJson = (value: unknown): string =>
+  JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 
 function normalizeLocalReturnUrl(input: unknown, fallback: string): string {
   const raw = typeof input === 'string' ? input.trim() : '';
@@ -43,8 +40,8 @@ function renderPopupResultHtml(args: {
   origin: string;
 }) {
   const payload = args.ok
-    ? `({ type: 'AUTH_SUCCESS', username: '${escapeHtml(args.username || '')}' })`
-    : `({ type: 'AUTH_ERROR', error: '${escapeHtml(args.error || 'SSO fehlgeschlagen')}' })`;
+    ? { type: 'AUTH_SUCCESS', username: args.username || '' }
+    : { type: 'AUTH_ERROR', error: args.error || 'SSO fehlgeschlagen' };
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -58,7 +55,7 @@ function renderPopupResultHtml(args: {
   <script>
     try {
       if (window.opener) {
-        window.opener.postMessage(${payload}, '${escapeHtml(args.origin)}');
+        window.opener.postMessage(${serializeInlineJson(payload)}, ${serializeInlineJson(args.origin)});
       }
     } catch (e) {
       // ignore
@@ -112,9 +109,7 @@ export function createEntraLoginHandler(config: {
     });
     if (!redirectUri || !/^https?:\/\//i.test(redirectUri)) {
       res.status(500).json({
-        error:
-          'Invalid redirect URI. Set ENTRA_REDIRECT_URI explicitly (must be an absolute http/https URL).',
-        computedRedirectUri: redirectUri,
+        error: 'SSO redirect configuration is invalid.',
       });
       return;
     }
@@ -149,8 +144,8 @@ export function createEntraLoginHandler(config: {
       buildSetCookie(cookies.state, state, common),
       buildSetCookie(cookies.nonce, nonce, common),
       buildSetCookie(cookies.verifier, verifier, common),
-      buildSetCookie(cookies.returnUrl, returnUrlRaw, { ...common, httpOnly: false }),
-      buildSetCookie(cookies.popup, popup ? '1' : '0', { ...common, httpOnly: false }),
+      buildSetCookie(cookies.returnUrl, returnUrlRaw, common),
+      buildSetCookie(cookies.popup, popup ? '1' : '0', common),
     ]);
 
     res.redirect(302, authorizeUrl);
@@ -185,9 +180,19 @@ export function createEntraCallbackHandler(config: {
     const cookieValues = parseCookies(req.headers.cookie);
     const secure = shouldUseSecureCookies(req);
 
-    const origin = `${String(req.headers['x-forwarded-proto'] || 'http')}://${String(
-      req.headers['x-forwarded-host'] || req.headers.host || 'localhost'
-    )}`;
+    let callbackRedirectUri: string;
+    let origin: string;
+    try {
+      callbackRedirectUri = getEntraRedirectUri({
+        req,
+        env: config.env,
+        callbackPath: config.callbackPath,
+      });
+      origin = new URL(callbackRedirectUri).origin;
+    } catch {
+      res.status(500).json({ error: 'SSO redirect configuration is invalid.' });
+      return;
+    }
 
     const clearCookies = [
       buildSetCookie(cookies.state, '', {
@@ -210,13 +215,13 @@ export function createEntraCallbackHandler(config: {
       }),
       buildSetCookie(cookies.returnUrl, '', {
         maxAgeSeconds: 0,
-        httpOnly: false,
+        httpOnly: true,
         sameSite: 'Lax',
         secure,
       }),
       buildSetCookie(cookies.popup, '', {
         maxAgeSeconds: 0,
-        httpOnly: false,
+        httpOnly: true,
         sameSite: 'Lax',
         secure,
       }),
@@ -226,11 +231,9 @@ export function createEntraCallbackHandler(config: {
     const returnUrl = normalizeLocalReturnUrl(cookieValues[cookies.returnUrl], '/admin');
 
     const error = typeof req.query.error === 'string' ? req.query.error : '';
-    const errorDesc =
-      typeof req.query.error_description === 'string' ? req.query.error_description : '';
     if (error) {
       res.setHeader('Set-Cookie', clearCookies);
-      const msg = errorDesc || error;
+      const msg = 'SSO-Anmeldung fehlgeschlagen';
       if (popup) {
         res.setHeader('Content-Type', 'text/html');
         res.status(200).send(renderPopupResultHtml({ ok: false, error: msg, origin }));
@@ -273,17 +276,11 @@ export function createEntraCallbackHandler(config: {
     }
 
     try {
-      const redirectUri = getEntraRedirectUri({
-        req,
-        env: config.env,
-        callbackPath: config.callbackPath,
-      });
-
       const tokens = await exchangeCodeForTokens({
         tenantId: config.tenantId,
         clientId: config.clientId,
         clientSecret: config.clientSecret,
-        redirectUri,
+        redirectUri: callbackRedirectUri,
         code,
         codeVerifier: verifier,
       });
@@ -333,8 +330,8 @@ export function createEntraCallbackHandler(config: {
       }
 
       res.redirect(302, returnUrl);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'SSO fehlgeschlagen';
+    } catch {
+      const msg = 'SSO-Anmeldung fehlgeschlagen';
       res.setHeader('Set-Cookie', clearCookies);
       if (popup) {
         res.setHeader('Content-Type', 'text/html');

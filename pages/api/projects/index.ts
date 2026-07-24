@@ -12,6 +12,8 @@ import { resolveSharePointSiteUrl } from '@/utils/sharepointEnv';
 import { getSampleProjects, isSampleDataInstance } from '@/utils/sampleInstanceData';
 import { sanitizeProjectRichTextFields } from '@/utils/richText';
 import { getMirroredProjectsForInstance } from '@/utils/instanceMirroring';
+import { requireAllowedExternalUrl, UnsafeExternalUrlError } from '@/utils/safeUrl';
+import { getInternalApiBaseUrl } from '@/utils/internalApiBaseUrl';
 
 const normalizeTeamMembers = (value: unknown): Array<{ name: string; role: string }> => {
   if (!Array.isArray(value)) return [];
@@ -35,9 +37,9 @@ const normalizeProjectLinks = (value: unknown): Array<{ title: string; url: stri
       if (!link || typeof link !== 'object') return null;
       const record = link as Record<string, unknown>;
       const title = typeof record.title === 'string' ? record.title.trim() : '';
-      const url = typeof record.url === 'string' ? record.url.trim() : '';
-      if (!title || !url) return null;
-      return { title, url };
+      const rawUrl = typeof record.url === 'string' ? record.url.trim() : '';
+      if (!title || !rawUrl) return null;
+      return { title, url: requireAllowedExternalUrl(rawUrl) };
     })
     .filter((link): link is { title: string; url: string } => Boolean(link));
 };
@@ -185,20 +187,7 @@ const mapMinimalSharePointItem = (item: Record<string, unknown>): Project => {
   };
 };
 
-const buildAbsoluteBaseUrl = (req: NextApiRequest): string => {
-  const internal = (process.env.INTERNAL_API_BASE_URL || '').trim();
-  if (internal) return internal.replace(/\/$/, '');
-
-  const protoHeader = req.headers['x-forwarded-proto'];
-  const proto = Array.isArray(protoHeader)
-    ? protoHeader[0]
-    : typeof protoHeader === 'string'
-      ? protoHeader.split(',')[0].trim()
-      : 'http';
-  const hostHeader = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
-  const host = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader;
-  return `${proto}://${host}`.replace(/\/$/, '');
-};
+const buildAbsoluteBaseUrl = (): string => getInternalApiBaseUrl();
 
 type ProxyProbeResult = {
   projects: Project[];
@@ -209,7 +198,7 @@ const fetchProjectsViaExplicitInstanceProxy = async (
   req: NextApiRequest,
   instance: RoadmapInstanceConfig
 ): Promise<ProxyProbeResult> => {
-  const baseUrl = buildAbsoluteBaseUrl(req);
+  const baseUrl = buildAbsoluteBaseUrl();
   const encodedInstance = encodeURIComponent(instance.slug);
   const candidateLists = ['Roadmap Projects'];
   const select = encodeURIComponent(
@@ -310,7 +299,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         cookie: typeof req.headers.cookie === 'string' ? req.headers.cookie : undefined,
       };
 
-      const session = requireUserSession(req);
+      const session = await requireUserSession(req);
       if (!session) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
@@ -470,7 +459,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         cookie: typeof req.headers.cookie === 'string' ? req.headers.cookie : undefined,
       };
 
-      const session = requireUserSession(req);
+      const session = await requireUserSession(req);
 
       if (
         !(await isAdminSessionAllowedForInstance({
@@ -510,6 +499,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       res.status(201).json(hydratedProject || newProject);
     } catch (error: unknown) {
+      if (error instanceof UnsafeExternalUrlError) {
+        return res.status(400).json({ error: error.message });
+      }
       console.error('Error creating project:', error);
       res.status(500).json({ error: 'Failed to create project' });
     }

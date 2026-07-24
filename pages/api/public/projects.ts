@@ -1,63 +1,23 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { clientDataService } from '@/utils/clientDataService';
-import { getInstanceConfigBySlug, INSTANCE_QUERY_PARAM } from '@/utils/instanceConfig';
-import { resolveSharePointSiteUrl } from '@/utils/sharepointEnv';
+import { getInstanceConfigBySlug } from '@/utils/instanceConfig';
 import type { Project } from '@/types';
 import { getSampleProjects, isSampleDataInstance } from '@/utils/sampleInstanceData';
+import {
+  extractHeaderApiKey,
+  getConfiguredPublicApiKeys,
+  isConfiguredApiKey,
+} from '@/utils/apiKeyAuth';
+import { consumePersistentRateLimit } from '@/utils/rateLimit';
 
 const RATE_LIMIT = 500; // requests per window
 const WINDOW_MS = 60_000;
-const rateBuckets = new Map<string, { count: number; reset: number }>();
 
 const disableCache = (res: NextApiResponse) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   res.setHeader('Surrogate-Control', 'no-store');
-};
-
-const parseApiKeys = (raw: string | undefined): string[] =>
-  (raw || '')
-    .split(',')
-    .map((k) => k.trim())
-    .filter(Boolean);
-
-const getAllowedApiKeys = (): Set<string> => {
-  const keys = [
-    ...parseApiKeys(process.env.PUBLIC_PROJECTS_API_KEYS),
-    ...parseApiKeys(process.env.ROADMAP_API_KEY),
-  ];
-  return new Set(keys);
-};
-
-const extractBearerApiKey = (authorization: string | string[] | undefined): string | null => {
-  const raw = Array.isArray(authorization) ? authorization[0] : authorization;
-  if (!raw) return null;
-  const match = raw.match(/^Bearer\s+(.+)$/i);
-  return match?.[1]?.trim() || null;
-};
-
-const extractApiKey = (req: NextApiRequest): string | null => {
-  const headerKey = req.headers['x-api-key'];
-  if (typeof headerKey === 'string' && headerKey.trim()) return headerKey.trim();
-  const queryKey = req.query.apiKey;
-  if (typeof queryKey === 'string' && queryKey.trim()) return queryKey.trim();
-  if (Array.isArray(queryKey) && queryKey[0]?.trim()) return queryKey[0].trim();
-  const bearerKey = extractBearerApiKey(req.headers.authorization);
-  if (bearerKey) return bearerKey;
-  return null;
-};
-
-const isRateLimited = (key: string): boolean => {
-  const now = Date.now();
-  const bucket = rateBuckets.get(key) || { count: 0, reset: now + WINDOW_MS };
-  if (now > bucket.reset) {
-    bucket.count = 0;
-    bucket.reset = now + WINDOW_MS;
-  }
-  bucket.count += 1;
-  rateBuckets.set(key, bucket);
-  return bucket.count > RATE_LIMIT;
 };
 
 const normalizeCategory = (value: unknown): string => {
@@ -138,9 +98,18 @@ const filterProjects = (list: Project[], query: NextApiRequest['query']): Projec
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   disableCache(res);
 
-  if (req.method !== 'GET' && req.method !== 'POST') {
-    res.setHeader('Allow', ['GET', 'POST']);
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', ['GET']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  }
+
+  const allowedKeys = getConfiguredPublicApiKeys();
+  if (!allowedKeys.length) {
+    return res.status(503).json({ error: 'Public API unavailable' });
+  }
+  const apiKey = extractHeaderApiKey(req);
+  if (!isConfiguredApiKey(apiKey, allowedKeys)) {
+    return res.status(401).json({ error: 'Invalid API key' });
   }
 
   const instanceParam = req.query.instance || req.query.roadmapInstance;
@@ -160,30 +129,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Instance not found' });
     }
 
-    if (req.method === 'POST') {
-      const target = `/admin/projects/new?${INSTANCE_QUERY_PARAM}=${encodeURIComponent(
-        instance.slug
-      )}`;
-      res.setHeader('Location', target);
-      return res.status(303).json({
-        redirect: target,
-        instance: instance.slug,
-        sharePointSiteUrl: resolveSharePointSiteUrl(instance),
-      });
-    }
-
-    const allowedKeys = getAllowedApiKeys();
-    if (!allowedKeys.size) {
-      return res.status(500).json({ error: 'API keys not configured' });
-    }
-
-    const apiKey = extractApiKey(req);
-    if (!apiKey || !allowedKeys.has(apiKey)) {
-      return res.status(401).json({ error: 'Invalid API key' });
-    }
-
-    if (isRateLimited(apiKey)) {
-      res.setHeader('Retry-After', '60');
+    const rateLimit = await consumePersistentRateLimit({
+      scope: 'public-projects',
+      key: apiKey as string,
+      limit: RATE_LIMIT,
+      windowMs: WINDOW_MS,
+    });
+    if (!rateLimit.allowed) {
+      res.setHeader('Retry-After', String(rateLimit.retryAfterSeconds));
       return res.status(429).json({ error: 'Rate limit exceeded (500/min)' });
     }
 
@@ -207,10 +160,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       projects: filtered,
       count: filtered.length,
       instance: instance.slug,
-      sharePointSiteUrl: resolveSharePointSiteUrl(instance),
     });
   } catch (error) {
-    console.error('[api/public/projects] failed', error);
+    console.error('[api/public/projects] failed', {
+      type: error instanceof Error ? error.name : 'UnknownError',
+    });
     return res.status(500).json({ error: 'Failed to fetch projects' });
   }
 }

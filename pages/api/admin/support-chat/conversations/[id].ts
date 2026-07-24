@@ -12,7 +12,8 @@ import {
 import type { SupportChatConversation } from '@/types/supportChat';
 import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
 
-type ApiResponse = { conversation: SupportChatConversation } | { error: string };
+type ApiResponse =
+  { conversation: SupportChatConversation } | { success: true } | { error: string };
 
 const parseConversationId = (raw: string | string[] | undefined): string => {
   const value = Array.isArray(raw) ? raw[0] : raw;
@@ -61,7 +62,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   }
 
   if (req.method === 'POST') {
-    const rateLimit = consumeSupportChatRateLimit(
+    const rateLimit = await consumeSupportChatRateLimit(
       getSupportChatRateLimitKey(req, `support-message:${id}`),
       30,
       60_000
@@ -102,6 +103,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     return res.status(200).json({ conversation: mapSupportChatConversation(conversation) });
   }
 
-  res.setHeader('Allow', ['GET', 'POST', 'PATCH']);
+  if (req.method === 'DELETE') {
+    await prisma.supportConversation.delete({ where: { id } });
+    return res.status(200).json({ success: true });
+  }
+
+  res.setHeader('Allow', ['GET', 'POST', 'PATCH', 'DELETE']);
   return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 }

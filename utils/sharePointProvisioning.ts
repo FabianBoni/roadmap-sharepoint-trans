@@ -536,9 +536,8 @@ const probePermissions = async (
     if (created) {
       try {
         await deleteListByTitle(probeList, digest);
-      } catch (cleanupError) {
-        // eslint-disable-next-line no-console
-        console.warn('[sharePointProvisioning] Failed to delete probe list', cleanupError);
+      } catch {
+        console.warn('[sharePointProvisioning] Failed to delete probe list');
       }
     }
   }

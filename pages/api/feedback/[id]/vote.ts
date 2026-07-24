@@ -14,7 +14,7 @@ const disableCache = (res: NextApiResponse) => {
 const normalizeUserKey = (value: unknown): string =>
   typeof value === 'string' ? value.trim().toLowerCase() : '';
 
-const getSessionUserKey = (session: ReturnType<typeof requireUserSession>): string => {
+const getSessionUserKey = (session: Awaited<ReturnType<typeof requireUserSession>>): string => {
   const entra = session.entra && typeof session.entra === 'object' ? session.entra : null;
   return (
     normalizeUserKey(entra?.upn) ||
@@ -40,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
   let userKey = '';
   try {
-    userKey = getSessionUserKey(requireUserSession(req));
+    userKey = getSessionUserKey(await requireUserSession(req));
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });
   }

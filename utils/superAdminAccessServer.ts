@@ -23,11 +23,34 @@ const parseCsv = (value: unknown): string[] => {
 
 const extractIdentifiers = (session: AdminSessionPayload | null | undefined) => {
   const username = typeof session?.username === 'string' ? session.username : null;
-  const displayName = typeof session?.displayName === 'string' ? session.displayName : null;
   const entra = asRecord(session?.entra);
+  const objectId = entra && typeof entra.id === 'string' ? entra.id : null;
+  const tenantId = entra && typeof entra.tenantId === 'string' ? entra.tenantId : null;
   const upn = entra && typeof entra.upn === 'string' ? entra.upn : null;
   const mail = entra && typeof entra.mail === 'string' ? entra.mail : null;
-  return { username, upn, mail, displayName };
+  const onPremisesUserPrincipalName =
+    entra && typeof entra.onPremisesUserPrincipalName === 'string'
+      ? entra.onPremisesUserPrincipalName
+      : null;
+  const onPremisesSamAccountName =
+    entra && typeof entra.onPremisesSamAccountName === 'string'
+      ? entra.onPremisesSamAccountName
+      : null;
+  const onPremisesDomainName =
+    entra && typeof entra.onPremisesDomainName === 'string' ? entra.onPremisesDomainName : null;
+  const onPremisesAccountName =
+    onPremisesDomainName && onPremisesSamAccountName
+      ? `${onPremisesDomainName}\\${onPremisesSamAccountName}`
+      : null;
+  return {
+    username,
+    objectId,
+    tenantId,
+    upn,
+    mail,
+    onPremisesUserPrincipalName,
+    onPremisesAccountName,
+  };
 };
 
 type ForwardedRequestHeaders = { authorization?: string; cookie?: string };
@@ -36,9 +59,11 @@ async function isDbSuperAdmin(ids: ReturnType<typeof extractIdentifiers>): Promi
   const candidates = Array.from(
     new Set([
       normalize(ids.username),
+      ids.tenantId && ids.objectId ? `${normalize(ids.tenantId)}:${normalize(ids.objectId)}` : '',
       normalize(ids.upn),
       normalize(ids.mail),
-      normalize(ids.displayName),
+      normalize(ids.onPremisesUserPrincipalName),
+      normalize(ids.onPremisesAccountName),
     ])
   ).filter(Boolean);
 
@@ -120,8 +145,8 @@ export async function isSuperAdminSessionWithSharePointFallback(
           clientDataService.isUserInSharePointGroupByTitle('superadmin', ids)
         )
       );
-    } catch (error) {
-      console.warn('[superadmin] SharePoint fallback check failed', { slug, error });
+    } catch {
+      console.warn('[superadmin] SharePoint fallback check failed');
       ok = false;
     }
     if (ok) break;
@@ -131,7 +156,7 @@ export async function isSuperAdminSessionWithSharePointFallback(
 }
 
 export async function requireSuperAdminAccess(req: NextApiRequest): Promise<AdminSessionPayload> {
-  const session = requireUserSession(req);
+  const session = await requireUserSession(req);
   const ok = await isSuperAdminSessionWithSharePointFallback(session, {
     requestHeaders: {
       authorization:

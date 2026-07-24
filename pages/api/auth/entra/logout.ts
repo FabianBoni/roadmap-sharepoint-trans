@@ -1,6 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { buildSetCookie, shouldUseSecureCookies } from '@roadmap/entra-sso/next';
 import { resolveNextBasePath } from '@/utils/entraSso';
+import { isSafeCookieRequest } from '@/utils/sessionSecurity';
+import { decodeAdminSessionFromHeaders } from '@/utils/apiAuth';
+import prisma from '@/lib/prisma';
 
 const COOKIE_ADMIN_TOKEN = 'roadmap-admin-token';
 
@@ -18,10 +21,28 @@ function getPostLogoutRedirectUri(): string {
   return `${callback.origin}${resolveNextBasePath()}/admin/login`;
 }
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET' && req.method !== 'POST') {
-    res.setHeader('Allow', ['GET', 'POST']);
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+  if (!isSafeCookieRequest(req)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const session = decodeAdminSessionFromHeaders({
+    authorization: req.headers.authorization,
+    cookie: req.headers.cookie,
+  });
+  if (session && typeof session.jti === 'string') {
+    try {
+      await prisma.authSession.updateMany({
+        where: { id: session.jti, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    } catch {
+      return res.status(503).json({ error: 'Session revocation is temporarily unavailable' });
+    }
   }
 
   const secure = shouldUseSecureCookies(req);
@@ -38,10 +59,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
   try {
     const postLogoutRedirectUri = getPostLogoutRedirectUri();
-    if (String(req.query.local || '') === '1') {
-      return res.redirect(302, postLogoutRedirectUri);
-    }
-
     const tenantId = String(process.env.ENTRA_TENANT_ID || '').trim();
     if (!tenantId) return res.redirect(302, postLogoutRedirectUri);
 

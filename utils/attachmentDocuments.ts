@@ -1,6 +1,6 @@
 import { extname } from 'path';
 
-export const DEFAULT_ATTACHMENT_MAX_BYTES = 100 * 1024 * 1024;
+export const DEFAULT_ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
 export const MAX_ATTACHMENT_CHUNK_BYTES = 2 * 1024 * 1024;
 export const MAX_ATTACHMENT_NAME_LENGTH = 180;
 
