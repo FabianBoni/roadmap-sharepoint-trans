@@ -24,6 +24,14 @@ test('deployment is scoped to the protected production environment and a non-roo
   assert.doesNotMatch(workflow, /\bsudo\b|--accept-data-loss|PM2_RUN_AS_USER: root/);
 });
 
+test('production PM2 service survives self-hosted runner process cleanup', () => {
+  const workflow = read('.github/workflows/deploy.yml');
+  assert.match(
+    workflow,
+    /- name: Restart only the roadmap service[\s\S]*?RUNNER_TRACKING_ID: ''[\s\S]*?pm2 startOrRestart/
+  );
+});
+
 test('production deployment maps every SSO GitHub Environment secret explicitly', () => {
   const workflow = read('.github/workflows/deploy.yml');
   for (const secret of [

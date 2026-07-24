@@ -216,6 +216,9 @@ jobs:
         env:
           NODE_ENV: production
           PORT: '3000'
+          # Keep the long-lived PM2 daemon and app outside the Actions job's
+          # orphan-process cleanup.
+          RUNNER_TRACKING_ID: ''
         run: |
           set -euo pipefail
           test -x node_modules/.bin/pm2 || {
