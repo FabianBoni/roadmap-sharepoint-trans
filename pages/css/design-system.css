@@ -2116,6 +2116,8 @@ textarea::placeholder {
   border-radius: var(--ds-radius-xl);
   background: color-mix(in srgb, var(--ds-bg-elevated) 68%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 420px;
 }
 
 .ds-roadmap-category-section.is-drop-target {
@@ -2126,6 +2128,11 @@ textarea::placeholder {
 
 .ds-roadmap-category-section.is-dragged {
   opacity: 0.58;
+}
+
+.ds-roadmap-shell .compact-project-card {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto 190px;
 }
 
 .ds-roadmap-shell .bg-slate-800.opacity-30 {

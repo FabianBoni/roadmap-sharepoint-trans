@@ -1,4 +1,7 @@
 import Head from 'next/head';
+import { forceServerSideRendering } from '@/utils/serverRendering';
+
+export const getServerSideProps = forceServerSideRendering;
 import Link from 'next/link';
 import {
   FiArrowRight,

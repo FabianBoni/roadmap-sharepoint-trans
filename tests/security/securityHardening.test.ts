@@ -188,7 +188,9 @@ test('browser defenses and production-safe internal origin are configured', () =
   assert.match(config, /Permissions-Policy/);
   assert.match(document, /Content-Security-Policy/);
   assert.match(document, /nonce=/);
-  assert.match(read('pages/_app.tsx'), /RoadmapApp\.getInitialProps/);
+  assert.doesNotMatch(read('pages/_app.tsx'), /RoadmapApp\.getInitialProps/);
+  assert.match(read('utils/serverRendering.ts'), /forceServerSideRendering/);
+  assert.match(read('pages/feedback.tsx'), /getServerSideProps/);
   assert.doesNotMatch(read('pages/landing/[slug].tsx'), /getStaticProps|getStaticPaths/);
   assert.match(
     read('utils/internalApiBaseUrl.ts'),

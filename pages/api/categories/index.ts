@@ -6,6 +6,7 @@ import {
   isReadSessionAllowedForInstance,
 } from '@/utils/instanceAccessServer';
 import { getInstanceConfigFromRequest } from '@/utils/instanceConfig';
+import { invalidateRoadmapDataCache } from '@/utils/roadmapData';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { getSampleCategories, isSampleDataInstance } from '@/utils/sampleInstanceData';
 import { getMirroredProjectsForInstance } from '@/utils/instanceMirroring';
@@ -100,6 +101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const newCategory = await clientDataService.withInstance(instance.slug, () =>
         clientDataService.createCategory({ name, color, icon })
       );
+      invalidateRoadmapDataCache(instance.slug);
       res.status(201).json(newCategory);
     } catch {
       console.error('Error creating category');

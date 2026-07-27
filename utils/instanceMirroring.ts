@@ -13,6 +13,23 @@ type MirroredProjectsResult = {
   badgeOptions: InstanceBadgeOption[];
 };
 
+type MirroringIndexEntry = {
+  sourceInstance: RoadmapInstanceConfig;
+  project: Project;
+};
+
+type MirroringIndex = {
+  badgeOptions: InstanceBadgeOption[];
+  projectsByBadge: Map<string, MirroringIndexEntry[]>;
+};
+
+let mirroringIndexCache: { expiresAt: number; value: MirroringIndex } | null = null;
+let mirroringIndexInFlight: Promise<MirroringIndex> | null = null;
+const MIRRORING_INDEX_TTL_MS = Math.max(
+  5_000,
+  Number.parseInt(process.env.ROADMAP_MIRRORING_CACHE_TTL_MS || '60000', 10) || 60_000
+);
+
 const MIRROR_PROJECT_PREFIX = 'mirror:';
 const MIRROR_CATEGORY_PREFIX = 'instance:';
 const DEFAULT_MIRROR_CATEGORY_COLOR = '#475569';
@@ -148,57 +165,98 @@ export async function getInstanceBadgeOptions(): Promise<InstanceBadgeOption[]> 
     .filter((entry): entry is InstanceBadgeOption => Boolean(entry.badge));
 }
 
+export function invalidateInstanceMirroringCache(): void {
+  mirroringIndexCache = null;
+  mirroringIndexInFlight = null;
+}
+
+const buildMirroringIndex = async (
+  forwardedHeaders?: ForwardedRequestHeaders
+): Promise<MirroringIndex> => {
+  const records = (await prisma.roadmapInstance.findMany({
+    include: { hosts: true },
+    orderBy: { slug: 'asc' },
+  })) as PrismaInstanceWithHosts[];
+  const instances = records.map((record) => mapInstanceRecord(record));
+  const badgeOptions = instances
+    .map((instance) => ({
+      slug: instance.slug,
+      displayName: instance.displayName,
+      badge: getInstanceBadge(instance),
+    }))
+    .filter((entry): entry is InstanceBadgeOption => Boolean(entry.badge));
+
+  const projectsByBadge = new Map<string, MirroringIndexEntry[]>();
+  const concurrency = Math.min(
+    4,
+    Math.max(1, Number.parseInt(process.env.ROADMAP_MIRRORING_CONCURRENCY || '3', 10) || 3)
+  );
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(concurrency, instances.length) }, async () => {
+    while (cursor < instances.length) {
+      const sourceInstance = instances[cursor++];
+      try {
+        const projects = await loadProjectsForInstance(sourceInstance, forwardedHeaders);
+        for (const project of projects) {
+          for (const badge of normalizeBadgeList(project.badges)) {
+            const key = badge.toLowerCase();
+            const entries = projectsByBadge.get(key) || [];
+            entries.push({ sourceInstance, project });
+            projectsByBadge.set(key, entries);
+          }
+        }
+      } catch {
+        console.warn('[instanceMirroring] failed to index source projects');
+      }
+    }
+  });
+  await Promise.all(workers);
+  return { badgeOptions, projectsByBadge };
+};
+
+const getMirroringIndex = async (
+  forwardedHeaders?: ForwardedRequestHeaders
+): Promise<MirroringIndex> => {
+  if (mirroringIndexCache && mirroringIndexCache.expiresAt > Date.now()) {
+    return mirroringIndexCache.value;
+  }
+  if (mirroringIndexInFlight) return mirroringIndexInFlight;
+  mirroringIndexInFlight = buildMirroringIndex(forwardedHeaders).then((value) => {
+    mirroringIndexCache = {
+      value,
+      expiresAt: Date.now() + MIRRORING_INDEX_TTL_MS,
+    };
+    return value;
+  });
+  try {
+    return await mirroringIndexInFlight;
+  } finally {
+    mirroringIndexInFlight = null;
+  }
+};
+
 export async function getMirroredProjectsForInstance(opts: {
   instance: RoadmapInstanceConfig;
   forwardedHeaders?: ForwardedRequestHeaders;
 }): Promise<MirroredProjectsResult> {
   const targetBadge = getInstanceBadge(opts.instance);
-  const badgeOptions = await getInstanceBadgeOptions();
-
   if (!targetBadge) {
+    const badgeOptions = await getInstanceBadgeOptions();
     return { mirroredProjects: [], mirroredCategories: [], badgeOptions };
   }
 
-  const records = (await prisma.roadmapInstance.findMany({
-    include: { hosts: true },
-    orderBy: { slug: 'asc' },
-  })) as PrismaInstanceWithHosts[];
-
-  const sourceInstances = records
-    .map((record) => mapInstanceRecord(record))
-    .filter((candidate) => candidate.slug !== opts.instance.slug);
-
-  const mirroredBySource = await Promise.all(
-    sourceInstances.map(async (sourceInstance) => {
-      try {
-        const projects = await loadProjectsForInstance(sourceInstance, opts.forwardedHeaders);
-        const mirroredProjects = projects
-          .filter((project) =>
-            normalizeBadgeList(project.badges).some(
-              (badge) => badge.toLowerCase() === targetBadge.toLowerCase()
-            )
-          )
-          .map((project) => mapMirroredProject(project, sourceInstance));
-
-        return mirroredProjects.length > 0
-          ? {
-              sourceInstance,
-              mirroredProjects,
-            }
-          : null;
-      } catch {
-        console.warn('[instanceMirroring] failed to load mirrored projects');
-        return null;
-      }
-    })
+  const index = await getMirroringIndex(opts.forwardedHeaders);
+  const matches = (index.projectsByBadge.get(targetBadge.toLowerCase()) || []).filter(
+    (entry) => entry.sourceInstance.slug !== opts.instance.slug
   );
-
-  const mirroredProjects = mirroredBySource.flatMap((entry) => entry?.mirroredProjects ?? []);
-  const mirroredCategories = mirroredBySource
-    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
-    .map((entry) => buildMirrorCategory(entry.sourceInstance));
-
-  return { mirroredProjects, mirroredCategories, badgeOptions };
+  const mirroredProjects = matches.map(({ project, sourceInstance }) =>
+    mapMirroredProject(project, sourceInstance)
+  );
+  const sourceInstances = Array.from(
+    new Map(matches.map((entry) => [entry.sourceInstance.slug, entry.sourceInstance])).values()
+  );
+  const mirroredCategories = sourceInstances.map(buildMirrorCategory);
+  return { mirroredProjects, mirroredCategories, badgeOptions: index.badgeOptions };
 }
 
 export async function getMirroredProjectById(opts: {

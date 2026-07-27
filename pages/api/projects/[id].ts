@@ -6,6 +6,7 @@ import {
   isReadSessionAllowedForInstance,
 } from '@/utils/instanceAccessServer';
 import { getInstanceConfigFromRequest } from '@/utils/instanceConfig';
+import { invalidateRoadmapDataCache } from '@/utils/roadmapData';
 import type { Project } from '@/types';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { getSampleProjectById, isSampleDataInstance } from '@/utils/sampleInstanceData';
@@ -184,6 +185,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         clientDataService.withInstance(instance.slug, () => clientDataService.getProjectById(id))
       );
 
+      invalidateRoadmapDataCache();
       res.status(200).json(updatedProject ?? { success: true });
     } catch (error) {
       if (error instanceof UnsafeExternalUrlError) {
@@ -219,6 +221,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await clientDataService.withRequestHeaders(forwardedHeaders, () =>
         clientDataService.withInstance(instance.slug, () => clientDataService.deleteProject(id))
       );
+      invalidateRoadmapDataCache();
       res.status(200).json({ success: true });
     } catch (error) {
       console.error('Error deleting project:', error);

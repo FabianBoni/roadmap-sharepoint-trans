@@ -1,4 +1,7 @@
 import Head from 'next/head';
+import { forceServerSideRendering } from '@/utils/serverRendering';
+
+export const getServerSideProps = forceServerSideRendering;
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FiCheck, FiMessageCircle, FiRefreshCw, FiRotateCcw } from 'react-icons/fi';
 import {

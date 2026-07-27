@@ -16,6 +16,8 @@ import {
   parseDepartmentsPayload,
   replaceAllowedDepartmentsForInstance,
 } from '@/utils/instanceDepartmentAccess';
+import { clearInstanceAccessDecisionCache } from '@/utils/instanceAccessServer';
+import { invalidateRoadmapDataCache } from '@/utils/roadmapData';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -125,6 +127,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     const mapped = mapInstanceRecord(created);
+    clearInstanceAccessDecisionCache();
+    invalidateRoadmapDataCache();
     let health: RoadmapInstanceHealth;
     try {
       health = await provisionSharePointForInstance(mapped);

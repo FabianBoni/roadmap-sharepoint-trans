@@ -1,10 +1,6 @@
 import { JSX, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { clientDataService } from '@/utils/clientDataService';
-import { initializeIcons } from '@fluentui/react/lib/Icons';
 import type { AppProps } from 'next/app';
-import App, { type AppContext } from 'next/app';
-import type { Category, Project } from '@/types';
 import '@chatscope/chat-ui-kit-styles/dist/default/styles.min.css';
 import './css/design-system.css';
 import './css/globals.css';
@@ -13,21 +9,7 @@ import SiteFooter from '@/components/SiteFooter';
 import SiteHeader from '@/components/SiteHeader';
 import Head from 'next/head';
 import { prefixBasePath } from '@/utils/nextBasePath';
-import SupportChatWidget from '@/components/SupportChatWidget';
-
-// Define a type for the window with our custom property
-interface CustomWindow extends Window {
-  __fluentUIIconsInitialized?: boolean;
-  __spFetchPatched?: boolean;
-  clientDataService?: typeof clientDataService;
-  fetchCategoriesAndProjects?: () => Promise<{
-    cats: Category[];
-    projs: Project[];
-    unmapped: Project[];
-  }>;
-  __categories?: Category[];
-  __projects?: Project[];
-}
+import SupportChatLauncher from '@/components/SupportChatLauncher';
 
 function RoadmapApp({ Component, pageProps }: AppProps): JSX.Element {
   const router = useRouter();
@@ -55,40 +37,6 @@ function RoadmapApp({ Component, pageProps }: AppProps): JSX.Element {
       /* ignore cookie access issues */
     }
   }, [router.query]);
-
-  useEffect(() => {
-    // Only initialize icons once on the client side
-    if (typeof window !== 'undefined') {
-      const customWindow = window as CustomWindow;
-      if (!customWindow.__fluentUIIconsInitialized) {
-        initializeIcons();
-        customWindow.__fluentUIIconsInitialized = true;
-      }
-
-      // Temporary fetch monkey patch to reroute any lingering absolute SharePoint REST calls via proxy (CORS bypass)
-      const SP_HOST = 'https://spi.intranet.bs.ch';
-      if (!customWindow.__spFetchPatched) {
-        const originalFetch = window.fetch.bind(window);
-        customWindow.__spFetchPatched = true;
-        window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
-          try {
-            if (typeof input === 'string' && input.startsWith(SP_HOST)) {
-              const idx = input.indexOf('/_api/');
-              if (idx > -1) {
-                const apiSuffix = input.substring(idx); // _api/...
-                // Build proxy path
-                const proxyUrl = '/api/sharepoint/' + apiSuffix.replace(/^_api\//, '_api/');
-                return originalFetch(proxyUrl, init);
-              }
-            }
-          } catch {
-            // swallow and fall through
-          }
-          return originalFetch(input, init);
-        };
-      }
-    }
-  }, []);
 
   if (maintenanceModeEnabled) {
     return (
@@ -161,13 +109,9 @@ function RoadmapApp({ Component, pageProps }: AppProps): JSX.Element {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <Component {...pageProps} />
-      <SupportChatWidget />
+      <SupportChatLauncher />
     </>
   );
 }
-
-// A nonce must be unique per HTTP response. Disabling automatic static optimization here ensures
-// that _document.tsx generates a fresh CSP nonce for pages that do not define their own data hook.
-RoadmapApp.getInitialProps = async (context: AppContext) => App.getInitialProps(context);
 
 export default RoadmapApp;

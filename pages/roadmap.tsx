@@ -3,68 +3,32 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import type { GetServerSideProps } from 'next';
+import { performance } from 'node:perf_hooks';
 import Roadmap from '../components/Roadmap';
 import SiteHeader from '@/components/SiteHeader';
-import { clientDataService } from '@/utils/clientDataService';
 import { extractAdminSessionFromHeaders } from '@/utils/apiAuth';
-import { isReadSessionAllowedForInstance } from '@/utils/instanceAccessServer';
+import {
+  isAdminSessionAllowedForInstance,
+  isReadSessionAllowedForInstance,
+} from '@/utils/instanceAccessServer';
 import { INSTANCE_QUERY_PARAM, setInstanceCookieHeader } from '@/utils/instanceConfig';
-import { ADMIN_SESSION_CHANGED_EVENT, getAdminSessionState } from '@/utils/auth';
+import { buildInstanceAwareUrl } from '@/utils/auth';
 import {
   resolveFirstAllowedInstanceForAdminSession,
   resolveInstanceForAdminSession,
 } from '@/utils/instanceSelection';
-import {
-  getSampleCategories,
-  getSampleProjects,
-  isSampleDataInstance,
-} from '@/utils/sampleInstanceData';
-import { getMirroredProjectsForInstance } from '@/utils/instanceMirroring';
+import { getRoadmapDataSnapshot } from '@/utils/roadmapData';
+import { DEFAULT_THEME, type ThemeSettings } from '@/utils/theme';
 import type { Category, Project, ProjectOrderByCategory } from '../types';
 
 const INSTANCE_CONTEXT_CHANGED_EVENT = 'roadmap-instance-changed';
-
-const parseProjectOrderByCategoryValue = (value: unknown): ProjectOrderByCategory => {
-  if (typeof value !== 'string' || !value.trim()) {
-    return {};
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return {};
-    }
-
-    const normalized: ProjectOrderByCategory = {};
-    for (const [categoryId, orderedIds] of Object.entries(parsed as Record<string, unknown>)) {
-      const normalizedCategoryId = String(categoryId || '').trim();
-      if (!normalizedCategoryId || !Array.isArray(orderedIds)) {
-        continue;
-      }
-
-      const normalizedIds = orderedIds
-        .map((entry) =>
-          typeof entry === 'string' || typeof entry === 'number' ? String(entry) : ''
-        )
-        .map((entry) => entry.trim())
-        .filter(Boolean)
-        .filter((entry, index, list) => list.indexOf(entry) === index);
-
-      if (normalizedIds.length > 0) {
-        normalized[normalizedCategoryId] = normalizedIds;
-      }
-    }
-
-    return normalized;
-  } catch {
-    return {};
-  }
-};
 
 type RoadmapPageProps = {
   projects: Project[];
   categories: Category[];
   projectOrderByCategory: ProjectOrderByCategory;
+  theme: ThemeSettings;
+  isAdmin: boolean;
   resolvedInstanceSlug: string;
   accessDenied?: boolean;
 };
@@ -73,6 +37,8 @@ const RoadmapPage: React.FC<RoadmapPageProps> = ({
   projects,
   categories,
   projectOrderByCategory,
+  theme,
+  isAdmin,
   resolvedInstanceSlug,
   accessDenied,
 }) => {
@@ -103,30 +69,30 @@ const RoadmapPage: React.FC<RoadmapPageProps> = ({
   const [categoriesState, setCategoriesState] = useState<Category[]>(categories);
   const [projectOrderByCategoryState, setProjectOrderByCategoryState] =
     useState<ProjectOrderByCategory>(projectOrderByCategory);
+  const [themeState, setThemeState] = useState(theme);
+  const [isAdminState, setIsAdminState] = useState(isAdmin);
   const [accessDeniedState, setAccessDeniedState] = useState(Boolean(accessDenied));
   const [activeInstanceSlug, setActiveInstanceSlug] = useState(resolvedInstanceSlug);
   const [loading, setLoading] = useState(false);
-  const [showFeedbackLink, setShowFeedbackLink] = useState(false);
 
   useEffect(() => {
     setProjectsState(projects);
     setCategoriesState(categories);
     setProjectOrderByCategoryState(projectOrderByCategory);
+    setThemeState(theme);
+    setIsAdminState(isAdmin);
     setAccessDeniedState(Boolean(accessDenied));
     setActiveInstanceSlug(resolvedInstanceSlug);
     setLoading(false);
-  }, [accessDenied, categories, projectOrderByCategory, projects, resolvedInstanceSlug]);
-
-  useEffect(() => {
-    const updateFeedbackLink = () => {
-      void getAdminSessionState(true).then((session) =>
-        setShowFeedbackLink(Boolean(session?.authenticated))
-      );
-    };
-    void updateFeedbackLink();
-    window.addEventListener(ADMIN_SESSION_CHANGED_EVENT, updateFeedbackLink);
-    return () => window.removeEventListener(ADMIN_SESSION_CHANGED_EVENT, updateFeedbackLink);
-  }, []);
+  }, [
+    accessDenied,
+    categories,
+    isAdmin,
+    projectOrderByCategory,
+    projects,
+    resolvedInstanceSlug,
+    theme,
+  ]);
 
   useEffect(() => {
     if (!currentInstanceSlug || typeof document === 'undefined' || typeof window === 'undefined') {
@@ -157,43 +123,27 @@ const RoadmapPage: React.FC<RoadmapPageProps> = ({
     const run = async () => {
       setLoading(true);
 
-      const projectsUrl = currentInstanceSlug
-        ? `/api/projects?${INSTANCE_QUERY_PARAM}=${encodeURIComponent(currentInstanceSlug)}`
-        : '/api/projects';
-      const categoriesUrl = currentInstanceSlug
-        ? `/api/categories?${INSTANCE_QUERY_PARAM}=${encodeURIComponent(currentInstanceSlug)}`
-        : '/api/categories';
-      const projectOrderUrl = currentInstanceSlug
-        ? `/api/settings/key/projectOrderByCategory?${INSTANCE_QUERY_PARAM}=${encodeURIComponent(currentInstanceSlug)}`
-        : '/api/settings/key/projectOrderByCategory';
+      const roadmapDataUrl = buildInstanceAwareUrl(
+        currentInstanceSlug
+          ? `/api/roadmap-data?${INSTANCE_QUERY_PARAM}=${encodeURIComponent(currentInstanceSlug)}`
+          : '/api/roadmap-data'
+      );
 
       try {
-        const [projectsResp, categoriesResp, projectOrderResp] = await Promise.all([
-          fetch(projectsUrl, {
-            credentials: 'same-origin',
-            signal: controller.signal,
-            headers: { Accept: 'application/json' },
-          }),
-          fetch(categoriesUrl, {
-            credentials: 'same-origin',
-            signal: controller.signal,
-            headers: { Accept: 'application/json' },
-          }),
-          fetch(projectOrderUrl, {
-            credentials: 'same-origin',
-            signal: controller.signal,
-            headers: { Accept: 'application/json' },
-          }),
-        ]);
+        const response = await fetch(roadmapDataUrl, {
+          credentials: 'same-origin',
+          signal: controller.signal,
+          headers: { Accept: 'application/json' },
+        });
 
-        if (projectsResp.status === 401 || categoriesResp.status === 401) {
+        if (response.status === 401) {
           if (controller.signal.aborted || requestId !== fetchRequestIdRef.current) return;
           const returnUrl = typeof router.asPath === 'string' ? router.asPath : '/roadmap';
           void router.push(`/admin/login?returnUrl=${encodeURIComponent(returnUrl)}`);
           return;
         }
 
-        if (projectsResp.status === 403 || categoriesResp.status === 403) {
+        if (response.status === 403) {
           if (controller.signal.aborted || requestId !== fetchRequestIdRef.current) return;
           setProjectsState([]);
           setCategoriesState([]);
@@ -203,35 +153,22 @@ const RoadmapPage: React.FC<RoadmapPageProps> = ({
           return;
         }
 
-        if (
-          !projectsResp.ok ||
-          !categoriesResp.ok ||
-          (projectOrderResp.status !== 404 && !projectOrderResp.ok)
-        ) {
-          const projectPayload = await projectsResp.json().catch(() => null);
-          const categoryPayload = await categoriesResp.json().catch(() => null);
-          const orderPayload = await projectOrderResp.json().catch(() => null);
+        if (!response.ok) {
+          const errorPayload = await response.json().catch(() => null);
           throw new Error(
-            projectPayload?.error ||
-              categoryPayload?.error ||
-              orderPayload?.message ||
-              `Failed to fetch roadmap data (${projectsResp.status}/${categoriesResp.status}/${projectOrderResp.status})`
+            errorPayload?.error || `Failed to fetch roadmap data (${response.status})`
           );
         }
 
-        const [nextProjects, nextCategories, projectOrderPayload] = await Promise.all([
-          projectsResp.json(),
-          categoriesResp.json(),
-          projectOrderResp.status === 404 ? Promise.resolve(null) : projectOrderResp.json(),
-        ]);
+        const payload = await response.json();
 
         if (controller.signal.aborted || requestId !== fetchRequestIdRef.current) return;
 
-        setProjectsState(Array.isArray(nextProjects) ? nextProjects : []);
-        setCategoriesState(Array.isArray(nextCategories) ? nextCategories : []);
-        setProjectOrderByCategoryState(
-          parseProjectOrderByCategoryValue(projectOrderPayload?.value)
-        );
+        setProjectsState(Array.isArray(payload.projects) ? payload.projects : []);
+        setCategoriesState(Array.isArray(payload.categories) ? payload.categories : []);
+        setProjectOrderByCategoryState(payload.projectOrderByCategory || {});
+        setThemeState(payload.theme || DEFAULT_THEME);
+        setIsAdminState(Boolean(payload.access?.isAdmin));
         setAccessDeniedState(false);
         setActiveInstanceSlug(currentInstanceSlug);
       } catch (error) {
@@ -253,7 +190,7 @@ const RoadmapPage: React.FC<RoadmapPageProps> = ({
         <title>Roadmap | JSDoIT Roadmap</title>
       </Head>
       <div className="ds-page-shell">
-        <SiteHeader activeRoute="roadmap" />
+        <SiteHeader activeRoute="roadmap" authenticated initialIsAdmin={isAdminState} />
 
         <main className="ds-page-main ds-roadmap-page-main">
           {loading ? (
@@ -279,6 +216,8 @@ const RoadmapPage: React.FC<RoadmapPageProps> = ({
               initialProjects={projectsState}
               initialCategories={categoriesState}
               initialProjectOrderByCategory={projectOrderByCategoryState}
+              initialTheme={themeState}
+              initialIsAdmin={isAdminState}
             />
           )}
         </main>
@@ -293,11 +232,9 @@ const RoadmapPage: React.FC<RoadmapPageProps> = ({
               <Link className="ds-footer-link" href="/help">
                 Hilfe
               </Link>
-              {showFeedbackLink && (
-                <Link className="ds-footer-link" href="/feedback">
-                  Feedback
-                </Link>
-              )}
+              <Link className="ds-footer-link" href="/feedback">
+                Feedback
+              </Link>
             </div>
           </div>
         </footer>
@@ -309,6 +246,13 @@ const RoadmapPage: React.FC<RoadmapPageProps> = ({
 export default RoadmapPage;
 
 export const getServerSideProps: GetServerSideProps<RoadmapPageProps> = async (ctx) => {
+  const startedAt = performance.now();
+  const timingMarks: string[] = [];
+  const markTiming = (name: string, since: number) => {
+    timingMarks.push(`${name};dur=${Math.max(0, performance.now() - since).toFixed(1)}`);
+    ctx.res?.setHeader('Server-Timing', timingMarks.join(', '));
+  };
+
   try {
     if (ctx.res) {
       ctx.res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -360,13 +304,14 @@ export const getServerSideProps: GetServerSideProps<RoadmapPageProps> = async (c
       ctx.res.setHeader('Set-Cookie', setInstanceCookieHeader(instance.slug));
     }
 
-    if (
-      !(await isReadSessionAllowedForInstance({
-        session,
-        instance,
-        requestHeaders: forwardedHeaders,
-      }))
-    ) {
+    const accessStartedAt = performance.now();
+    const canRead = await isReadSessionAllowedForInstance({
+      session,
+      instance,
+      requestHeaders: forwardedHeaders,
+    });
+    markTiming('access', accessStartedAt);
+    if (!canRead) {
       const fallback = await resolveFirstAllowedInstanceForAdminSession(session, ctx.req);
       if (fallback && fallback.slug && fallback.slug !== instance.slug) {
         if (ctx.res) {
@@ -384,44 +329,30 @@ export const getServerSideProps: GetServerSideProps<RoadmapPageProps> = async (c
           projects: [],
           categories: [],
           projectOrderByCategory: {},
+          theme: DEFAULT_THEME,
+          isAdmin: false,
           resolvedInstanceSlug: instance.slug,
           accessDenied: true,
         },
       };
     }
 
-    const [projects, categories, projectOrderByCategory] = isSampleDataInstance(instance)
-      ? [getSampleProjects(), getSampleCategories(), {}]
-      : await clientDataService.withRequestHeaders(forwardedHeaders, () =>
-          clientDataService.withInstance(instance.slug, () =>
-            Promise.all([
-              clientDataService.getAllProjects(),
-              clientDataService.getAllCategories(),
-              clientDataService.getProjectOrderByCategory(),
-            ])
-          )
-        );
-
-    const { mirroredProjects, mirroredCategories } = await getMirroredProjectsForInstance({
-      instance,
-      forwardedHeaders,
-    });
-
-    const safeProjects = [...(Array.isArray(projects) ? projects : []), ...mirroredProjects];
-    const safeCategories = [
-      ...(Array.isArray(categories) ? categories : []),
-      ...mirroredCategories,
-    ];
-    const safeProjectOrderByCategory =
-      projectOrderByCategory && typeof projectOrderByCategory === 'object'
-        ? projectOrderByCategory
-        : {};
+    const dataStartedAt = performance.now();
+    const [{ snapshot, cacheStatus }, isAdmin] = await Promise.all([
+      getRoadmapDataSnapshot({ instance, forwardedHeaders }),
+      isAdminSessionAllowedForInstance({ session, instance, requestHeaders: forwardedHeaders }),
+    ]);
+    markTiming('roadmap-data', dataStartedAt);
+    markTiming('total', startedAt);
+    ctx.res?.setHeader('X-Roadmap-Data-Cache', cacheStatus);
 
     return {
       props: {
-        projects: safeProjects,
-        categories: safeCategories,
-        projectOrderByCategory: safeProjectOrderByCategory,
+        projects: snapshot.projects,
+        categories: snapshot.categories,
+        projectOrderByCategory: snapshot.projectOrderByCategory,
+        theme: snapshot.theme,
+        isAdmin,
         resolvedInstanceSlug: instance.slug,
       },
     };
@@ -432,6 +363,8 @@ export const getServerSideProps: GetServerSideProps<RoadmapPageProps> = async (c
         projects: [],
         categories: [],
         projectOrderByCategory: {},
+        theme: DEFAULT_THEME,
+        isAdmin: false,
         resolvedInstanceSlug: '',
         accessDenied: false,
       },

@@ -84,6 +84,12 @@ async function isDbSuperAdmin(ids: ReturnType<typeof extractIdentifiers>): Promi
   }
 }
 
+export async function isDbSuperAdminSession(
+  session: AdminSessionPayload | null | undefined
+): Promise<boolean> {
+  return session ? isDbSuperAdmin(extractIdentifiers(session)) : false;
+}
+
 async function getAllInstanceSlugs(): Promise<string[]> {
   const rows = await prisma.roadmapInstance.findMany({
     select: { slug: true },
@@ -111,9 +117,10 @@ async function getSuperAdminCheckInstanceSlugs(
 
   const wantsAll = configured.includes('all') || configured.includes('*');
   if (configured.length > 0 && !wantsAll) return Array.from(new Set(configured));
-
   if (candidates.length > 0) return Array.from(new Set(candidates));
-  return await getAllInstanceSlugs();
+  // Never fan out across every SharePoint site implicitly. Operators can opt
+  // into that legacy behavior explicitly, but ordinary checks stay local.
+  return wantsAll ? await getAllInstanceSlugs() : [];
 }
 
 export async function isSuperAdminSessionWithSharePointFallback(
@@ -157,13 +164,7 @@ export async function isSuperAdminSessionWithSharePointFallback(
 
 export async function requireSuperAdminAccess(req: NextApiRequest): Promise<AdminSessionPayload> {
   const session = await requireUserSession(req);
-  const ok = await isSuperAdminSessionWithSharePointFallback(session, {
-    requestHeaders: {
-      authorization:
-        typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined,
-      cookie: typeof req.headers.cookie === 'string' ? req.headers.cookie : undefined,
-    },
-  });
+  const ok = await isDbSuperAdminSession(session);
   if (!ok) throw new Error('Forbidden');
   return session;
 }

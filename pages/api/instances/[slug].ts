@@ -17,6 +17,8 @@ import {
   parseDepartmentsPayload,
   replaceAllowedDepartmentsForInstance,
 } from '@/utils/instanceDepartmentAccess';
+import { clearInstanceAccessDecisionCache } from '@/utils/instanceAccessServer';
+import { invalidateRoadmapDataCache } from '@/utils/roadmapData';
 
 async function updateHosts(instanceId: number, hosts: string[]) {
   await prisma.roadmapInstanceHost.deleteMany({ where: { instanceId } });
@@ -219,6 +221,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     })) as PrismaInstanceWithHosts;
 
     const remapped = mapInstanceRecord(updated);
+    clearInstanceAccessDecisionCache(slug);
+    invalidateRoadmapDataCache();
     const allowedBySlug = await getAllowedDepartmentsForInstanceSlugs([remapped.slug]);
     const summary = toInstanceSummary(remapped);
     return res.status(200).json({
@@ -246,6 +250,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       await deleteDepartmentAccessForInstance(slug);
       await prisma.roadmapInstance.delete({ where: { slug } });
+      clearInstanceAccessDecisionCache(slug);
+      invalidateRoadmapDataCache();
       return res.status(204).end();
     } catch {
       return res.status(404).json({ error: 'Instance not found' });

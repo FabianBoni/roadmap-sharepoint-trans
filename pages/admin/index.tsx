@@ -1,4 +1,7 @@
 import clsx from 'clsx';
+import { forceServerSideRendering } from '@/utils/serverRendering';
+
+export const getServerSideProps = forceServerSideRendering;
 import Head from 'next/head';
 import Link from 'next/link';
 import React, { useCallback, useEffect, useRef, useState } from 'react';

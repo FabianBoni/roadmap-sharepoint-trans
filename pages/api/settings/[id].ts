@@ -6,6 +6,7 @@ import {
   isReadSessionAllowedForInstance,
 } from '@/utils/instanceAccessServer';
 import { getInstanceConfigFromRequest } from '@/utils/instanceConfig';
+import { invalidateRoadmapDataCache } from '@/utils/roadmapData';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { sanitizeSettingRichTextFields } from '@/utils/richText';
 
@@ -91,6 +92,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         clientDataService.updateSetting(safeSetting)
       );
 
+      invalidateRoadmapDataCache();
       return res.status(200).json(updatedSetting);
     } catch {
       console.error('Error updating setting');
@@ -104,6 +106,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await clientDataService.withInstance(instance.slug, () =>
         clientDataService.deleteSetting(id)
       );
+      invalidateRoadmapDataCache();
       return res.status(200).json({ message: 'Setting deleted successfully' });
     } catch {
       console.error('Error deleting setting');

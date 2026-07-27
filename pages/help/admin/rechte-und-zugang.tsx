@@ -1,4 +1,7 @@
 import Link from 'next/link';
+import { forceServerSideRendering } from '@/utils/serverRendering';
+
+export const getServerSideProps = forceServerSideRendering;
 import { FiArrowRight, FiEye, FiLock, FiShield, FiUserCheck } from 'react-icons/fi';
 import HelpLayout from '@/components/HelpLayout';
 

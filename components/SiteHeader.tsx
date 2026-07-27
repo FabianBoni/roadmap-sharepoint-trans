@@ -17,6 +17,8 @@ type RouteKey = 'home' | 'instances' | 'roadmap' | 'help' | 'docs' | 'admin' | '
 type SiteHeaderProps = {
   activeRoute?: RouteKey;
   brandLabel?: string;
+  authenticated?: boolean;
+  initialIsAdmin?: boolean;
 };
 
 const INSTANCE_CONTEXT_CHANGED_EVENT = 'roadmap-instance-changed';
@@ -46,6 +48,8 @@ const deriveRouteKey = (pathname: string): RouteKey => {
 const SiteHeader: React.FC<SiteHeaderProps> = ({
   activeRoute,
   brandLabel = 'Kantonale Roadmap',
+  authenticated,
+  initialIsAdmin,
 }) => {
   const router = useRouter();
   const pathname = router.pathname || '';
@@ -56,8 +60,8 @@ const SiteHeader: React.FC<SiteHeaderProps> = ({
   }, [router.query]);
 
   const [cookieSlug, setCookieSlug] = useState<string>('');
-  const [showAdminLink, setShowAdminLink] = useState(false);
-  const [showFeedbackLink, setShowFeedbackLink] = useState(false);
+  const [showAdminLink, setShowAdminLink] = useState(Boolean(initialIsAdmin));
+  const [showFeedbackLink, setShowFeedbackLink] = useState(Boolean(authenticated));
 
   useEffect(() => {
     if (typeof document === 'undefined' || typeof window === 'undefined') return;
@@ -93,6 +97,10 @@ const SiteHeader: React.FC<SiteHeaderProps> = ({
   const brandHref = maybeQuery ? { pathname: '/landing', query: maybeQuery } : '/landing';
 
   useEffect(() => {
+    if (authenticated !== undefined) {
+      setShowFeedbackLink(authenticated);
+      return;
+    }
     if (typeof window === 'undefined') return;
     const updateFeedbackLink = () => {
       void getAdminSessionState(true).then((session) =>
@@ -102,12 +110,16 @@ const SiteHeader: React.FC<SiteHeaderProps> = ({
     void updateFeedbackLink();
     window.addEventListener(ADMIN_SESSION_CHANGED_EVENT, updateFeedbackLink);
     return () => window.removeEventListener(ADMIN_SESSION_CHANGED_EVENT, updateFeedbackLink);
-  }, [router.asPath]);
+  }, [authenticated, router.asPath]);
 
   useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
+      if (initialIsAdmin !== undefined) {
+        if (!cancelled) setShowAdminLink(initialIsAdmin);
+        return;
+      }
       if (currentRoute === 'admin') {
         if (!cancelled) setShowAdminLink(hasAdminHref);
         return;
@@ -133,7 +145,7 @@ const SiteHeader: React.FC<SiteHeaderProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [currentRoute, hasAdminHref]);
+  }, [currentRoute, hasAdminHref, initialIsAdmin]);
 
   return (
     <header className="ds-topbar">

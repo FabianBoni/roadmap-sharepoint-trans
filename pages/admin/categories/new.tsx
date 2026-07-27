@@ -1,4 +1,7 @@
 import { useRouter } from 'next/router';
+import { forceServerSideRendering } from '@/utils/serverRendering';
+
+export const getServerSideProps = forceServerSideRendering;
 import { type FC } from 'react';
 import AdminSubpageLayout from '@/components/AdminSubpageLayout';
 import CategoryForm from '@/components/CategoryForm';

@@ -8,7 +8,10 @@ import {
   removeAllowedUser,
   updateInstanceAdminAccessMetadata,
 } from '@/utils/instanceAccess';
-import { isAdminSessionAllowedForInstance } from '@/utils/instanceAccessServer';
+import {
+  clearInstanceAccessDecisionCache,
+  isAdminSessionAllowedForInstance,
+} from '@/utils/instanceAccessServer';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { isStableAuthorizationIdentifier } from '@/utils/authorizationIdentity';
 
@@ -108,6 +111,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       where: { id: record.id },
       data: { settingsJson: JSON.stringify(nextSettings) },
     });
+    clearInstanceAccessDecisionCache(instance.slug);
     return res.status(200).json({ users });
   }
 
@@ -121,6 +125,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       where: { id: record.id },
       data: { settingsJson: JSON.stringify(nextSettings) },
     });
+    clearInstanceAccessDecisionCache(instance.slug);
     return res.status(200).json({ users });
   }
 

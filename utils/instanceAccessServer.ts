@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { AdminSessionPayload } from '@/utils/apiAuth';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { clientDataService } from '@/utils/clientDataService';
@@ -10,16 +11,85 @@ import {
   isAnyDepartmentCandidateAllowedForInstance,
   normalizeDepartment,
 } from '@/utils/instanceDepartmentAccess';
-import { isSuperAdminSessionWithSharePointFallback } from '@/utils/superAdminAccessServer';
+import {
+  isDbSuperAdminSession,
+  isSuperAdminSessionWithSharePointFallback,
+} from '@/utils/superAdminAccessServer';
 
 type Principal = { username: string | null; groups?: unknown };
 type ForwardedRequestHeaders = { authorization?: string; cookie?: string };
 type InstanceAccessHints = {
   knownSuperAdmin?: boolean;
   resolvedDepartment?: string | null;
+  allowSharePointFallback?: boolean;
 };
 
 type InstanceAccessMode = 'read' | 'admin';
+
+type AccessDecisionCacheEntry = { expiresAt: number; allowed: boolean };
+const accessDecisionCache = new Map<string, AccessDecisionCacheEntry>();
+const accessDecisionInFlight = new Map<string, Promise<boolean>>();
+const ACCESS_DECISION_CACHE_MAX_ENTRIES = 5_000;
+const ACCESS_DECISION_TTL_MS = Math.max(
+  5_000,
+  Number.parseInt(process.env.ROADMAP_ACCESS_CACHE_TTL_MS || '60000', 10) || 60_000
+);
+const ACCESS_DENIAL_TTL_MS = Math.min(
+  ACCESS_DECISION_TTL_MS,
+  Math.max(
+    1_000,
+    Number.parseInt(process.env.ROADMAP_ACCESS_DENIED_CACHE_TTL_MS || '15000', 10) || 15_000
+  )
+);
+
+const buildAccessDecisionKey = (opts: {
+  session: AdminSessionPayload;
+  instanceSlug: string;
+  mode: InstanceAccessMode;
+  knownSuperAdmin?: boolean;
+  resolvedDepartment?: string | null;
+  allowSharePointFallback?: boolean;
+}) => {
+  const sessionKey =
+    typeof opts.session.jti === 'string'
+      ? opts.session.jti
+      : JSON.stringify({
+          username: opts.session.username,
+          entra: opts.session.entra,
+          groups: opts.session.groups,
+        });
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        sessionKey,
+        instanceSlug: opts.instanceSlug,
+        mode: opts.mode,
+        knownSuperAdmin: opts.knownSuperAdmin,
+        resolvedDepartment: opts.resolvedDepartment,
+        allowSharePointFallback: opts.allowSharePointFallback,
+      })
+    )
+    .digest('base64url');
+};
+
+export function clearInstanceAccessDecisionCache(instanceSlug?: string): void {
+  // Cache keys are intentionally opaque. Per-instance invalidation is uncommon,
+  // so a bounded full clear is safer than retaining a second key index.
+  void instanceSlug;
+  accessDecisionCache.clear();
+  accessDecisionInFlight.clear();
+}
+
+const pruneAccessDecisionCache = (now: number): void => {
+  for (const [key, entry] of accessDecisionCache) {
+    if (entry.expiresAt <= now) accessDecisionCache.delete(key);
+  }
+  while (accessDecisionCache.size >= ACCESS_DECISION_CACHE_MAX_ENTRIES) {
+    const oldestKey = accessDecisionCache.keys().next().value;
+    if (typeof oldestKey !== 'string') break;
+    accessDecisionCache.delete(oldestKey);
+  }
+};
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
@@ -100,22 +170,16 @@ export async function resolveSessionDepartmentAcrossInstances(opts: {
   const candidateSlugs = Array.from(
     new Set(opts.instanceSlugs.map((slug) => String(slug || '').trim()).filter(Boolean))
   );
-
-  for (const slug of candidateSlugs) {
-    const resolvedDepartment = await resolveDepartmentForIdentifiers({
-      identifiers,
-      instanceSlug: slug,
-      requestHeaders: opts.requestHeaders,
-    });
-    if (resolvedDepartment) {
-      return resolvedDepartment;
-    }
-  }
-
-  return null;
+  const lookupSlug = candidateSlugs[0];
+  if (!lookupSlug) return null;
+  return resolveDepartmentForIdentifiers({
+    identifiers,
+    instanceSlug: lookupSlug,
+    requestHeaders: opts.requestHeaders,
+  });
 }
 
-async function isSessionAllowedForInstance(
+async function isSessionAllowedForInstanceUncached(
   opts: {
     session: AdminSessionPayload;
     instance: Pick<RoadmapInstanceConfig, 'slug' | 'metadata'>;
@@ -131,15 +195,6 @@ async function isSessionAllowedForInstance(
       : ((await getInstanceConfigBySlug(String(instance.slug || ''))) ?? instance);
 
   if (opts.knownSuperAdmin === true) {
-    return true;
-  }
-
-  if (
-    opts.knownSuperAdmin !== false &&
-    (await isSuperAdminSessionWithSharePointFallback(session, {
-      requestHeaders: opts.requestHeaders,
-    }))
-  ) {
     return true;
   }
 
@@ -205,19 +260,33 @@ async function isSessionAllowedForInstance(
     }
   }
 
-  // Fallback: for Entra sessions (or missing token group claims), verify membership
-  // in the SharePoint site group "admin-<instanceSlug>" using the service account.
+  // Database authorization is cheap and authoritative. SharePoint is a last
+  // resort and is deliberately limited to the current instance.
+  if (opts.knownSuperAdmin !== false && (await isDbSuperAdminSession(session))) {
+    return true;
+  }
+
+  if (
+    opts.allowSharePointFallback !== false &&
+    opts.knownSuperAdmin !== false &&
+    (await isSuperAdminSessionWithSharePointFallback(session, {
+      candidateInstanceSlugs: [String(effectiveInstance.slug || '')],
+      requestHeaders: opts.requestHeaders,
+    }))
+  ) {
+    return true;
+  }
+
+  if (opts.allowSharePointFallback === false) return false;
+
+  // Final fallback: verify the instance-specific SharePoint admin group.
   const groupTitle = `admin-${String(instance.slug || '').toLowerCase()}`;
 
   try {
     return await clientDataService.withRequestHeaders(opts.requestHeaders, () =>
-      clientDataService.withInstance(String(effectiveInstance.slug || ''), async () => {
-        const [inAdminGroup, inSuperAdminGroup] = await Promise.all([
-          clientDataService.isUserInSharePointGroupByTitle(groupTitle, ids),
-          clientDataService.isUserInSharePointGroupByTitle('superadmin', ids),
-        ]);
-        return Boolean(inAdminGroup || inSuperAdminGroup);
-      })
+      clientDataService.withInstance(String(effectiveInstance.slug || ''), () =>
+        clientDataService.isUserInSharePointGroupByTitle(groupTitle, ids)
+      )
     );
   } catch (error) {
     console.warn('[instanceAccess] SharePoint membership fallback failed', {
@@ -225,6 +294,46 @@ async function isSessionAllowedForInstance(
       error,
     });
     return false;
+  }
+}
+
+async function isSessionAllowedForInstance(
+  opts: {
+    session: AdminSessionPayload;
+    instance: Pick<RoadmapInstanceConfig, 'slug' | 'metadata'>;
+    requestHeaders?: ForwardedRequestHeaders;
+    mode: InstanceAccessMode;
+  } & InstanceAccessHints
+): Promise<boolean> {
+  const key = buildAccessDecisionKey({
+    session: opts.session,
+    instanceSlug: String(opts.instance.slug || ''),
+    mode: opts.mode,
+    knownSuperAdmin: opts.knownSuperAdmin,
+    resolvedDepartment: opts.resolvedDepartment,
+    allowSharePointFallback: opts.allowSharePointFallback,
+  });
+  const cached = accessDecisionCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.allowed;
+  if (cached) accessDecisionCache.delete(key);
+
+  const existing = accessDecisionInFlight.get(key);
+  if (existing) return existing;
+
+  const request = isSessionAllowedForInstanceUncached(opts).then((allowed) => {
+    const now = Date.now();
+    pruneAccessDecisionCache(now);
+    accessDecisionCache.set(key, {
+      allowed,
+      expiresAt: now + (allowed ? ACCESS_DECISION_TTL_MS : ACCESS_DENIAL_TTL_MS),
+    });
+    return allowed;
+  });
+  accessDecisionInFlight.set(key, request);
+  try {
+    return await request;
+  } finally {
+    if (accessDecisionInFlight.get(key) === request) accessDecisionInFlight.delete(key);
   }
 }
 
@@ -244,12 +353,7 @@ export async function isSessionExplicitlyAllowedByDepartmentForInstance(
     return true;
   }
 
-  if (
-    opts.knownSuperAdmin !== false &&
-    (await isSuperAdminSessionWithSharePointFallback(opts.session, {
-      requestHeaders: opts.requestHeaders,
-    }))
-  ) {
+  if (opts.knownSuperAdmin !== false && (await isDbSuperAdminSession(opts.session))) {
     return true;
   }
 
@@ -276,10 +380,20 @@ export async function isSessionExplicitlyAllowedByDepartmentForInstance(
   );
   if (departmentCandidates.length === 0) return false;
 
-  return isAnyDepartmentCandidateAllowedForInstance({
+  const allowedByDepartment = await isAnyDepartmentCandidateAllowedForInstance({
     instanceSlug: String(effectiveInstance.slug || ''),
     candidates: departmentCandidates,
   });
+  if (allowedByDepartment) return true;
+
+  return (
+    opts.allowSharePointFallback !== false &&
+    opts.knownSuperAdmin !== false &&
+    (await isSuperAdminSessionWithSharePointFallback(opts.session, {
+      candidateInstanceSlugs: [String(effectiveInstance.slug || '')],
+      requestHeaders: opts.requestHeaders,
+    }))
+  );
 }
 
 export async function isAdminSessionAllowedForInstance(

@@ -1,4 +1,7 @@
 import React from 'react';
+import { forceServerSideRendering } from '@/utils/serverRendering';
+
+export const getServerSideProps = forceServerSideRendering;
 import DocsLayout from '../../../components/DocsLayout';
 import Link from 'next/link';
 

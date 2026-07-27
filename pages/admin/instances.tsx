@@ -1,5 +1,8 @@
 ﻿import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { forceServerSideRendering } from '@/utils/serverRendering';
+
+export const getServerSideProps = forceServerSideRendering;
 import clsx from 'clsx';
 import { useRouter } from 'next/router';
 import AdminSubpageLayout from '@/components/AdminSubpageLayout';

@@ -10,6 +10,8 @@ const getInternalApiSecret = (): string | null => {
   return secret.length >= 32 ? secret : null;
 };
 
+export const isInternalApiAuthConfigured = (): boolean => Boolean(getInternalApiSecret());
+
 export const canonicalizeInternalApiTarget = (value: string): string => {
   try {
     const parsed = new URL(value, 'http://internal.invalid');

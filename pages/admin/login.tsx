@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import { forceServerSideRendering } from '@/utils/serverRendering';
+
+export const getServerSideProps = forceServerSideRendering;
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';

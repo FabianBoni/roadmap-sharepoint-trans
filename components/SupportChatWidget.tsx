@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useCallback, useEffect, useState } from 'react';
 import { FiMessageCircle, FiMinimize2, FiShield } from 'react-icons/fi';
 import {
   ChatContainer,
@@ -9,42 +8,28 @@ import {
   MessageInput,
   MessageList,
 } from '@chatscope/chat-ui-kit-react';
-import type { SupportChatConversation, SupportChatMessage } from '@/types/supportChat';
+import type { SupportChatConversation } from '@/types/supportChat';
 import { buildInstanceAwareUrl } from '@/utils/auth';
 
 type ApiResponse = { conversation: SupportChatConversation | null; error?: string };
 
-const LAST_SEEN_KEY = 'roadmap-support-chat-last-seen';
+type SupportChatWidgetProps = {
+  onClose: () => void;
+};
 
 const formatTime = (value: string) =>
   new Intl.DateTimeFormat('de-CH', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 
-const getLatestSupportMessageId = (messages: SupportChatMessage[]): number =>
-  messages.reduce(
-    (latest, message) => (message.senderRole === 'SUPPORT' ? Math.max(latest, message.id) : latest),
-    0
-  );
-
-const SupportChatWidget = () => {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
+/**
+ * The heavy chat UI is mounted only after the launcher is clicked. While it is
+ * mounted, polling pauses automatically in background tabs.
+ */
+const SupportChatWidget = ({ onClose }: SupportChatWidgetProps) => {
   const [conversation, setConversation] = useState<SupportChatConversation | null>(null);
   const [visitorName, setVisitorName] = useState('');
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [unread, setUnread] = useState(false);
-
-  const latestSupportMessageId = useMemo(
-    () => getLatestSupportMessageId(conversation?.messages ?? []),
-    [conversation]
-  );
-
-  const markRead = useCallback((messageId: number) => {
-    if (messageId <= 0 || typeof window === 'undefined') return;
-    window.localStorage.setItem(LAST_SEEN_KEY, String(messageId));
-    setUnread(false);
-  }, []);
 
   const loadConversation = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -69,20 +54,15 @@ const SupportChatWidget = () => {
   }, []);
 
   useEffect(() => {
-    void loadConversation(true);
+    void loadConversation();
   }, [loadConversation]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => void loadConversation(true), open ? 3000 : 12000);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void loadConversation(true);
+    }, 3000);
     return () => window.clearInterval(interval);
-  }, [loadConversation, open]);
-
-  useEffect(() => {
-    if (!latestSupportMessageId || typeof window === 'undefined') return;
-    const seen = Number(window.localStorage.getItem(LAST_SEEN_KEY) || 0);
-    if (open) markRead(latestSupportMessageId);
-    else if (latestSupportMessageId > seen) setUnread(true);
-  }, [latestSupportMessageId, markRead, open]);
+  }, [loadConversation]);
 
   const sendMessage = async (message: string) => {
     const normalized = message.trim();
@@ -110,125 +90,102 @@ const SupportChatWidget = () => {
     }
   };
 
-  const openChat = () => {
-    setOpen(true);
-    markRead(latestSupportMessageId);
-    void loadConversation();
-  };
-
-  if (router.pathname === '/admin/support-chat') return null;
-
   return (
     <div className="support-chat-root">
-      {open && (
-        <section
-          className="support-chat-panel"
-          role="dialog"
-          aria-modal="false"
-          aria-label="Live-Chat mit dem Roadmap-Support"
-        >
-          <MainContainer>
-            <ChatContainer>
-              <ConversationHeader>
-                <ConversationHeader.Content
-                  userName="Roadmap-Support"
-                  info="Antwortzeit ca. 5 min."
-                />
-                <ConversationHeader.Actions>
-                  <button
-                    type="button"
-                    className="support-chat-header-button"
-                    onClick={() => setOpen(false)}
-                    aria-label="Chat minimieren"
-                  >
-                    <FiMinimize2 />
-                  </button>
-                </ConversationHeader.Actions>
-              </ConversationHeader>
-
-              <MessageList loading={loading} loadingMore={false}>
-                {!conversation && (
-                  <MessageList.Content className="support-chat-welcome">
-                    <div className="support-chat-welcome-icon" aria-hidden="true">
-                      <FiMessageCircle />
-                    </div>
-                    <h2>Wie können wir helfen?</h2>
-                    <p>
-                      Schreiben Sie Ihre Frage möglichst konkret. Der Verlauf bleibt auf diesem
-                      Roadmap-Server gespeichert.
-                    </p>
-                    <label className="support-chat-name-field">
-                      <span>Ihr Name (optional)</span>
-                      <input
-                        value={visitorName}
-                        onChange={(event) => setVisitorName(event.target.value.slice(0, 80))}
-                        autoComplete="name"
-                        maxLength={80}
-                        placeholder="Name"
-                      />
-                    </label>
-                  </MessageList.Content>
-                )}
-
-                {conversation?.messages.map((message) => (
-                  <Message
-                    key={message.id}
-                    model={{
-                      message: message.body,
-                      sentTime: formatTime(message.createdAt),
-                      sender:
-                        message.senderName ||
-                        (message.senderRole === 'SUPPORT' ? 'Roadmap-Support' : 'Sie'),
-                      direction: message.senderRole === 'VISITOR' ? 'outgoing' : 'incoming',
-                      position: 'single',
-                      type: 'text',
-                    }}
-                  >
-                    <Message.Footer
-                      sender={
-                        message.senderRole === 'SUPPORT' ? message.senderName || 'Support' : 'Sie'
-                      }
-                      sentTime={formatTime(message.createdAt)}
-                    />
-                  </Message>
-                ))}
-
-                {conversation?.status === 'CLOSED' && (
-                  <MessageList.Content className="support-chat-status-note">
-                    Dieser Chat wurde abgeschlossen. Eine neue Nachricht öffnet ihn wieder.
-                  </MessageList.Content>
-                )}
-              </MessageList>
-
-              {error && <div className="support-chat-error">{error}</div>}
-              <div className="support-chat-privacy-note">
-                <FiShield aria-hidden="true" /> Keine Passwörter oder Zugangstokens senden.
-              </div>
-              <MessageInput
-                placeholder="Nachricht schreiben …"
-                attachButton={false}
-                disabled={sending}
-                sendDisabled={sending}
-                sendOnReturnDisabled={false}
-                onSend={(_html, textContent) => void sendMessage(textContent)}
+      <section
+        className="support-chat-panel"
+        role="dialog"
+        aria-modal="false"
+        aria-label="Live-Chat mit dem Roadmap-Support"
+      >
+        <MainContainer>
+          <ChatContainer>
+            <ConversationHeader>
+              <ConversationHeader.Content
+                userName="Roadmap-Support"
+                info="Antwortzeit ca. 5 min."
               />
-            </ChatContainer>
-          </MainContainer>
-        </section>
-      )}
+              <ConversationHeader.Actions>
+                <button
+                  type="button"
+                  className="support-chat-header-button"
+                  onClick={onClose}
+                  aria-label="Chat minimieren"
+                >
+                  <FiMinimize2 />
+                </button>
+              </ConversationHeader.Actions>
+            </ConversationHeader>
 
-      {!open && (
-        <button
-          type="button"
-          className="support-chat-launcher"
-          onClick={openChat}
-          aria-label={unread ? 'Live-Chat öffnen, neue Antwort vorhanden' : 'Live-Chat öffnen'}
-        >
-          <FiMessageCircle aria-hidden="true" />
-          <span className="support-chat-launcher-label">Live-Chat</span>
-          {unread && <span className="support-chat-unread" aria-hidden="true" />}
-        </button>
-      )}
+            <MessageList loading={loading} loadingMore={false}>
+              {!conversation && (
+                <MessageList.Content className="support-chat-welcome">
+                  <div className="support-chat-welcome-icon" aria-hidden="true">
+                    <FiMessageCircle />
+                  </div>
+                  <h2>Wie können wir helfen?</h2>
+                  <p>
+                    Schreiben Sie Ihre Frage möglichst konkret. Der Verlauf bleibt auf diesem
+                    Roadmap-Server gespeichert.
+                  </p>
+                  <label className="support-chat-name-field">
+                    <span>Ihr Name (optional)</span>
+                    <input
+                      value={visitorName}
+                      onChange={(event) => setVisitorName(event.target.value.slice(0, 80))}
+                      autoComplete="name"
+                      maxLength={80}
+                      placeholder="Name"
+                    />
+                  </label>
+                </MessageList.Content>
+              )}
+
+              {conversation?.messages.map((message) => (
+                <Message
+                  key={message.id}
+                  model={{
+                    message: message.body,
+                    sentTime: formatTime(message.createdAt),
+                    sender:
+                      message.senderName ||
+                      (message.senderRole === 'SUPPORT' ? 'Roadmap-Support' : 'Sie'),
+                    direction: message.senderRole === 'VISITOR' ? 'outgoing' : 'incoming',
+                    position: 'single',
+                    type: 'text',
+                  }}
+                >
+                  <Message.Footer
+                    sender={
+                      message.senderRole === 'SUPPORT' ? message.senderName || 'Support' : 'Sie'
+                    }
+                    sentTime={formatTime(message.createdAt)}
+                  />
+                </Message>
+              ))}
+
+              {conversation?.status === 'CLOSED' && (
+                <MessageList.Content className="support-chat-status-note">
+                  Dieser Chat wurde abgeschlossen. Eine neue Nachricht öffnet ihn wieder.
+                </MessageList.Content>
+              )}
+            </MessageList>
+
+            {error && <div className="support-chat-error">{error}</div>}
+            <div className="support-chat-privacy-note">
+              <FiShield aria-hidden="true" /> Keine Passwörter oder Zugangstokens senden.
+            </div>
+            <MessageInput
+              placeholder="Nachricht schreiben …"
+              attachButton={false}
+              disabled={sending}
+              sendDisabled={sending}
+              sendOnReturnDisabled={false}
+              onSend={(_html, textContent) => void sendMessage(textContent)}
+            />
+          </ChatContainer>
+        </MainContainer>
+      </section>
     </div>
   );
 };

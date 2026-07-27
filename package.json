@@ -14,6 +14,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md,mjs}\"",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md,mjs}\"",
+    "perf:budget": "node scripts/check-performance-budgets.mjs",
     "security:audit": "yarn audit --level moderate",
     "test:security": "node scripts/run-security-tests.mjs",
     "pre-commit": "lint-staged",

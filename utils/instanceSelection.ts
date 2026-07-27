@@ -2,7 +2,7 @@ import type { IncomingMessage } from 'http';
 import type { NextApiRequest } from 'next';
 import prisma from '@/lib/prisma';
 import type { AdminSessionPayload } from '@/utils/apiAuth';
-import { isSuperAdminSessionWithSharePointFallback } from '@/utils/superAdminAccessServer';
+import { isDbSuperAdminSession } from '@/utils/superAdminAccessServer';
 import { isReadSessionAllowedForInstance } from '@/utils/instanceAccessServer';
 import {
   getInstanceConfigFromRequest,
@@ -49,11 +49,7 @@ export async function resolveInstanceForAdminSession(
   })) as PrismaInstanceWithHosts[];
 
   if (records.length === 0) return null;
-  if (
-    await isSuperAdminSessionWithSharePointFallback(session, {
-      candidateInstanceSlugs: records.map((r) => String(r.slug || '')).filter(Boolean),
-    })
-  ) {
+  if (await isDbSuperAdminSession(session)) {
     return mapInstanceRecord(records[0]);
   }
 
@@ -64,7 +60,8 @@ export async function resolveInstanceForAdminSession(
       session,
       instance,
       requestHeaders: forwardedHeaders,
-      knownSuperAdmin: false,
+      knownSuperAdmin: undefined,
+      allowSharePointFallback: false,
     });
     if (allowed) return instance;
   }
@@ -87,11 +84,7 @@ export async function resolveFirstAllowedInstanceForAdminSession(
   })) as PrismaInstanceWithHosts[];
 
   if (records.length === 0) return null;
-  if (
-    await isSuperAdminSessionWithSharePointFallback(session, {
-      candidateInstanceSlugs: records.map((r) => String(r.slug || '')).filter(Boolean),
-    })
-  ) {
+  if (await isDbSuperAdminSession(session)) {
     return mapInstanceRecord(records[0]);
   }
 
@@ -101,7 +94,8 @@ export async function resolveFirstAllowedInstanceForAdminSession(
       session,
       instance,
       requestHeaders: forwardedHeaders,
-      knownSuperAdmin: false,
+      knownSuperAdmin: undefined,
+      allowSharePointFallback: false,
     });
     if (allowed) return instance;
   }

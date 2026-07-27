@@ -398,6 +398,9 @@ jobs:
           NODE_ENV: production
         run: yarn build
 
+      - name: Enforce performance budgets
+        run: yarn perf:budget
+
       - name: Restart only the roadmap service
         env:
           NODE_ENV: production

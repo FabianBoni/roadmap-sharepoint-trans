@@ -99,11 +99,18 @@ const PROJECT_ORDER_SETTING_DESCRIPTION = 'Persisted roadmap project order by ca
 
 class ClientDataService {
   private listTitleCache: Record<string, string> = {};
+  private listTitleInFlight: Record<string, Promise<string> | undefined> = {};
   private listFieldsCache: Record<string, Set<string>> = {};
   private listFieldTypeCache: Record<string, Record<string, string>> = {};
+  private listFieldSchemaInFlight: Record<string, Promise<void> | undefined> = {};
   private requestDigestCache: Record<string, { value: string; expiration: number }> = {};
   private metadataCache: Record<string, string> = {};
   private validProjectFieldsCache: Record<string, string[]> = {};
+  private appSettingsCache: Record<
+    string,
+    { expiresAt: number; values: AppSettings[] } | undefined
+  > = {};
+  private appSettingsInFlight: Record<string, Promise<AppSettings[]> | undefined> = {};
 
   private normalizeStringList(value: unknown): string[] {
     const normalizeEntry = (entry: unknown): string[] => {
@@ -213,7 +220,10 @@ class ClientDataService {
     }
 
     if (typeof window === 'undefined') {
-      const secret = String(process.env.INTERNAL_API_SECRET || process.env.JWT_SECRET || '');
+      // The verifier deliberately accepts only the dedicated internal key.
+      // Never sign with JWT_SECRET: that produces signatures the receiver
+      // rejects and obscures a deployment configuration error.
+      const secret = String(process.env.INTERNAL_API_SECRET || '');
       const req = nodeRequire();
       if (secret.length >= 32 && req) {
         const { createHmac } = req('node:crypto') as typeof import('node:crypto');
@@ -272,6 +282,12 @@ class ClientDataService {
 
   private getDigestCacheKey(): string {
     return this.getInstanceCacheKey();
+  }
+
+  private clearAppSettingsCache(): void {
+    const cacheKey = this.getInstanceCacheKey('app-settings');
+    delete this.appSettingsCache[cacheKey];
+    delete this.appSettingsInFlight[cacheKey];
   }
 
   private getClientInstanceSlugHint(): string | null {
@@ -546,108 +562,110 @@ class ClientDataService {
   async resolveListTitle(preferred: string, variants: string[] = []): Promise<string> {
     const cacheKey = this.getInstanceCacheKey(preferred);
     if (this.listTitleCache[cacheKey]) return this.listTitleCache[cacheKey];
+    const existing = this.listTitleInFlight[cacheKey];
+    if (existing) return existing;
 
-    const normalizedPreferred = preferred.trim();
-    const definition = SHAREPOINT_LIST_DEFINITIONS.find((def) => {
-      const names = [def.key, def.title, ...(def.aliases || [])].filter(Boolean);
-      return names.some((name) => name.trim().toLowerCase() === normalizedPreferred.toLowerCase());
-    });
-    const generatedNames = definition
-      ? [definition.title, definition.key, ...(definition.aliases || [])].filter(Boolean)
-      : [];
-    const autoSpaced = normalizedPreferred.replace(/([a-z])([A-Z])/g, '$1 $2');
-    const candidates = Array.from(
-      new Set([normalizedPreferred, autoSpaced, ...variants, ...generatedNames].filter(Boolean))
-    );
-    const webUrl = this.getWebUrl();
-    for (const name of candidates) {
+    const request = (async () => {
+      const normalizedPreferred = preferred.trim();
+      const definition = SHAREPOINT_LIST_DEFINITIONS.find((def) => {
+        const names = [def.key, def.title, ...(def.aliases || [])].filter(Boolean);
+        return names.some(
+          (name) => name.trim().toLowerCase() === normalizedPreferred.toLowerCase()
+        );
+      });
+      const generatedNames = definition
+        ? [definition.title, definition.key, ...(definition.aliases || [])].filter(Boolean)
+        : [];
+      const autoSpaced = normalizedPreferred.replace(/([a-z])([A-Z])/g, '$1 $2');
+      const candidates = Array.from(
+        new Set([normalizedPreferred, autoSpaced, ...variants, ...generatedNames].filter(Boolean))
+      );
+      const webUrl = this.getWebUrl();
+      for (const name of candidates) {
+        try {
+          const url = `${webUrl}/_api/web/lists/getByTitle('${name}')?$select=Title&$top=1`;
+          const response = await this.spFetch(url, {
+            headers: { Accept: 'application/json;odata=nometadata' },
+          });
+          if (response.ok) {
+            this.listTitleCache[cacheKey] = name;
+            return name;
+          }
+        } catch {
+          /* ignore and try next */
+        }
+      }
+      return preferred;
+    })();
+    this.listTitleInFlight[cacheKey] = request;
+    try {
+      return await request;
+    } finally {
+      if (this.listTitleInFlight[cacheKey] === request) {
+        delete this.listTitleInFlight[cacheKey];
+      }
+    }
+  }
+
+  private async ensureListFieldSchema(listName: string): Promise<void> {
+    const cacheKey = this.getInstanceCacheKey(listName);
+    if (this.listFieldsCache[cacheKey] && this.listFieldTypeCache[cacheKey]) return;
+    const existing = this.listFieldSchemaInFlight[cacheKey];
+    if (existing) return existing;
+
+    const request = (async () => {
       try {
-        const url = `${webUrl}/_api/web/lists/getByTitle('${name}')?$select=Title&$top=1`;
-        const r = await this.spFetch(url, {
+        const webUrl = this.getWebUrl();
+        const resolvedName = await this.resolveListTitle(
+          listName,
+          SP_LIST_VARIANTS[listName] || []
+        );
+        const endpoint = `${webUrl}/_api/web/lists/getByTitle('${resolvedName}')/fields?$select=InternalName,TypeAsString`;
+        let response = await this.spFetch(endpoint, {
           headers: { Accept: 'application/json;odata=nometadata' },
         });
-        if (r.ok) {
-          this.listTitleCache[cacheKey] = name;
-          return name;
+        if (!response.ok) {
+          response = await this.spFetch(endpoint, {
+            headers: { Accept: 'application/json;odata=verbose' },
+          });
+          if (!response.ok) throw new Error('Failed to read list field schema');
         }
-      } catch {
-        /* ignore and try next */
+        const data = await response.json();
+        const fields: any[] = data?.value || data?.d?.results || [];
+        const names = new Set<string>();
+        const types: Record<string, string> = {};
+        for (const field of fields) {
+          const name = String(field?.InternalName || '');
+          if (!name) continue;
+          names.add(name);
+          types[name] = String(field?.TypeAsString || '');
+        }
+        this.listFieldsCache[cacheKey] = names;
+        this.listFieldTypeCache[cacheKey] = types;
+      } catch (error) {
+        console.warn('[clientDataService] Could not fetch field schema for list', listName, error);
+        this.listFieldsCache[cacheKey] = new Set();
+        this.listFieldTypeCache[cacheKey] = {};
+      }
+    })();
+    this.listFieldSchemaInFlight[cacheKey] = request;
+    try {
+      await request;
+    } finally {
+      if (this.listFieldSchemaInFlight[cacheKey] === request) {
+        delete this.listFieldSchemaInFlight[cacheKey];
       }
     }
-    // No variant confirmed; do not cache fallback to allow re-probing next time
-    return preferred;
   }
 
-  // Discover internal field names for a list and cache them (per instance)
   async getListFieldNames(listName: string): Promise<Set<string>> {
-    const cacheKey = this.getInstanceCacheKey(listName);
-    if (this.listFieldsCache[cacheKey]) return this.listFieldsCache[cacheKey];
-    try {
-      const webUrl = this.getWebUrl();
-      const resolvedName = await this.resolveListTitle(listName, SP_LIST_VARIANTS[listName] || []);
-      const endpoint = `${webUrl}/_api/web/lists/getByTitle('${resolvedName}')/fields?$select=InternalName`;
-      const resp = await this.spFetch(endpoint, {
-        headers: { Accept: 'application/json;odata=nometadata' },
-      });
-      if (!resp.ok) {
-        // Retry verbose
-        const resp2 = await this.spFetch(endpoint, {
-          headers: { Accept: 'application/json;odata=verbose' },
-        });
-        if (!resp2.ok) throw new Error('Failed to read fields');
-        const data2 = await resp2.json();
-        const results = (data2?.d?.results || []).map((f: any) => f.InternalName).filter(Boolean);
-        this.listFieldsCache[cacheKey] = new Set(results);
-        return this.listFieldsCache[cacheKey];
-      }
-      const data = await resp.json();
-      const values: string[] = (data.value || []).map((f: any) => f.InternalName).filter(Boolean);
-      this.listFieldsCache[cacheKey] = new Set(values);
-      return this.listFieldsCache[cacheKey];
-    } catch (e) {
-      console.warn('[clientDataService] Could not fetch field names for list', listName, e);
-      this.listFieldsCache[cacheKey] = new Set();
-      return this.listFieldsCache[cacheKey];
-    }
+    await this.ensureListFieldSchema(listName);
+    return this.listFieldsCache[this.getInstanceCacheKey(listName)] || new Set();
   }
 
-  // Discover InternalName -> TypeAsString for a list (cached)
   async getListFieldTypes(listName: string): Promise<Record<string, string>> {
-    const cacheKey = this.getInstanceCacheKey(listName);
-    if (this.listFieldTypeCache[cacheKey]) return this.listFieldTypeCache[cacheKey];
-    try {
-      const resolvedName = await this.resolveListTitle(listName, SP_LIST_VARIANTS[listName] || []);
-      const webUrl = this.getWebUrl();
-      const endpoint = `${webUrl}/_api/web/lists/getByTitle('${resolvedName}')/fields?$select=InternalName,TypeAsString`;
-      let resp = await this.spFetch(endpoint, {
-        headers: { Accept: 'application/json;odata=nometadata' },
-      });
-      if (!resp.ok) {
-        // Retry verbose
-        resp = await this.spFetch(endpoint, {
-          headers: { Accept: 'application/json;odata=verbose' },
-        });
-        if (!resp.ok) throw new Error('Failed to read field types');
-        const dataV = await resp.json();
-        const arr: any[] = dataV?.d?.results || [];
-        const map: Record<string, string> = {};
-        for (const f of arr)
-          if (f.InternalName) map[String(f.InternalName)] = String(f.TypeAsString || '');
-        this.listFieldTypeCache[cacheKey] = map;
-        return map;
-      }
-      const data = await resp.json();
-      const values: any[] = data?.value || [];
-      const map: Record<string, string> = {};
-      for (const f of values)
-        if (f.InternalName) map[String(f.InternalName)] = String(f.TypeAsString || '');
-      this.listFieldTypeCache[cacheKey] = map;
-      return map;
-    } catch (e) {
-      console.warn('[clientDataService] Could not fetch field types for list', listName, e);
-      this.listFieldTypeCache[cacheKey] = {};
-      return {};
-    }
+    await this.ensureListFieldSchema(listName);
+    return this.listFieldTypeCache[this.getInstanceCacheKey(listName)] || {};
   }
 
   private async getRequestDigest(): Promise<string> {
@@ -699,14 +717,69 @@ class ClientDataService {
   private async fetchFromSharePoint(listName: string, select: string = '*'): Promise<any[]> {
     const resolvedName = await this.resolveListTitle(listName, SP_LIST_VARIANTS[listName] || []);
     const webUrl = this.getWebUrl(); // '/api/sharepoint'
-    const endpoint = `${webUrl}/_api/web/lists/getByTitle('${resolvedName}')/items?$select=${select}`;
+    const endpoint = `${webUrl}/_api/web/lists/getByTitle('${resolvedName}')/items?$select=${select}&$top=5000`;
+    const MAX_PAGES = 100;
 
-    const parseAtom = (xml: string): any[] => {
+    const toProxyPageUrl = (nextLink: unknown): string | null => {
+      if (typeof nextLink !== 'string' || !nextLink.trim()) return null;
+      const decoded = nextLink.replace(/&amp;/g, '&');
+      const apiIndex = decoded.toLowerCase().indexOf('/_api/');
+      if (apiIndex >= 0) {
+        return `${webUrl}${decoded.slice(apiIndex)}`;
+      }
+      if (decoded.startsWith('_api/')) {
+        return `${webUrl}/${decoded}`;
+      }
+      if (decoded.startsWith('/_api/')) {
+        return `${webUrl}${decoded}`;
+      }
+      return null;
+    };
+
+    const parseJsonPage = (data: any): { items: any[]; nextUrl: string | null } => {
+      const items = Array.isArray(data?.value)
+        ? data.value
+        : Array.isArray(data?.d?.results)
+          ? data.d.results
+          : Array.isArray(data?.d)
+            ? data.d
+            : [];
+      const nextLink =
+        data?.['@odata.nextLink'] ?? data?.['odata.nextLink'] ?? data?.d?.__next ?? null;
+      return { items, nextUrl: toProxyPageUrl(nextLink) };
+    };
+
+    const fetchRemainingJsonPages = async (firstData: any, accept: string): Promise<any[]> => {
+      const firstPage = parseJsonPage(firstData);
+      const items = [...firstPage.items];
+      let nextUrl = firstPage.nextUrl;
+      let pageCount = 1;
+
+      while (nextUrl && pageCount < MAX_PAGES) {
+        const pageResponse = await this.spFetch(nextUrl, {
+          headers: { Accept: accept },
+        });
+        if (!pageResponse.ok) {
+          throw new Error(`SharePoint pagination failed: ${pageResponse.statusText}`);
+        }
+        const page = parseJsonPage(await pageResponse.json());
+        items.push(...page.items);
+        nextUrl = page.nextUrl;
+        pageCount += 1;
+      }
+
+      if (nextUrl) {
+        throw new Error(`SharePoint pagination exceeded ${MAX_PAGES} pages`);
+      }
+      return items;
+    };
+
+    const parseAtom = (xml: string): { items: any[]; nextUrl: string | null } => {
       try {
         const parser = new DOMParser();
         const doc = parser.parseFromString(xml, 'application/xml');
         const entries = Array.from(doc.getElementsByTagName('entry'));
-        return entries.map((entry) => {
+        const items = entries.map((entry) => {
           const props = entry.getElementsByTagNameNS(
             'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata',
             'properties'
@@ -723,9 +796,16 @@ class ClientDataService {
           }
           return item;
         });
+        const nextLink = Array.from(doc.getElementsByTagName('link')).find(
+          (link) => link.getAttribute('rel') === 'next'
+        );
+        return {
+          items,
+          nextUrl: toProxyPageUrl(nextLink?.getAttribute('href')),
+        };
       } catch (e) {
         console.error('[clientDataService] Atom parse failed', e);
-        return [];
+        return { items: [], nextUrl: null };
       }
     };
 
@@ -751,8 +831,27 @@ class ClientDataService {
                 headers: { Accept: 'application/atom+xml' },
               });
               if (atomResp.ok) {
-                const atomXml = await atomResp.text();
-                const items = parseAtom(atomXml);
+                const firstPage = parseAtom(await atomResp.text());
+                const items = [...firstPage.items];
+                let nextUrl = firstPage.nextUrl;
+                let pageCount = 1;
+                while (nextUrl && pageCount < MAX_PAGES) {
+                  const pageResponse = await this.spFetch(nextUrl, {
+                    headers: { Accept: 'application/atom+xml' },
+                  });
+                  if (!pageResponse.ok) {
+                    throw new Error(
+                      `SharePoint Atom pagination failed: ${pageResponse.statusText}`
+                    );
+                  }
+                  const page = parseAtom(await pageResponse.text());
+                  items.push(...page.items);
+                  nextUrl = page.nextUrl;
+                  pageCount += 1;
+                }
+                if (nextUrl) {
+                  throw new Error(`SharePoint Atom pagination exceeded ${MAX_PAGES} pages`);
+                }
                 console.warn('[clientDataService] Fallback to Atom XML succeeded', {
                   count: items.length,
                   list: listName,
@@ -777,7 +876,7 @@ class ClientDataService {
           // Verbose success path
           try {
             const dataVerbose = await response.json();
-            return dataVerbose?.d?.results || [];
+            return await fetchRemainingJsonPages(dataVerbose, 'application/json;odata=verbose');
           } catch (e) {
             console.error('[clientDataService] Verbose JSON parse error', e);
             throw e;
@@ -792,11 +891,7 @@ class ClientDataService {
       }
       // Lightweight JSON success (but some farms still return verbose shape with 200)
       const data = await response.json();
-      if (Array.isArray(data?.value)) return data.value;
-      if (Array.isArray(data?.d?.results)) return data.d.results;
-      // Some endpoints may return a single item in data.d
-      if (data?.d && Array.isArray(data.d)) return data.d;
-      return [];
+      return await fetchRemainingJsonPages(data, 'application/json;odata=nometadata');
     } catch (error) {
       console.error(`Error fetching from SharePoint list ${listName}:`, error);
       throw error;
@@ -883,8 +978,10 @@ class ClientDataService {
     };
     // Determine the available category field name (supports variants like Bereich/Bereiche)
     const resolvedProjects = await this.resolveListTitle(SP_LISTS.PROJECTS, ['Roadmap Projects']);
-    const listFieldNames = await this.getListFieldNames(resolvedProjects);
-    const listFieldTypes = await this.getListFieldTypes(resolvedProjects);
+    const [listFieldNames, listFieldTypes] = await Promise.all([
+      this.getListFieldNames(resolvedProjects),
+      this.getListFieldTypes(resolvedProjects),
+    ]);
     const selectableCandidateFields = getSelectableProjectFields(candidateFields, listFieldNames);
     const categoryFieldCandidates = ['Category', 'Bereich', 'Bereiche'];
     const categoryFieldName = categoryFieldCandidates.find((f) => listFieldNames.has(f)) || null;
@@ -1070,26 +1167,6 @@ class ClientDataService {
 
     let items = initialResult;
 
-    // Phase 1 minimal category fetch (avoid problematic fields like CategoryId that trigger SP exceptions on this farm)
-    const earlyCategoryMap: Record<string, string> = {};
-    try {
-      const catMinimal = await this.fetchFromSharePoint(
-        resolvedProjects,
-        categorySelectFields.join(',')
-      );
-      if (Array.isArray(catMinimal)) {
-        for (const r of catMinimal) {
-          const pid = (r.Id ?? r.ID ?? '').toString();
-          if (!pid) continue;
-          const normalized = normalizeCategoryValue(pickCategoryValue(r));
-          if (normalized) {
-            earlyCategoryMap[pid] = normalized;
-          }
-        }
-      }
-    } catch (ecErr) {
-      console.warn('[clientDataService] early minimal category fetch failed', ecErr);
-    }
     // If we got an empty array (possible Atom-minimal normalization), try generic helper as a second chance
     if (Array.isArray(items) && items.length === 0) {
       try {
@@ -1130,17 +1207,8 @@ class ClientDataService {
       }
     }
 
-    // Category recovery fetch: if after all fallbacks every item still lacks ANY category signal, do one extremely tolerant fetch
-    // Pre-patch items with early category map before deciding on recovery
-    if (Array.isArray(items) && Object.keys(earlyCategoryMap).length) {
-      for (const it of items) {
-        const pid = (it.Id ?? it.ID ?? '').toString();
-        const existing = getNormalizedCategoryFromEntity(it);
-        if (pid && !existing) {
-          if (earlyCategoryMap[pid]) it.Category = earlyCategoryMap[pid];
-        }
-      }
-    }
+    // Category recovery runs only when the main projection genuinely omitted
+    // every category value; the normal path no longer performs a duplicate read.
     const needsCategoryRecovery =
       Array.isArray(items) &&
       items.length > 0 &&
@@ -2294,7 +2362,7 @@ class ClientDataService {
       const resolvedLinks = await this.resolveListTitle(SP_LISTS.PROJECT_LINKS, [
         'Roadmap Project Links',
       ]);
-      const endpoint = `${webUrl}/_api/web/lists/getByTitle('${resolvedLinks}')/items?$select=Id,Title,Url,ProjectId`;
+      const endpoint = `${webUrl}/_api/web/lists/getByTitle('${resolvedLinks}')/items?$select=Id,Title,Url,ProjectId&$top=5000`;
       const response = await this.spFetch(endpoint, {
         headers: { Accept: 'application/json;odata=nometadata' },
       });
@@ -2324,7 +2392,7 @@ class ClientDataService {
       const resolvedMembers = await this.resolveListTitle(SP_LISTS.TEAM_MEMBERS, [
         'Roadmap Team Members',
       ]);
-      const endpoint = `${webUrl}/_api/web/lists/getByTitle('${resolvedMembers}')/items?$select=Id,Title,Role,ProjectId`;
+      const endpoint = `${webUrl}/_api/web/lists/getByTitle('${resolvedMembers}')/items?$select=Id,Title,Role,ProjectId&$top=5000`;
       const response = await this.spFetch(endpoint, {
         headers: { Accept: 'application/json;odata=nometadata' },
       });
@@ -3026,6 +3094,7 @@ class ClientDataService {
 
       const newItem = await response.json();
 
+      this.clearAppSettingsCache();
       return {
         id: newItem.Id.toString(),
         key: settingData.key,
@@ -3039,74 +3108,55 @@ class ClientDataService {
   }
 
   async getAppSettings(): Promise<AppSettings[]> {
-    try {
-      const resolvedSettings = await this.resolveListTitle(SP_LISTS.SETTINGS, ['Roadmap Settings']);
-      const items = await this.fetchFromSharePoint(resolvedSettings, 'Id,Title,Value,Description');
+    const cacheKey = this.getInstanceCacheKey('app-settings');
+    const cached = this.appSettingsCache[cacheKey];
+    if (cached && cached.expiresAt > Date.now()) return cached.values;
+    const existing = this.appSettingsInFlight[cacheKey];
+    if (existing) return existing;
 
-      // Map SharePoint items to AppSettings format
-      return items.map((item) => ({
-        id: item.Id.toString(),
-        key: item.Title,
-        value: item.Value || '',
-        description: item.Description,
-      }));
-    } catch (error) {
-      console.error('Error fetching app settings:', error);
-      // Return default settings if fetch fails
-      return [
-        {
-          id: '1',
-          key: 'defaultSettings',
-          value: JSON.stringify({
-            theme: 'dark',
-            defaultView: 'quarters',
-            showCompletedProjects: true,
-            enableNotifications: false,
-            customColors: {},
-          }),
-          description: 'Default application settings',
-        },
-      ];
+    const request = (async () => {
+      try {
+        const resolvedSettings = await this.resolveListTitle(SP_LISTS.SETTINGS, [
+          'Roadmap Settings',
+        ]);
+        const items = await this.fetchFromSharePoint(
+          resolvedSettings,
+          'Id,Title,Value,Description'
+        );
+        return items.map((item) => ({
+          id: item.Id.toString(),
+          key: item.Title,
+          value: item.Value || '',
+          description: item.Description,
+        }));
+      } catch (error) {
+        console.error('Error fetching app settings:', error);
+        return [];
+      }
+    })();
+    this.appSettingsInFlight[cacheKey] = request;
+    try {
+      const values = await request;
+      this.appSettingsCache[cacheKey] = {
+        values,
+        expiresAt:
+          Date.now() +
+          Math.max(
+            5_000,
+            Number.parseInt(process.env.ROADMAP_APP_SETTINGS_CACHE_TTL_MS || '60000', 10) || 60_000
+          ),
+      };
+      return values;
+    } finally {
+      if (this.appSettingsInFlight[cacheKey] === request) {
+        delete this.appSettingsInFlight[cacheKey];
+      }
     }
   }
 
   async getSettingByKey(key: string): Promise<AppSettings | null> {
-    try {
-      const webUrl = this.getWebUrl();
-      const resolvedSettings = await this.resolveListTitle(SP_LISTS.SETTINGS, ['Roadmap Settings']);
-      const escapedKey = escapeODataStringLiteral(key);
-      const endpoint = `${webUrl}/_api/web/lists/getByTitle('${resolvedSettings}')/items?$filter=Title eq '${escapedKey}'&$select=Id,Title,Value,Description`;
-
-      const response = await this.spFetch(endpoint, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json;odata=nometadata',
-        },
-        credentials: 'same-origin',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch setting: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const items = data.value || [];
-
-      if (items.length === 0) {
-        return null;
-      }
-
-      const item = items[0];
-      return {
-        id: item.Id.toString(),
-        key: item.Title,
-        value: item.Value || '',
-        description: item.Description || '',
-      };
-    } catch (error) {
-      console.error(`Error fetching setting with key ${key}:`, error);
-      return null;
-    }
+    const settings = await this.getAppSettings();
+    return settings.find((setting) => setting.key === key) || null;
   }
 
   async updateSetting(setting: AppSettings): Promise<AppSettings> {
@@ -3143,6 +3193,7 @@ class ClientDataService {
         throw new Error(`Failed to update setting: ${response.statusText}`);
       }
 
+      this.clearAppSettingsCache();
       // Return the updated setting
       return setting;
     } catch (error) {
@@ -3174,6 +3225,7 @@ class ClientDataService {
       if (!response.ok) {
         throw new Error(`Failed to delete setting: ${response.statusText}`);
       }
+      this.clearAppSettingsCache();
     } catch (error) {
       console.error(`Error deleting setting ${id}:`, error);
       throw error;

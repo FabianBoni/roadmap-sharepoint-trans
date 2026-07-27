@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
+import { clearInstanceAccessDecisionCache } from '@/utils/instanceAccessServer';
 import {
   isStableAuthorizationIdentifier,
   normalizeAuthorizationIdentifier,
@@ -144,6 +145,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         return res.status(500).json({ error: 'Failed to save superadmin' });
       }
 
+      clearInstanceAccessDecisionCache();
       return res.status(200).json({ superadmin: mapped[0] });
     } catch {
       return res.status(500).json({ error: 'Failed to save superadmin' });
@@ -169,6 +171,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         return res.status(404).json({ error: 'Superadmin not found' });
       }
 
+      clearInstanceAccessDecisionCache();
       return res.status(200).json({ success: true });
     } catch {
       return res.status(500).json({ error: 'Failed to delete superadmin' });

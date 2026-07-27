@@ -27,7 +27,7 @@ import {
   isReadSessionAllowedForInstance,
   resolveSessionDepartmentAcrossInstances,
 } from '@/utils/instanceAccessServer';
-import { isSuperAdminSessionWithSharePointFallback } from '@/utils/superAdminAccessServer';
+import { isDbSuperAdminSession } from '@/utils/superAdminAccessServer';
 
 const HTTP_URL_REGEX = /^https?:\/\//i;
 
@@ -673,7 +673,7 @@ export const getServerSideProps: GetServerSideProps<LandingPageProps> = async (c
     };
   }
 
-  if (await isSuperAdminSessionWithSharePointFallback(session)) {
+  if (await isDbSuperAdminSession(session)) {
     const instances: LandingInstance[] = records.map((record) => {
       const hosts = record.hosts.map((host) => host.host);
       return {
@@ -712,6 +712,7 @@ export const getServerSideProps: GetServerSideProps<LandingPageProps> = async (c
           requestHeaders: forwardedHeaders,
           knownSuperAdmin: false,
           resolvedDepartment,
+          allowSharePointFallback: false,
         });
         return { record: r, allowed };
       } catch {

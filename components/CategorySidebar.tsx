@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Category } from '../types';
 import { getIconByName } from '../utils/reactIcons';
-import * as Fa from 'react-icons/fa';
+import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { FiLayers } from 'react-icons/fi';
 
 interface CategorySidebarProps {
   categories: Category[];
@@ -48,9 +49,8 @@ const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
     if (IconComponent) {
       return <IconComponent style={{ fontSize: '16px', color: iconColor }} />;
-    } else {
-      return <span style={{ color: iconColor }}>?</span>;
     }
+    return <FiLayers aria-label={`Unbekanntes Kategorie-Icon ${iconName}`} color={iconColor} />;
   };
 
   return (
@@ -62,7 +62,7 @@ const CategorySidebar: React.FC<CategorySidebarProps> = ({
           onClick={() => setIsCollapsed(!isCollapsed)}
           type="button"
         >
-          {isCollapsed ? <Fa.FaChevronDown /> : <Fa.FaChevronUp />}
+          {isCollapsed ? <FaChevronDown /> : <FaChevronUp />}
         </button>
       </div>
 

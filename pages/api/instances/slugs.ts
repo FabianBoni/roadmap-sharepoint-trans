@@ -6,7 +6,7 @@ import {
   isReadSessionAllowedForInstance,
   resolveSessionDepartmentAcrossInstances,
 } from '@/utils/instanceAccessServer';
-import { isSuperAdminSessionWithSharePointFallback } from '@/utils/superAdminAccessServer';
+import { isDbSuperAdminSession } from '@/utils/superAdminAccessServer';
 
 const HTTP_URL_REGEX = /^https?:\/\//i;
 
@@ -160,9 +160,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined,
       cookie: typeof req.headers.cookie === 'string' ? req.headers.cookie : undefined,
     };
-    const isSuperAdmin = await isSuperAdminSessionWithSharePointFallback(session, {
-      requestHeaders: forwardedHeaders,
-    });
+    const isSuperAdmin = await isDbSuperAdminSession(session);
 
     const allRecords = await prisma.roadmapInstance.findMany({
       ...instanceQuery,
@@ -191,6 +189,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           requestHeaders: forwardedHeaders,
           knownSuperAdmin: false,
           resolvedDepartment,
+          allowSharePointFallback: false,
         }),
       }))
     );

@@ -8,6 +8,7 @@ import {
   getInstanceAdminAccessConfig,
 } from '@/utils/instanceAccess';
 import { isStableAuthorizationIdentifier } from '@/utils/authorizationIdentity';
+import { clearInstanceAccessDecisionCache } from '@/utils/instanceAccessServer';
 
 const sanitizeSlug = (value: string) => value.trim().toLowerCase();
 
@@ -104,6 +105,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       data: { settingsJson: JSON.stringify(settings) },
     });
 
+    clearInstanceAccessDecisionCache(slug);
     return res.status(200).json({ users, groups });
   }
 

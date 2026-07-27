@@ -7,14 +7,10 @@ import { INSTANCE_COOKIE_NAME, INSTANCE_QUERY_PARAM } from '../utils/instanceCon
 import { normalizeCategoryId, UNCATEGORIZED_ID } from '../utils/categoryUtils';
 import CategorySidebar from './CategorySidebar';
 import { FaBars, FaFileExcel, FaGripVertical as FiGripVertical, FaTimes } from 'react-icons/fa';
-import { loadThemeSettings } from '../utils/theme';
+import type { ThemeSettings } from '../utils/theme';
 import RoadmapFilters from './RoadmapFilters';
 import CompactProjectCard from './CompactProjectCard';
-import {
-  buildInstanceAwareUrl,
-  hasAdminAccessToCurrentInstance,
-  hasValidAdminSession,
-} from '@/utils/auth';
+import { buildInstanceAwareUrl } from '@/utils/auth';
 import { getRichTextPlainText } from '@/utils/richText';
 import { exportRoadmapToExcel } from '@/utils/roadmapExcelExport';
 
@@ -128,12 +124,16 @@ interface RoadmapProps {
   initialProjects: Project[];
   initialCategories: Category[];
   initialProjectOrderByCategory: ProjectOrderByCategory;
+  initialTheme: ThemeSettings;
+  initialIsAdmin: boolean;
 }
 
 const Roadmap: React.FC<RoadmapProps> = ({
   initialProjects,
   initialCategories,
   initialProjectOrderByCategory,
+  initialTheme,
+  initialIsAdmin,
 }) => {
   const router = useRouter();
 
@@ -142,18 +142,17 @@ const Roadmap: React.FC<RoadmapProps> = ({
     return Array.isArray(raw) ? (raw[0] ?? '') : (raw ?? '');
   }, [router.query]);
   const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
-  const [displayedProjects, setDisplayedProjects] = useState<Project[]>([]);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [activeCategories, setActiveCategories] = useState<string[]>([]);
   const [hoveredProject, setHoveredProject] = useState<Project | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [viewType, setViewType] = useState<'quarters' | 'months' | 'weeks' | 'years'>('quarters');
   const [mobileCategoriesOpen, setMobileCategoriesOpen] = useState(false);
-  const [siteTitle, setSiteTitle] = useState('IT + Digital Roadmap');
-  const [themeColors, setThemeColors] = useState<{ gradientFrom: string; gradientTo: string }>({
-    gradientFrom: '#eab308',
-    gradientTo: '#b45309',
-  });
+  const siteTitle = initialTheme.siteTitle;
+  const themeColors = {
+    gradientFrom: initialTheme.gradientFrom,
+    gradientTo: initialTheme.gradientTo,
+  };
   const [filterText, setFilterText] = useState('');
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [badgeFilters, setBadgeFilters] = useState<string[]>([]);
@@ -169,7 +168,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
   });
   const [onlyRunning, setOnlyRunning] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'timeline' | 'tiles'>('timeline');
-  const [isAdmin, setIsAdmin] = useState(false);
+  const isAdmin = initialIsAdmin;
   const [projectOrderByCategory, setProjectOrderByCategory] = useState<ProjectOrderByCategory>(
     initialProjectOrderByCategory
   );
@@ -216,46 +215,6 @@ const Roadmap: React.FC<RoadmapProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
-
-  useEffect(() => {
-    // Laden des Site-Titels beim Mounten der Komponente
-    const loadAppTitle = async () => {
-      try {
-        const theme = await loadThemeSettings();
-        setSiteTitle(theme.siteTitle || 'IT + Digital Roadmap');
-        setThemeColors({ gradientFrom: theme.gradientFrom, gradientTo: theme.gradientTo });
-      } catch (error) {
-        console.error('Fehler beim Laden des Site-Titels:', error);
-      }
-    };
-
-    loadAppTitle();
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const checkAdmin = async () => {
-      try {
-        const [hasSession, hasInstanceAdminAccess] = await Promise.all([
-          hasValidAdminSession(),
-          hasAdminAccessToCurrentInstance(),
-        ]);
-        if (!cancelled) {
-          setIsAdmin(Boolean(hasSession && hasInstanceAdminAccess));
-        }
-      } catch {
-        if (!cancelled) {
-          setIsAdmin(false);
-        }
-      }
-    };
-
-    void checkAdmin();
-    return () => {
-      cancelled = true;
-    };
-  }, [instanceSlug]);
 
   // Load filters from URL on mount and whenever query changes
   useEffect(() => {
@@ -332,7 +291,6 @@ const Roadmap: React.FC<RoadmapProps> = ({
         urlCatsAppliedRef.current = true;
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.query]);
 
   // Persist filters to URL (shallow) to allow shareable state
@@ -479,9 +437,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
     viewMode,
   ]);
 
-  // Fetch categories and filter projects based on the selected year
-  useEffect(() => {
-    // Filter projects based on year
+  const displayedProjects = useMemo(() => {
     const derive = (q: string, end = false): string => {
       const y = currentYear;
       switch ((q || '').toUpperCase()) {
@@ -507,7 +463,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
             : new Date(Date.UTC(y, 0, 1)).toISOString();
       }
     };
-    const filteredProjects = initialProjects.filter((project) => {
+    return initialProjects.filter((project) => {
       const startIso =
         project.startDate || (project.startQuarter ? derive(project.startQuarter, false) : '');
       const endIso =
@@ -521,8 +477,6 @@ const Roadmap: React.FC<RoadmapProps> = ({
       const endYear = getYearFromISOString(endIso, currentYear);
       return startYear <= currentYear && endYear >= currentYear;
     });
-
-    setDisplayedProjects(filteredProjects);
   }, [currentYear, initialProjects]);
 
   useEffect(() => {
@@ -813,169 +767,231 @@ const Roadmap: React.FC<RoadmapProps> = ({
   };
 
   // Derive filter options from displayed projects
-  const allStatuses = Array.from(
-    new Set(displayedProjects.map((p) => (p.status || '').toLowerCase()).filter(Boolean))
-  ).sort(
-    (left, right) =>
-      STATUS_ORDER.indexOf(left as (typeof STATUS_ORDER)[number]) -
-      STATUS_ORDER.indexOf(right as (typeof STATUS_ORDER)[number])
-  );
-  const allTags = Array.from(
-    new Set(
-      displayedProjects
-        .flatMap((project) => project.ProjectFields ?? [])
-        .filter((value): value is string => Boolean(value))
-    )
-  ).sort((left, right) => left.localeCompare(right, 'de'));
-  const allBadges = Array.from(
-    new Set(
-      displayedProjects
-        .flatMap((project) => project.badges ?? [])
-        .filter((value): value is string => Boolean(value))
-    )
-  ).sort((left, right) => left.localeCompare(right, 'de'));
-  const allLeads = Array.from(
-    new Set(displayedProjects.map((p) => (p.projektleitung || '').trim()).filter(Boolean))
-  ).sort((left, right) => left.localeCompare(right, 'de'));
-  const allPhases = PHASE_ORDER.filter((phase) =>
-    displayedProjects.some((project) => normalizePhaseValue(project.projektphase) === phase)
-  );
+  const { allStatuses, allTags, allBadges, allLeads, allPhases } = useMemo(() => {
+    const statuses = Array.from(
+      new Set(
+        displayedProjects.map((project) => (project.status || '').toLowerCase()).filter(Boolean)
+      )
+    ).sort(
+      (left, right) =>
+        STATUS_ORDER.indexOf(left as (typeof STATUS_ORDER)[number]) -
+        STATUS_ORDER.indexOf(right as (typeof STATUS_ORDER)[number])
+    );
+    const tags = Array.from(
+      new Set(
+        displayedProjects
+          .flatMap((project) => project.ProjectFields ?? [])
+          .filter((value): value is string => Boolean(value))
+      )
+    ).sort((left, right) => left.localeCompare(right, 'de'));
+    const badges = Array.from(
+      new Set(
+        displayedProjects
+          .flatMap((project) => project.badges ?? [])
+          .filter((value): value is string => Boolean(value))
+      )
+    ).sort((left, right) => left.localeCompare(right, 'de'));
+    const leads = Array.from(
+      new Set(
+        displayedProjects.map((project) => (project.projektleitung || '').trim()).filter(Boolean)
+      )
+    ).sort((left, right) => left.localeCompare(right, 'de'));
+    const phases = PHASE_ORDER.filter((phase) =>
+      displayedProjects.some((project) => normalizePhaseValue(project.projektphase) === phase)
+    );
+
+    return {
+      allStatuses: statuses,
+      allTags: tags,
+      allBadges: badges,
+      allLeads: leads,
+      allPhases: phases,
+    };
+  }, [displayedProjects]);
+
+  const activeCategorySet = useMemo(() => new Set(activeCategories), [activeCategories]);
 
   // Filter projects by active categories + advanced filters
-  const filteredProjects = displayedProjects.filter((project) => {
-    const catId = normalizeCategoryId(project.category, categories);
-    if (!activeCategories.includes(catId)) return false;
+  const filteredProjects = useMemo(
+    () =>
+      displayedProjects.filter((project) => {
+        const catId = normalizeCategoryId(project.category, categories);
+        if (!activeCategorySet.has(catId)) return false;
 
-    // Text filter across central metadata
-    if (filterText.trim()) {
-      const q = filterText.toLowerCase();
-      const inTitle = project.title?.toLowerCase().includes(q);
-      const inDesc = getRichTextPlainText(project.description).toLowerCase().includes(q);
-      const inLead = (project.projektleitung || '').toLowerCase().includes(q);
-      const inMilestone = (project.naechster_meilenstein || '').toLowerCase().includes(q);
-      const inBadges = (project.badges ?? []).some((value) => value.toLowerCase().includes(q));
-      const inTags = (project.ProjectFields ?? []).some((value) => value.toLowerCase().includes(q));
-      const inTeam = (project.teamMembers ?? []).some((member) =>
-        (member.name || '').toLowerCase().includes(q)
-      );
-      if (!inTitle && !inDesc && !inLead && !inMilestone && !inBadges && !inTags && !inTeam)
-        return false;
-    }
+        // Text filter across central metadata
+        if (filterText.trim()) {
+          const q = filterText.toLowerCase();
+          const inTitle = project.title?.toLowerCase().includes(q);
+          const inDesc = getRichTextPlainText(project.description).toLowerCase().includes(q);
+          const inLead = (project.projektleitung || '').toLowerCase().includes(q);
+          const inMilestone = (project.naechster_meilenstein || '').toLowerCase().includes(q);
+          const inBadges = (project.badges ?? []).some((value) => value.toLowerCase().includes(q));
+          const inTags = (project.ProjectFields ?? []).some((value) =>
+            value.toLowerCase().includes(q)
+          );
+          const inTeam = (project.teamMembers ?? []).some((member) =>
+            (member.name || '').toLowerCase().includes(q)
+          );
+          if (!inTitle && !inDesc && !inLead && !inMilestone && !inBadges && !inTags && !inTeam)
+            return false;
+        }
 
-    // Status filter (if any selected)
-    if (statusFilters.length > 0) {
-      const s = (project.status || '').toLowerCase();
-      if (!statusFilters.includes(s)) return false;
-    }
+        // Status filter (if any selected)
+        if (statusFilters.length > 0) {
+          const s = (project.status || '').toLowerCase();
+          if (!statusFilters.includes(s)) return false;
+        }
 
-    // Project type filter
-    if (projectTypeFilters.length > 0) {
-      const projectType = (project.projectType || 'long').toLowerCase();
-      if (!projectTypeFilters.includes(projectType)) return false;
-    }
+        // Project type filter
+        if (projectTypeFilters.length > 0) {
+          const projectType = (project.projectType || 'long').toLowerCase();
+          if (!projectTypeFilters.includes(projectType)) return false;
+        }
 
-    // Phase filter
-    if (phaseFilters.length > 0) {
-      const phase = normalizePhaseValue(project.projektphase);
-      if (!phaseFilters.includes(phase)) return false;
-    }
+        // Phase filter
+        if (phaseFilters.length > 0) {
+          const phase = normalizePhaseValue(project.projektphase);
+          if (!phaseFilters.includes(phase)) return false;
+        }
 
-    // Progress bucket filter
-    if (progressBucket !== 'all') {
-      if (getProgressBucket(project.fortschritt) !== progressBucket) return false;
-    }
+        // Progress bucket filter
+        if (progressBucket !== 'all') {
+          if (getProgressBucket(project.fortschritt) !== progressBucket) return false;
+        }
 
-    // Lead filter
-    if (leadFilters.length > 0) {
-      const lead = (project.projektleitung || '').trim();
-      if (!leadFilters.includes(lead)) return false;
-    }
+        // Lead filter
+        if (leadFilters.length > 0) {
+          const lead = (project.projektleitung || '').trim();
+          if (!leadFilters.includes(lead)) return false;
+        }
 
-    if (badgeFilters.length > 0) {
-      const projectBadges = (project.badges ?? []).map((badge) => badge.toLowerCase());
-      const hasAnyBadge = badgeFilters.some((badge) => projectBadges.includes(badge.toLowerCase()));
-      if (!hasAnyBadge) return false;
-    }
+        if (badgeFilters.length > 0) {
+          const projectBadges = (project.badges ?? []).map((badge) => badge.toLowerCase());
+          const hasAnyBadge = badgeFilters.some((badge) =>
+            projectBadges.includes(badge.toLowerCase())
+          );
+          if (!hasAnyBadge) return false;
+        }
 
-    // Tag filter (ProjectFields contains any of selected)
-    if (tagFilters.length > 0) {
-      const pf: string[] = (project.ProjectFields ?? []).map((t) => (t || '').toLowerCase());
-      const hasAny = tagFilters.some((t) => pf.includes(t.toLowerCase()));
-      if (!hasAny) return false;
-    }
+        // Tag filter (ProjectFields contains any of selected)
+        if (tagFilters.length > 0) {
+          const pf: string[] = (project.ProjectFields ?? []).map((t) => (t || '').toLowerCase());
+          const hasAny = tagFilters.some((t) => pf.includes(t.toLowerCase()));
+          if (!hasAny) return false;
+        }
 
-    if (attributeFilters.length > 0) {
-      const attributeChecks: Record<string, boolean> = {
-        'with-team': Boolean(project.teamMembers && project.teamMembers.length > 0),
-        'with-links': Boolean(project.links && project.links.length > 0),
-        'with-owner': Boolean(project.projektleitung && project.projektleitung.trim()),
-        'with-milestone': Boolean(
-          project.naechster_meilenstein && project.naechster_meilenstein.trim()
-        ),
-      };
+        if (attributeFilters.length > 0) {
+          const attributeChecks: Record<string, boolean> = {
+            'with-team': Boolean(project.teamMembers && project.teamMembers.length > 0),
+            'with-links': Boolean(project.links && project.links.length > 0),
+            'with-owner': Boolean(project.projektleitung && project.projektleitung.trim()),
+            'with-milestone': Boolean(
+              project.naechster_meilenstein && project.naechster_meilenstein.trim()
+            ),
+          };
 
-      const matchesAttributes = attributeFilters.every((attribute) => attributeChecks[attribute]);
-      if (!matchesAttributes) return false;
-    }
+          const matchesAttributes = attributeFilters.every(
+            (attribute) => attributeChecks[attribute]
+          );
+          if (!matchesAttributes) return false;
+        }
 
-    // Zeitraum Month filter (if not default 1-12): intersect project with selected months of currentYear
-    if (monthRange.start !== 1 || monthRange.end !== 12) {
-      if (!project.startDate || !project.endDate) return false;
-      const s = new Date(project.startDate);
-      const e = new Date(project.endDate);
-      // Map to month indices within current year (1..12)
-      const projectStartMonth = Math.max(1, s.getFullYear() < currentYear ? 1 : s.getMonth() + 1);
-      const projectEndMonth = Math.min(12, e.getFullYear() > currentYear ? 12 : e.getMonth() + 1);
-      const overlaps = projectEndMonth >= monthRange.start && projectStartMonth <= monthRange.end;
-      if (!overlaps) return false;
-    }
+        // Zeitraum Month filter (if not default 1-12): intersect project with selected months of currentYear
+        if (monthRange.start !== 1 || monthRange.end !== 12) {
+          if (!project.startDate || !project.endDate) return false;
+          const s = new Date(project.startDate);
+          const e = new Date(project.endDate);
+          // Map to month indices within current year (1..12)
+          const projectStartMonth = Math.max(
+            1,
+            s.getFullYear() < currentYear ? 1 : s.getMonth() + 1
+          );
+          const projectEndMonth = Math.min(
+            12,
+            e.getFullYear() > currentYear ? 12 : e.getMonth() + 1
+          );
+          const overlaps =
+            projectEndMonth >= monthRange.start && projectStartMonth <= monthRange.end;
+          if (!overlaps) return false;
+        }
 
-    // Only running projects: start <= today <= end
-    if (onlyRunning) {
-      const now = new Date();
-      const sd = project.startDate ? new Date(project.startDate) : null;
-      const ed = project.endDate ? new Date(project.endDate) : null;
-      if (!sd || !ed) return false;
-      if (!(sd <= now && now <= ed)) return false;
-    }
+        // Only running projects: start <= today <= end
+        if (onlyRunning) {
+          const now = new Date();
+          const sd = project.startDate ? new Date(project.startDate) : null;
+          const ed = project.endDate ? new Date(project.endDate) : null;
+          if (!sd || !ed) return false;
+          if (!(sd <= now && now <= ed)) return false;
+        }
 
-    return true;
-  });
+        return true;
+      }),
+    [
+      activeCategorySet,
+      attributeFilters,
+      badgeFilters,
+      categories,
+      currentYear,
+      displayedProjects,
+      filterText,
+      leadFilters,
+      monthRange,
+      onlyRunning,
+      phaseFilters,
+      progressBucket,
+      projectTypeFilters,
+      statusFilters,
+      tagFilters,
+    ]
+  );
 
-  const allProjectsByCategory = initialProjects.reduce<Record<string, Project[]>>(
-    (acc, project) => {
+  const allProjectsByCategory = useMemo(
+    () =>
+      initialProjects.reduce<Record<string, Project[]>>((acc, project) => {
+        const catId = normalizeCategoryId(project.category, categories);
+        (acc[catId] ||= []).push(project);
+        return acc;
+      }, {}),
+    [categories, initialProjects]
+  );
+
+  const orderedProjectsByCategory = useMemo(() => {
+    const grouped = filteredProjects.reduce<Record<string, Project[]>>((acc, project) => {
       const catId = normalizeCategoryId(project.category, categories);
       (acc[catId] ||= []).push(project);
       return acc;
-    },
-    {}
-  );
+    }, {});
 
-  // Group projects by category (Bereich)
-  const projectsByCategory = filteredProjects.reduce<Record<string, Project[]>>((acc, p) => {
-    const catId = normalizeCategoryId(p.category, categories);
-    (acc[catId] ||= []).push(p);
-    return acc;
-  }, {});
-
-  const orderedProjectsByCategory = Object.entries(projectsByCategory).reduce<
-    Record<string, Project[]>
-  >((acc, [categoryId, projects]) => {
-    acc[categoryId] = applyStoredProjectOrder(projects, projectOrderByCategory[categoryId]);
-    return acc;
-  }, {});
+    return Object.entries(grouped).reduce<Record<string, Project[]>>(
+      (acc, [categoryId, projects]) => {
+        acc[categoryId] = applyStoredProjectOrder(projects, projectOrderByCategory[categoryId]);
+        return acc;
+      },
+      {}
+    );
+  }, [categories, filteredProjects, projectOrderByCategory]);
 
   // Ordered list of visible categories (only those with projects)
-  const visibleCategoryIds = [
-    ...categories.filter((c) => orderedProjectsByCategory[c.id]?.length).map((c) => c.id),
-    ...(orderedProjectsByCategory[UNCATEGORIZED_ID]?.length ? [UNCATEGORIZED_ID] : []),
-  ];
+  const visibleCategoryIds = useMemo(
+    () => [
+      ...categories
+        .filter((category) => orderedProjectsByCategory[category.id]?.length)
+        .map((category) => category.id),
+      ...(orderedProjectsByCategory[UNCATEGORIZED_ID]?.length ? [UNCATEGORIZED_ID] : []),
+    ],
+    [categories, orderedProjectsByCategory]
+  );
+
+  const categoryById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category])),
+    [categories]
+  );
 
   // Get category name by ID
   const getCategoryName = (categoryValue: unknown) => {
     const categoryId = normalizeCategoryId(categoryValue, categories);
     if (categoryId === UNCATEGORIZED_ID) return 'Uncategorized';
-    const category = categories.find((cat) => cat.id === categoryId);
+    const category = categoryById.get(categoryId);
     return category?.name || 'Uncategorized';
   };
 
@@ -983,7 +999,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
   const getCategoryColor = (categoryValue: unknown) => {
     const categoryId = normalizeCategoryId(categoryValue, categories);
     if (categoryId === UNCATEGORIZED_ID) return '#777777';
-    const category = categories.find((cat) => cat.id === categoryId);
+    const category = categoryById.get(categoryId);
     return category?.color || '#777777';
   };
   const hoveredProjectDescription = hoveredProject

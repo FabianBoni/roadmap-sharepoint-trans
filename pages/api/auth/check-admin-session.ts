@@ -1,8 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '@/lib/prisma';
 import { extractAdminSession } from '@/utils/apiAuth';
 import { isAdminSessionAllowedForInstance } from '@/utils/instanceAccessServer';
-import { isSuperAdminSessionWithSharePointFallback } from '@/utils/superAdminAccessServer';
+import {
+  isDbSuperAdminSession,
+  isSuperAdminSessionWithSharePointFallback,
+} from '@/utils/superAdminAccessServer';
+import { getInstanceConfigFromRequest } from '@/utils/instanceConfig';
 
 /**
  * Check if the current session has a valid JWT token
@@ -37,33 +40,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       (entra && typeof entra.department === 'string' ? entra.department : null) ||
       (typeof session.department === 'string' ? session.department : null);
 
-    const candidateInstanceSlugs = (
-      await prisma.roadmapInstance.findMany({ select: { slug: true }, orderBy: { slug: 'asc' } })
-    )
-      .map((record) => String(record.slug || '').trim())
-      .filter(Boolean);
-
-    const isSuperAdmin = await isSuperAdminSessionWithSharePointFallback(session, {
-      candidateInstanceSlugs,
-      requestHeaders,
-    });
-
-    let isAdmin = isSuperAdmin;
-    if (!isAdmin) {
-      for (const slug of candidateInstanceSlugs) {
-        if (
-          await isAdminSessionAllowedForInstance({
-            session,
-            instance: { slug },
-            requestHeaders,
-            knownSuperAdmin: false,
-          })
-        ) {
-          isAdmin = true;
-          break;
-        }
-      }
-    }
+    const instance = await getInstanceConfigFromRequest(req).catch(() => null);
+    const dbSuperAdmin = await isDbSuperAdminSession(session);
+    const isSuperAdmin =
+      dbSuperAdmin ||
+      Boolean(
+        instance &&
+        (await isSuperAdminSessionWithSharePointFallback(session, {
+          candidateInstanceSlugs: [instance.slug],
+          requestHeaders,
+        }))
+      );
+    const isAdmin =
+      isSuperAdmin ||
+      Boolean(
+        instance &&
+        (await isAdminSessionAllowedForInstance({
+          session,
+          instance,
+          requestHeaders,
+          knownSuperAdmin: false,
+        }))
+      );
 
     return res.status(200).json({
       authenticated: true,

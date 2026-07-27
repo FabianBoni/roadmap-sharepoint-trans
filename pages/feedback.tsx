@@ -1,4 +1,7 @@
 import Head from 'next/head';
+import { forceServerSideRendering } from '@/utils/serverRendering';
+
+export const getServerSideProps = forceServerSideRendering;
 import { useRouter } from 'next/router';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {

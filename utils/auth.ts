@@ -17,7 +17,8 @@ type AdminSessionState = {
   groups: string[];
 };
 
-const ADMIN_SESSION_STATE_TTL_MS = 1500;
+const ADMIN_SESSION_STATE_TTL_MS = 30_000;
+const INSTANCE_ADMIN_ACCESS_TTL_MS = 30_000;
 
 let adminSessionStateCache: {
   token: string;
@@ -28,10 +29,14 @@ let adminSessionStateInFlight: {
   token: string;
   promise: Promise<AdminSessionState | null>;
 } | null = null;
+const instanceAdminAccessCache = new Map<string, { expiresAt: number; allowed: boolean }>();
+const instanceAdminAccessInFlight = new Map<string, Promise<boolean>>();
 
 function clearAdminSessionStateCache() {
   adminSessionStateCache = null;
   adminSessionStateInFlight = null;
+  instanceAdminAccessCache.clear();
+  instanceAdminAccessInFlight.clear();
 }
 
 function dispatchAdminSessionChanged() {
@@ -140,15 +145,33 @@ export async function hasAdminAccessToCurrentInstance(): Promise<boolean> {
     const slug = getBrowserInstanceSlug();
     if (!slug) return true;
 
-    const resp = await fetch(
-      buildInstanceAwareUrl(`/api/instances/select?slug=${encodeURIComponent(slug)}&mode=admin`),
-      {
-        credentials: 'same-origin',
-      }
-    );
+    const cached = instanceAdminAccessCache.get(slug);
+    if (cached && cached.expiresAt > Date.now()) return cached.allowed;
+    if (cached) instanceAdminAccessCache.delete(slug);
 
-    if (resp.status === 403) return false;
-    return true;
+    const existing = instanceAdminAccessInFlight.get(slug);
+    if (existing) return existing;
+
+    const request = fetch(
+      buildInstanceAwareUrl(`/api/instances/select?slug=${encodeURIComponent(slug)}&mode=admin`),
+      { credentials: 'same-origin' }
+    )
+      .then((resp) => resp.status !== 403 && resp.ok)
+      .then((allowed) => {
+        instanceAdminAccessCache.set(slug, {
+          allowed,
+          expiresAt: Date.now() + INSTANCE_ADMIN_ACCESS_TTL_MS,
+        });
+        return allowed;
+      });
+    instanceAdminAccessInFlight.set(slug, request);
+    try {
+      return await request;
+    } finally {
+      if (instanceAdminAccessInFlight.get(slug) === request) {
+        instanceAdminAccessInFlight.delete(slug);
+      }
+    }
   } catch {
     return true;
   }
@@ -238,7 +261,7 @@ export async function getAdminSessionState(
       adminSessionStateCache = null;
     }
 
-    if (!forceRefresh && adminSessionStateInFlight?.token === token) {
+    if (adminSessionStateInFlight?.token === token) {
       return adminSessionStateInFlight.promise;
     }
 

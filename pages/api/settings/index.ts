@@ -6,6 +6,7 @@ import {
   isReadSessionAllowedForInstance,
 } from '@/utils/instanceAccessServer';
 import { getInstanceConfigFromRequest } from '@/utils/instanceConfig';
+import { invalidateRoadmapDataCache } from '@/utils/roadmapData';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { sanitizeSettingRichTextFields } from '@/utils/richText';
 
@@ -75,6 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         clientDataService.createSetting(safeSetting)
       );
 
+      invalidateRoadmapDataCache();
       return res.status(201).json(newSetting);
     } catch {
       console.error('Error creating setting');

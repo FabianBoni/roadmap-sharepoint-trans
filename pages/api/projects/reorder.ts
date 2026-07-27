@@ -3,6 +3,7 @@ import { clientDataService } from '@/utils/clientDataService';
 import { requireUserSession } from '@/utils/apiAuth';
 import { isAdminSessionAllowedForInstance } from '@/utils/instanceAccessServer';
 import { getInstanceConfigFromRequest } from '@/utils/instanceConfig';
+import { invalidateRoadmapDataCache } from '@/utils/roadmapData';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { isSampleDataInstance } from '@/utils/sampleInstanceData';
 import { normalizeCategoryId, UNCATEGORIZED_ID } from '@/utils/categoryUtils';
@@ -117,6 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     });
 
+    invalidateRoadmapDataCache(instance.slug);
     return res.status(200).json(result);
   } catch (error) {
     if ((error as Error)?.message === 'Invalid categoryId') {

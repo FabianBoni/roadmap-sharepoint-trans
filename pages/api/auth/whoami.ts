@@ -1,8 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '@/lib/prisma';
 import { requireUserSession } from '@/utils/apiAuth';
 import { isAdminSessionAllowedForInstance } from '@/utils/instanceAccessServer';
-import { isSuperAdminSessionWithSharePointFallback } from '@/utils/superAdminAccessServer';
+import { getInstanceConfigFromRequest } from '@/utils/instanceConfig';
+import {
+  isDbSuperAdminSession,
+  isSuperAdminSessionWithSharePointFallback,
+} from '@/utils/superAdminAccessServer';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -20,31 +23,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined,
       cookie: typeof req.headers.cookie === 'string' ? req.headers.cookie : undefined,
     };
-    const candidateInstanceSlugs = (
-      await prisma.roadmapInstance.findMany({ select: { slug: true }, orderBy: { slug: 'asc' } })
-    )
-      .map((record) => String(record.slug || '').trim())
-      .filter(Boolean);
-    const isSuperAdmin = await isSuperAdminSessionWithSharePointFallback(session, {
-      candidateInstanceSlugs,
-      requestHeaders,
-    });
-    let isAdmin = isSuperAdmin;
-    if (!isAdmin) {
-      for (const slug of candidateInstanceSlugs) {
-        if (
-          await isAdminSessionAllowedForInstance({
+    const instance = await getInstanceConfigFromRequest(req).catch(() => null);
+    const dbSuperAdmin = await isDbSuperAdminSession(session);
+    const isSuperAdmin =
+      dbSuperAdmin ||
+      Boolean(
+        instance &&
+          (await isSuperAdminSessionWithSharePointFallback(session, {
+            candidateInstanceSlugs: [instance.slug],
+            requestHeaders,
+          }))
+      );
+    const isAdmin =
+      isSuperAdmin ||
+      Boolean(
+        instance &&
+          (await isAdminSessionAllowedForInstance({
             session,
-            instance: { slug },
+            instance,
             requestHeaders,
             knownSuperAdmin: false,
-          })
-        ) {
-          isAdmin = true;
-          break;
-        }
-      }
-    }
+          }))
+      );
 
     return res.status(200).json({
       username: session.username ?? null,

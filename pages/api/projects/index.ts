@@ -6,6 +6,7 @@ import {
   isReadSessionAllowedForInstance,
 } from '@/utils/instanceAccessServer';
 import { getInstanceConfigFromRequest } from '@/utils/instanceConfig';
+import { invalidateRoadmapDataCache } from '@/utils/roadmapData';
 import type { Project } from '@/types';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { resolveSharePointSiteUrl } from '@/utils/sharepointEnv';
@@ -497,6 +498,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         )
       );
 
+      invalidateRoadmapDataCache();
       res.status(201).json(hydratedProject || newProject);
     } catch (error: unknown) {
       if (error instanceof UnsafeExternalUrlError) {

@@ -6,6 +6,7 @@ import {
   isReadSessionAllowedForInstance,
 } from '@/utils/instanceAccessServer';
 import { getInstanceConfigFromRequest } from '@/utils/instanceConfig';
+import { invalidateRoadmapDataCache } from '@/utils/roadmapData';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -91,6 +92,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         clientDataService.getCategoryById(id)
       );
 
+      invalidateRoadmapDataCache(instance.slug);
       res.status(200).json(updatedCategory);
     } catch {
       console.error('Error updating category');
@@ -116,6 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         clientDataService.deleteCategory(id)
       );
 
+      invalidateRoadmapDataCache(instance.slug);
       res.status(204).end();
     } catch {
       console.error('Error deleting category');
