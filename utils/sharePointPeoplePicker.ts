@@ -1,7 +1,33 @@
 type PeoplePickerRecord = Record<string, unknown>;
 
+export type SharePointPeoplePickerRequest = {
+  queryParams: {
+    AllowEmailAddresses: boolean;
+    AllowMultipleEntities: boolean;
+    AllUrlZones: boolean;
+    MaximumEntitySuggestions: number;
+    PrincipalSource: number;
+    PrincipalType: number;
+    QueryString: string;
+  };
+};
+
 const isRecord = (value: unknown): value is PeoplePickerRecord =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+export const buildSharePointPeoplePickerRequest = (
+  query: string
+): SharePointPeoplePickerRequest => ({
+  queryParams: {
+    AllowEmailAddresses: true,
+    AllowMultipleEntities: false,
+    AllUrlZones: false,
+    MaximumEntitySuggestions: 20,
+    PrincipalSource: 15,
+    PrincipalType: 1,
+    QueryString: query,
+  },
+});
 
 const parseValue = (value: unknown, depth: number): PeoplePickerRecord[] | null => {
   if (depth > 4) return null;

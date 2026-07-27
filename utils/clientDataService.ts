@@ -15,7 +15,10 @@ import { prefixBasePath } from '@/utils/nextBasePath';
 import { normalizeAllowedExternalUrl } from '@/utils/safeUrl';
 import { escapeODataStringLiteral } from '@/utils/odata';
 import { getInternalApiBaseUrl } from '@/utils/internalApiBaseUrl';
-import { parseSharePointPeoplePickerResponse } from '@/utils/sharePointPeoplePicker';
+import {
+  buildSharePointPeoplePickerRequest,
+  parseSharePointPeoplePickerResponse,
+} from '@/utils/sharePointPeoplePicker';
 
 type NodeRequireFn = typeof require;
 type AsyncLocalStorageCtor = new <T>() => AsyncLocalStorage<T>;
@@ -4093,22 +4096,7 @@ class ClientDataService {
       // Get request digest for this POST operation
       const requestDigest = await this.getRequestDigest();
 
-      // Configure search parameters
-      const searchRequest = {
-        queryParams: {
-          __metadata: {
-            type: 'SP.UI.ApplicationPages.ClientPeoplePickerQueryParameters',
-          },
-          AllowEmailAddresses: true,
-          AllowMultipleEntities: false,
-          AllUrlZones: false,
-          MaximumEntitySuggestions: 20,
-          PrincipalSource: 15, // All sources (15)
-          PrincipalType: 1, // User (1)
-          QueryString: trimmedQuery,
-          SharePointGroupID: null,
-        },
-      };
+      const searchRequest = buildSharePointPeoplePickerRequest(trimmedQuery);
 
       const response = await this.spFetch(endpoint, {
         method: 'POST',

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseSharePointPeoplePickerResponse } from '../../utils/sharePointPeoplePicker';
+import {
+  buildSharePointPeoplePickerRequest,
+  parseSharePointPeoplePickerResponse,
+} from '../../utils/sharePointPeoplePicker';
 
 const entity = {
   Key: 'i:0#.w|domain\\fabian.boni',
@@ -8,6 +11,20 @@ const entity = {
   EntityData: { Email: 'fabian.boni@jsd.bs.ch' },
 };
 const encodedEntities = JSON.stringify([entity]);
+
+test('SharePoint People Picker request omits nullable optional CSOM fields', () => {
+  assert.deepEqual(buildSharePointPeoplePickerRequest('fabian'), {
+    queryParams: {
+      AllowEmailAddresses: true,
+      AllowMultipleEntities: false,
+      AllUrlZones: false,
+      MaximumEntitySuggestions: 20,
+      PrincipalSource: 15,
+      PrincipalType: 1,
+      QueryString: 'fabian',
+    },
+  });
+});
 
 test('SharePoint People Picker accepts verbose and no-metadata response envelopes', () => {
   assert.deepEqual(
