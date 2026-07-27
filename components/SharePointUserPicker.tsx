@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import JSDoITLoader from '@/components/JSDoITLoader';
 import { buildInstanceAwareUrl } from '@/utils/auth';
+import { createLatestRequestManager, type LatestRequestManager } from '@/utils/latestRequest';
 
 export type SharePointUserOption = {
   key: string;
@@ -35,6 +36,10 @@ const SharePointUserPicker: React.FC<SharePointUserPickerProps> = ({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestManagerRef = useRef<LatestRequestManager | null>(null);
+  if (!requestManagerRef.current) {
+    requestManagerRef.current = createLatestRequestManager();
+  }
 
   const canSearch = useMemo(
     () => Boolean(instanceSlug && query.trim().length >= 2 && !disabled),
@@ -42,6 +47,10 @@ const SharePointUserPicker: React.FC<SharePointUserPickerProps> = ({
   );
 
   useEffect(() => {
+    const requestManager = requestManagerRef.current;
+    if (!requestManager) return;
+    let request: ReturnType<LatestRequestManager['start']> | null = null;
+
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
@@ -56,6 +65,9 @@ const SharePointUserPicker: React.FC<SharePointUserPickerProps> = ({
     }
 
     timeoutRef.current = setTimeout(async () => {
+      timeoutRef.current = null;
+      request = requestManager.start();
+
       try {
         setLoading(true);
         setError(null);
@@ -64,14 +76,17 @@ const SharePointUserPicker: React.FC<SharePointUserPickerProps> = ({
         const resp = await fetch(buildInstanceAwareUrl(`/api/sharepoint-user-search?${params}`), {
           credentials: 'same-origin',
           headers: { Accept: 'application/json' },
+          signal: request.signal,
         });
         const payload = await resp.json().catch(() => null);
+        if (!request.isCurrent()) return;
         if (!resp.ok) {
           throw new Error(payload?.error || 'Benutzer konnten nicht geladen werden');
         }
         setResults(Array.isArray(payload?.users) ? payload.users : []);
         setOpen(true);
       } catch (searchError) {
+        if (!request.isCurrent()) return;
         const message =
           searchError instanceof Error
             ? searchError.message
@@ -80,7 +95,9 @@ const SharePointUserPicker: React.FC<SharePointUserPickerProps> = ({
         setOpen(true);
         setError(message);
       } finally {
-        setLoading(false);
+        if (request.isCurrent()) {
+          setLoading(false);
+        }
       }
     }, 250);
 
@@ -89,6 +106,7 @@ const SharePointUserPicker: React.FC<SharePointUserPickerProps> = ({
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
+      request?.cancel();
     };
   }, [canSearch, instanceSlug, query]);
 
@@ -98,7 +116,14 @@ const SharePointUserPicker: React.FC<SharePointUserPickerProps> = ({
         <input
           type="text"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            requestManagerRef.current?.cancel();
+            setLoading(false);
+            setResults([]);
+            setOpen(false);
+            setError(null);
+            setQuery(event.target.value);
+          }}
           disabled={disabled || !instanceSlug}
           placeholder={instanceSlug ? placeholder : `${buttonLabel}: zuerst Instanz wählen`}
           className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
@@ -123,7 +148,9 @@ const SharePointUserPicker: React.FC<SharePointUserPickerProps> = ({
                   <button
                     type="button"
                     onClick={() => {
+                      requestManagerRef.current?.cancel();
                       onSelect(user);
+                      setLoading(false);
                       setQuery('');
                       setResults([]);
                       setOpen(false);
