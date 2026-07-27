@@ -18,8 +18,8 @@ const DocsLayout: React.FC<DocsLayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="docs-layout-shell min-h-screen bg-gray-900 text-white">
-      <header className="docs-layout-header bg-gray-800 py-4 px-6 border-b border-gray-700">
+    <div className="docs-layout-shell [background:var(--ds-bg-page)] [color:var(--ds-text-strong)] min-h-screen bg-gray-900 text-white">
+      <header className="docs-layout-header [border-color:var(--ds-border-subtle)] bg-gray-800 py-4 px-6 border-b border-gray-700">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-bold">Roadmap JSD Dokumentation</h1>
           <div className="flex items-center gap-3">
@@ -33,7 +33,7 @@ const DocsLayout: React.FC<DocsLayoutProps> = ({ children }) => {
 
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 flex">
         {/* Sidebar Navigation */}
-        <div className="docs-layout-sidebar w-64 pr-8 border-r border-gray-700">
+        <div className="docs-layout-sidebar [border-color:var(--ds-border-subtle)] w-64 pr-8 border-r border-gray-700">
           <nav className="space-y-6">
             <div>
               <h3 className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-3">

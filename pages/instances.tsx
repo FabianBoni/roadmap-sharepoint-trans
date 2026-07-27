@@ -388,77 +388,98 @@ const InstancesPage = ({ instances }: LandingPageProps) => {
       <Head>
         <title>JSDoIT Instanzübersicht</title>
       </Head>
-      <div className="ds-page-shell">
+      <div className="ds-page-shell before:[position:absolute] before:[inset:0] before:[z-index:0] before:[pointer-events:none] before:[background-image:linear-gradient(var(--ds-grid-line)_1px,_transparent_1px),_linear-gradient(90deg,_var(--ds-grid-line)_1px,_transparent_1px)] before:[background-size:56px_56px] before:[mask-image:linear-gradient(to_bottom,_black,_rgba(0,_0,_0,_0.72),_transparent_98%)] after:[position:absolute] after:[right:-10%] after:[bottom:-25%] after:[left:-10%] after:[z-index:0] after:[height:38vh] after:[pointer-events:none] after:[background:radial-gradient(ellipse_at_center,_var(--ds-hero-glow-a),_transparent_62%)] after:[filter:blur(12px)] [position:relative] [isolation:isolate] [display:flex] [min-height:100vh] [flex-direction:column] [overflow:hidden] [background:radial-gradient(circle_at_7%_18%,_var(--ds-hero-glow-a),_transparent_31%),_radial-gradient(circle_at_70%_8%,_var(--ds-hero-glow-b),_transparent_28%),_radial-gradient(circle_at_48%_86%,_var(--ds-hero-glow-c),_transparent_26%),_linear-gradient(135deg,_var(--ds-bg-page),_var(--ds-bg-page-2))] [color:var(--ds-text-default)] [font-family:var(--ds-font-sans)] [&>*]:[position:relative] [&>*]:[z-index:1]">
         <SiteHeader activeRoute="instances" />
 
-        <main className="ds-page-main">
-          <section className="ds-container ds-hero ds-instance-hero">
-            <div className="ds-hero-content">
-              <div className="ds-eyebrow">
-                <FiStar className="ds-icon-sm" />
+        <main className="ds-page-main [flex:1]">
+          <section className="ds-container [width:min(1280px,_calc(100%_-_48px))] [margin-inline:auto] max-[760px]:[width:min(100%_-_32px,_1280px)] ds-hero [display:grid] [min-height:calc(100vh_-_78px)] [grid-template-columns:minmax(0,_1.08fr)_minmax(420px,_0.92fr)] [align-items:center] [gap:clamp(40px,_6vw,_86px)] [padding-block:clamp(56px,_7vw,_96px)] max-[1100px]:[grid-template-columns:1fr] max-[760px]:[padding-block:42px] ds-instance-hero [align-items:center]">
+            <div className="ds-hero-content [max-width:760px]">
+              <div className="ds-eyebrow [display:inline-flex] [width:fit-content] [align-items:center] [gap:10px] [padding:9px_15px] [border:1px_solid_var(--ds-border-strong)] [border-radius:var(--ds-radius-pill)] [background:var(--ds-accent-soft)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-strong)] [font-size:0.75rem] [font-weight:850] [letter-spacing:0.22em] [text-transform:uppercase] [&_svg]:[color:var(--ds-accent-strong)]">
+                <FiStar className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
                 Instanzübersicht
               </div>
 
-              <h1 className="ds-hero-title">
+              <h1 className="ds-hero-title [max-width:760px] [margin:28px_0_22px] [color:var(--ds-text-strong)] [font-size:clamp(2.625rem,_5.8vw,_4.75rem)] [font-weight:860] [letter-spacing:-0.06em] [line-height:0.98] [text-wrap:balance]">
                 Verbinde dich mit der passenden{' '}
-                <span className="ds-accent-text">Roadmap-Instanz</span>
+                <span className="ds-accent-text [background:linear-gradient(_90deg,_var(--ds-text-strong),_var(--ds-accent-strong),_var(--ds-accent-2)_)] [background-clip:text] [color:transparent]">
+                  Roadmap-Instanz
+                </span>
               </h1>
-              <p className="ds-hero-copy">
+              <p className="ds-hero-copy [max-width:660px] [margin:0] [color:var(--ds-text-default)] [font-size:1.0625rem] [line-height:1.75]">
                 Wähle deine Organisationseinheit, öffne die passende Roadmap und behalte
                 gleichzeitig Zugriff, Herkunft und Betriebsmodell jeder Instanz im Blick.
               </p>
 
-              <div className="ds-actions">
+              <div className="ds-actions [display:flex] [flex-wrap:wrap] [align-items:center] [gap:var(--ds-space-4)] [margin-top:30px] max-[760px]:[&_.ds-button]:[width:100%]">
                 {authed ? (
                   <button
                     type="button"
                     onClick={() => openInstance(defaultInstance)}
                     disabled={!visibleInstances.length || selectingSlug !== null}
-                    className="ds-button ds-button-primary"
+                    className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-primary [background:linear-gradient(_135deg,_var(--ds-accent),_var(--ds-accent-2)_58%,_var(--ds-accent-strong)_)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-inverse)]"
                   >
                     {!visibleInstances.length
                       ? 'Keine Instanzen vorhanden'
                       : selectingSlug
                         ? 'Weiterleitung wird vorbereitet ...'
                         : 'Roadmap starten'}
-                    {visibleInstances.length ? <FiArrowRight className="ds-icon-sm" /> : null}
+                    {visibleInstances.length ? (
+                      <FiArrowRight className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
+                    ) : null}
                   </button>
                 ) : entraEnabled ? (
-                  <button type="button" onClick={startSso} className="ds-button ds-button-primary">
+                  <button
+                    type="button"
+                    onClick={startSso}
+                    className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-primary [background:linear-gradient(_135deg,_var(--ds-accent),_var(--ds-accent-2)_58%,_var(--ds-accent-strong)_)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-inverse)]"
+                  >
                     Anmelden
                   </button>
                 ) : (
-                  <span className="ds-button ds-button-secondary ds-button-disabled">
+                  <span className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)] ds-button-disabled">
                     Microsoft SSO ist nicht konfiguriert
                   </span>
                 )}
-                <Link href="/help" className="ds-button ds-button-secondary">
+                <Link
+                  href="/help"
+                  className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)]"
+                >
                   Hilfe entdecken
                 </Link>
               </div>
             </div>
 
-            <aside className="ds-card ds-logic-panel" aria-label="Zugriff und Orientierung">
-              <div className="ds-panel-header">
+            <aside
+              className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-logic-panel [padding:30px] [border-color:var(--ds-border-strong)] [border-radius:var(--ds-radius-xl)] [box-shadow:var(--ds-shadow-soft),_var(--ds-shadow-glow),_inset_0_1px_0_rgba(255,_255,_255,_0.06)] max-[1100px]:[max-width:760px]"
+              aria-label="Zugriff und Orientierung"
+            >
+              <div className="ds-panel-header [display:flex] [justify-content:space-between] [gap:var(--ds-space-5)] [margin-bottom:24px] max-[760px]:[flex-direction:column-reverse]">
                 <div>
-                  <p className="ds-panel-label">Zugriff & Orientierung</p>
-                  <h2 className="ds-panel-title">Welche Instanzen du hier erwarten kannst</h2>
+                  <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+                    Zugriff & Orientierung
+                  </p>
+                  <h2 className="ds-panel-title [margin:0] [color:var(--ds-text-strong)] [font-size:clamp(1.5rem,_3vw,_2.125rem)] [letter-spacing:-0.04em] [line-height:1.15]">
+                    Welche Instanzen du hier erwarten kannst
+                  </h2>
                 </div>
-                <div className="ds-panel-icon" aria-hidden="true">
-                  <FiLock className="ds-icon-md" />
+                <div
+                  className="ds-panel-icon [display:grid] [flex:0_0_auto] [width:68px] [height:68px] [place-items:center] [border:1px_solid_var(--ds-border-strong)] [border-radius:24px] [background:radial-gradient(circle,_var(--ds-accent-soft),_transparent_74%)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-accent-strong)]"
+                  aria-hidden="true"
+                >
+                  <FiLock className="ds-icon-md [flex:0_0_auto] [width:1.5rem] [height:1.5rem]" />
                 </div>
               </div>
 
-              <div className="ds-info-list">
-                <p className="ds-info-item">
+              <div className="ds-info-list [display:grid] [gap:var(--ds-space-3)]">
+                <p className="ds-info-item [margin:0] [padding:16px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:color-mix(in_srgb,_var(--ds-bg-elevated-strong)_72%,_transparent)] [color:var(--ds-text-default)] [font-size:0.875rem] [line-height:1.6]">
                   Nur freigegebene Instanzen werden angezeigt. Rollen und Berechtigungen bleiben aus
                   SharePoint und Admin-Konfiguration ableitbar.
                 </p>
-                <p className="ds-info-item">
+                <p className="ds-info-item [margin:0] [padding:16px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:color-mix(in_srgb,_var(--ds-bg-elevated-strong)_72%,_transparent)] [color:var(--ds-text-default)] [font-size:0.875rem] [line-height:1.6]">
                   Jede Karte zeigt Name, Bereich, SharePoint-Ziel und verfügbare Hosts, damit die
                   Auswahl nachvollziehbar bleibt.
                 </p>
-                <p className="ds-note ds-info-note">
+                <p className="ds-note [display:grid] [grid-template-columns:48px_1fr] [align-items:center] [gap:var(--ds-space-4)] [margin-top:18px] [padding:18px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(_135deg,_var(--ds-accent-soft),_color-mix(in_srgb,_var(--ds-bg-elevated)_86%,_transparent)_)] ds-info-note [grid-template-columns:1fr] [margin-top:0]">
                   Der Schnellstart oben öffnet direkt die erste verfügbare Instanz. Einzelne Karten
                   geben dir mehr Kontext vor dem Wechsel.
                 </p>
@@ -466,43 +487,58 @@ const InstancesPage = ({ instances }: LandingPageProps) => {
             </aside>
           </section>
 
-          <section className="ds-container ds-section">
-            <div className="ds-section-header">
+          <section className="ds-container [width:min(1280px,_calc(100%_-_48px))] [margin-inline:auto] max-[760px]:[width:min(100%_-_32px,_1280px)] ds-section [padding-block:70px_96px]">
+            <div className="ds-section-header [display:flex] [align-items:end] [justify-content:space-between] [gap:var(--ds-space-6)] [margin-bottom:24px]">
               <div>
-                <p className="ds-panel-label">Warum diese Übersicht hilft</p>
-                <h2 className="ds-section-title">Orientierung für Teams und Stakeholder</h2>
+                <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+                  Warum diese Übersicht hilft
+                </p>
+                <h2 className="ds-section-title [margin:0] [color:var(--ds-text-strong)] [font-size:2rem] [letter-spacing:-0.04em]">
+                  Orientierung für Teams und Stakeholder
+                </h2>
               </div>
-              <p className="ds-section-copy">
+              <p className="ds-section-copy [max-width:620px] [margin:10px_0_0] [color:var(--ds-text-muted)] [line-height:1.65]">
                 Die Roadmap vereint Status, Aufgaben und Ansprechpersonen. Die folgenden Highlights
                 zeigen, wie du schnell ans Ziel kommst.
               </p>
             </div>
-            <div className="ds-value-grid">
+            <div className="ds-value-grid [display:grid] [grid-template-columns:repeat(3,_minmax(0,_1fr))] [gap:var(--ds-space-6)] [margin-top:48px] max-[1100px]:[grid-template-columns:repeat(2,_minmax(0,_1fr))] max-[760px]:[grid-template-columns:1fr]">
               {highlightCards.map((card) => (
-                <article key={card.title} className="ds-card ds-value-card">
-                  <div className="ds-value-icon">
-                    <card.icon className="ds-icon" />
+                <article
+                  key={card.title}
+                  className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-value-card [padding:24px] [transition:transform_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out)] hover:[border-color:var(--ds-border-strong)] hover:[box-shadow:var(--ds-shadow-soft),_var(--ds-shadow-glow)] hover:[transform:translateY(-2px)]"
+                >
+                  <div className="ds-value-icon [display:grid] [width:48px] [height:48px] [place-items:center] [margin-bottom:22px] [border:1px_solid_var(--ds-border-default)] [border-radius:16px] [background:linear-gradient(135deg,_var(--ds-accent-soft),_var(--ds-bg-muted))] [color:var(--ds-accent-strong)]">
+                    <card.icon className="ds-icon [flex:0_0_auto] [width:1.125rem] [height:1.125rem]" />
                   </div>
-                  <h3 className="ds-value-title">{card.title}</h3>
-                  <p className="ds-value-copy">{card.description}</p>
+                  <h3 className="ds-value-title [margin:0] [color:var(--ds-text-strong)] [font-size:1.125rem] [font-weight:800]">
+                    {card.title}
+                  </h3>
+                  <p className="ds-value-copy [margin:14px_0_0] [color:var(--ds-text-default)] [font-size:0.875rem] [line-height:1.7]">
+                    {card.description}
+                  </p>
                 </article>
               ))}
             </div>
           </section>
 
           {!authChecked ? (
-            <section className="ds-container ds-section">
-              <div className="ds-centered-state">
+            <section className="ds-container [width:min(1280px,_calc(100%_-_48px))] [margin-inline:auto] max-[760px]:[width:min(100%_-_32px,_1280px)] ds-section [padding-block:70px_96px]">
+              <div className="ds-centered-state [display:flex] [justify-content:center] [padding-block:var(--ds-space-8)]">
                 <JSDoITLoader sizeRem={2.2} message={authStatus || 'Anmeldung wird geprüft ...'} />
               </div>
             </section>
           ) : authed ? (
-            <section className="ds-container ds-section">
-              <div className="ds-section-header">
+            <section className="ds-container [width:min(1280px,_calc(100%_-_48px))] [margin-inline:auto] max-[760px]:[width:min(100%_-_32px,_1280px)] ds-section [padding-block:70px_96px]">
+              <div className="ds-section-header [display:flex] [align-items:end] [justify-content:space-between] [gap:var(--ds-space-6)] [margin-bottom:24px]">
                 <div>
-                  <p className="ds-panel-label">Auswahlbereich</p>
-                  <h2 className="ds-section-title">Aktive Instanzen</h2>
-                  <p className="ds-section-copy">
+                  <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+                    Auswahlbereich
+                  </p>
+                  <h2 className="ds-section-title [margin:0] [color:var(--ds-text-strong)] [font-size:2rem] [letter-spacing:-0.04em]">
+                    Aktive Instanzen
+                  </h2>
+                  <p className="ds-section-copy [max-width:620px] [margin:10px_0_0] [color:var(--ds-text-muted)] [line-height:1.65]">
                     {visibleInstances.length
                       ? 'Wähle eine Instanz, um dich mit der passenden Roadmap zu verbinden.'
                       : canManageInstances
@@ -513,80 +549,101 @@ const InstancesPage = ({ instances }: LandingPageProps) => {
                 {canManageInstances ? (
                   <Link
                     href="/admin/instances"
-                    className="ds-button ds-button-secondary ds-section-action"
+                    className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)] ds-section-action [flex:0_0_auto]"
                   >
                     Instanzen verwalten
-                    <FiExternalLink className="ds-icon-sm" />
+                    <FiExternalLink className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
                   </Link>
                 ) : null}
               </div>
 
-              {errorMessage && <div className="ds-message ds-message-danger">{errorMessage}</div>}
+              {errorMessage && (
+                <div className="ds-message [margin-bottom:var(--ds-space-6)] [padding:16px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:var(--ds-bg-elevated)] [color:var(--ds-text-default)] [font-size:0.875rem] ds-message-danger [border-color:color-mix(in_srgb,_var(--ds-danger)_38%,_transparent)] [background:color-mix(in_srgb,_var(--ds-danger)_12%,_transparent)] [color:var(--ds-danger)]">
+                  {errorMessage}
+                </div>
+              )}
 
-              <div className="ds-instance-grid">
+              <div className="ds-instance-grid [display:grid] [grid-template-columns:repeat(2,_minmax(0,_1fr))] [gap:var(--ds-space-6)] max-[1100px]:[grid-template-columns:repeat(2,_minmax(0,_1fr))] max-[760px]:[grid-template-columns:1fr]">
                 {visibleInstances.map((instance, index) => (
-                  <article key={instance.slug} className="ds-card ds-instance-card">
-                    <div className="ds-instance-card-header">
+                  <article
+                    key={instance.slug}
+                    className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-instance-card [display:grid] [gap:var(--ds-space-5)] [padding:24px] [border-radius:var(--ds-radius-xl)] [transition:transform_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out)] hover:[border-color:var(--ds-border-strong)] hover:[box-shadow:var(--ds-shadow-soft),_var(--ds-shadow-glow)] hover:[transform:translateY(-2px)]"
+                  >
+                    <div className="ds-instance-card-header [display:flex] [align-items:flex-start] [justify-content:space-between] [gap:var(--ds-space-4)] max-[760px]:[flex-direction:column]">
                       <div>
-                        <p className="ds-kicker">Instanz {String(index + 1).padStart(2, '0')}</p>
-                        <h3 className="ds-instance-title">{instance.displayName}</h3>
+                        <p className="ds-kicker [margin:0_0_9px] [color:var(--ds-text-strong)] [font-size:0.75rem] [font-weight:850] [letter-spacing:0.18em] [text-transform:uppercase]">
+                          Instanz {String(index + 1).padStart(2, '0')}
+                        </p>
+                        <h3 className="ds-instance-title [margin:0] [color:var(--ds-text-strong)] [font-size:1.25rem] [font-weight:850]">
+                          {instance.displayName}
+                        </h3>
                         {instance.department && (
-                          <p className="ds-badge ds-instance-department">
-                            <FiMapPin className="ds-icon-sm" />
+                          <p className="ds-badge [display:inline-flex] [align-items:center] [gap:var(--ds-space-2)] [padding:7px_10px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-pill)] [background:var(--ds-bg-soft)] [color:var(--ds-text-default)] [font-size:0.75rem] [font-weight:750] ds-instance-department [margin-top:10px]">
+                            <FiMapPin className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
                             {instance.department}
                           </p>
                         )}
                       </div>
-                      <span className="ds-badge">{instance.strategy}</span>
+                      <span className="ds-badge [display:inline-flex] [align-items:center] [gap:var(--ds-space-2)] [padding:7px_10px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-pill)] [background:var(--ds-bg-soft)] [color:var(--ds-text-default)] [font-size:0.75rem] [font-weight:750]">
+                        {instance.strategy}
+                      </span>
                     </div>
 
                     {instance.description && (
-                      <p className="ds-instance-description">{instance.description}</p>
+                      <p className="ds-instance-description [margin:0] [color:var(--ds-text-default)] [font-size:0.875rem] [line-height:1.7]">
+                        {instance.description}
+                      </p>
                     )}
 
-                    <dl className="ds-instance-details">
-                      <div className="ds-instance-detail">
-                        <div className="ds-instance-detail-label">
-                          <FiGlobe className="ds-icon-sm" />
+                    <dl className="ds-instance-details [display:grid] [gap:var(--ds-space-3)] [margin:0]">
+                      <div className="ds-instance-detail [padding:16px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:color-mix(in_srgb,_var(--ds-bg-elevated-strong)_74%,_transparent)]">
+                        <div className="ds-instance-detail-label [display:flex] [align-items:center] [gap:var(--ds-space-2)] [color:var(--ds-text-strong)] [font-size:0.875rem] [font-weight:800] [&_svg]:[color:var(--ds-accent-strong)]">
+                          <FiGlobe className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
                           <span>SharePoint</span>
                         </div>
-                        <dd className="ds-instance-detail-value">{instance.sharePointUrl}</dd>
+                        <dd className="ds-instance-detail-value [display:block] [margin:10px_0_0] [overflow:hidden] [color:var(--ds-text-muted)] [font-size:0.875rem] [text-overflow:ellipsis] [white-space:nowrap]">
+                          {instance.sharePointUrl}
+                        </dd>
                       </div>
                       {instance.hosts.length > 0 && (
-                        <div className="ds-instance-detail">
-                          <div className="ds-instance-detail-label">
-                            <FiExternalLink className="ds-icon-sm" />
+                        <div className="ds-instance-detail [padding:16px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:color-mix(in_srgb,_var(--ds-bg-elevated-strong)_74%,_transparent)]">
+                          <div className="ds-instance-detail-label [display:flex] [align-items:center] [gap:var(--ds-space-2)] [color:var(--ds-text-strong)] [font-size:0.875rem] [font-weight:800] [&_svg]:[color:var(--ds-accent-strong)]">
+                            <FiExternalLink className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
                             <span>Hosts</span>
                           </div>
-                          <dd className="ds-instance-detail-value">{instance.hosts.join(', ')}</dd>
+                          <dd className="ds-instance-detail-value [display:block] [margin:10px_0_0] [overflow:hidden] [color:var(--ds-text-muted)] [font-size:0.875rem] [text-overflow:ellipsis] [white-space:nowrap]">
+                            {instance.hosts.join(', ')}
+                          </dd>
                         </div>
                       )}
                     </dl>
 
-                    <div className="ds-instance-actions">
+                    <div className="ds-instance-actions [display:flex] [flex-wrap:wrap] [align-items:center] [gap:var(--ds-space-3)]">
                       <button
                         type="button"
                         onClick={() => openInstance(instance)}
                         disabled={selectingSlug === instance.slug}
-                        className="ds-button ds-button-primary ds-instance-open"
+                        className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-primary [background:linear-gradient(_135deg,_var(--ds-accent),_var(--ds-accent-2)_58%,_var(--ds-accent-strong)_)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-inverse)] ds-instance-open [flex:1_1_220px]"
                       >
                         {selectingSlug === instance.slug ? 'Öffne Roadmap ...' : 'Roadmap öffnen'}
-                        <FiArrowRight className="ds-icon-sm" />
+                        <FiArrowRight className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
                       </button>
-                      <div className="ds-instance-slug">{instance.slug}</div>
+                      <div className="ds-instance-slug [padding:14px_16px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:var(--ds-bg-soft)] [color:var(--ds-text-muted)] [font-size:0.75rem] [font-weight:850] [letter-spacing:0.08em] [text-transform:uppercase]">
+                        {instance.slug}
+                      </div>
                     </div>
                   </article>
                 ))}
               </div>
 
               {!visibleInstances.length && !instancesLoading && (
-                <div className="ds-empty-state">
-                  <p className="ds-empty-title">
+                <div className="ds-empty-state [margin-top:48px] [padding:32px] [border:1px_dashed_var(--ds-border-default)] [border-radius:var(--ds-radius-xl)] [background:color-mix(in_srgb,_var(--ds-bg-elevated-strong)_72%,_transparent)] [color:var(--ds-text-default)] [text-align:center]">
+                  <p className="ds-empty-title [margin:0] [color:var(--ds-text-strong)] [font-size:1.125rem] [font-weight:800]">
                     {canManageInstances
                       ? 'Noch keine Instanzen vorhanden'
                       : 'Keine freigegebenen Instanzen'}
                   </p>
-                  <p className="ds-empty-copy">
+                  <p className="ds-empty-copy [max-width:680px] [margin:10px_auto_0] [color:var(--ds-text-muted)] [font-size:0.875rem] [line-height:1.6]">
                     {canManageInstances
                       ? 'Erstelle in der Instanzverwaltung eine neue Roadmap-Instanz und verknüpfe den passenden SharePoint-Endpunkt.'
                       : 'Dir ist aktuell keine Roadmap-Instanz über die explizit freigegebenen Abteilungen zugeordnet.'}
@@ -595,32 +652,36 @@ const InstancesPage = ({ instances }: LandingPageProps) => {
               )}
 
               {!visibleInstances.length && instancesLoading && (
-                <div className="ds-centered-state">
+                <div className="ds-centered-state [display:flex] [justify-content:center] [padding-block:var(--ds-space-8)]">
                   <JSDoITLoader sizeRem={2} message="Instanzen werden geladen ..." />
                 </div>
               )}
             </section>
           ) : (
-            <section className="ds-container ds-section">
-              <div className="ds-card ds-auth-panel">
+            <section className="ds-container [width:min(1280px,_calc(100%_-_48px))] [margin-inline:auto] max-[760px]:[width:min(100%_-_32px,_1280px)] ds-section [padding-block:70px_96px]">
+              <div className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-auth-panel [display:grid] [gap:var(--ds-space-4)] [padding:32px] [border-radius:var(--ds-radius-xl)]">
                 <div>
-                  <p className="ds-panel-label">Anmeldung erforderlich</p>
-                  <h2 className="ds-section-title">Instanzzugriff freischalten</h2>
+                  <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+                    Anmeldung erforderlich
+                  </p>
+                  <h2 className="ds-section-title [margin:0] [color:var(--ds-text-strong)] [font-size:2rem] [letter-spacing:-0.04em]">
+                    Instanzzugriff freischalten
+                  </h2>
                 </div>
-                <p className="ds-section-copy">
+                <p className="ds-section-copy [max-width:620px] [margin:10px_0_0] [color:var(--ds-text-muted)] [line-height:1.65]">
                   Die Instanzübersicht ist erst nach Anmeldung sichtbar.
                 </p>
-                <div className="ds-actions">
+                <div className="ds-actions [display:flex] [flex-wrap:wrap] [align-items:center] [gap:var(--ds-space-4)] [margin-top:30px] max-[760px]:[&_.ds-button]:[width:100%]">
                   {entraEnabled ? (
                     <button
                       type="button"
                       onClick={startSso}
-                      className="ds-button ds-button-primary"
+                      className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-primary [background:linear-gradient(_135deg,_var(--ds-accent),_var(--ds-accent-2)_58%,_var(--ds-accent-strong)_)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-inverse)]"
                     >
                       Anmelden
                     </button>
                   ) : (
-                    <span className="ds-button ds-button-secondary ds-button-disabled">
+                    <span className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)] ds-button-disabled">
                       Microsoft SSO ist nicht konfiguriert
                     </span>
                   )}
@@ -630,17 +691,26 @@ const InstancesPage = ({ instances }: LandingPageProps) => {
           )}
         </main>
 
-        <footer className="ds-footer">
-          <div className="ds-container ds-footer-inner">
+        <footer className="ds-footer [border-top:1px_solid_var(--ds-border-subtle)] [background:color-mix(in_srgb,_var(--ds-bg-page)_82%,_transparent)] [backdrop-filter:blur(18px)]">
+          <div className="ds-container [width:min(1280px,_calc(100%_-_48px))] [margin-inline:auto] max-[760px]:[width:min(100%_-_32px,_1280px)] ds-footer-inner [display:flex] [align-items:center] [justify-content:space-between] [gap:var(--ds-space-4)] [padding-block:24px] [color:var(--ds-text-muted)] [font-size:0.875rem] max-[760px]:[align-items:flex-start] max-[760px]:[flex-direction:column]">
             <span>JSDoIT Roadmap Center</span>
-            <div className="ds-footer-links">
-              <Link className="ds-footer-link" href="/landing">
+            <div className="ds-footer-links [display:flex] [flex-wrap:wrap] [align-items:center] [gap:var(--ds-space-4)]">
+              <Link
+                className="ds-footer-link [color:var(--ds-text-muted)] [font-weight:700] [transition:color_var(--ds-duration-fast)_var(--ds-ease-out)] hover:[color:var(--ds-text-strong)]"
+                href="/landing"
+              >
                 Start
               </Link>
-              <Link className="ds-footer-link" href="/help">
+              <Link
+                className="ds-footer-link [color:var(--ds-text-muted)] [font-weight:700] [transition:color_var(--ds-duration-fast)_var(--ds-ease-out)] hover:[color:var(--ds-text-strong)]"
+                href="/help"
+              >
                 Hilfe
               </Link>
-              <Link className="ds-footer-link" href="/feedback">
+              <Link
+                className="ds-footer-link [color:var(--ds-text-muted)] [font-weight:700] [transition:color_var(--ds-duration-fast)_var(--ds-ease-out)] hover:[color:var(--ds-text-strong)]"
+                href="/feedback"
+              >
                 Feedback
               </Link>
             </div>

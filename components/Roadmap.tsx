@@ -539,7 +539,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
     const isDropTarget = dragOverCategoryId === categoryId && draggedCategoryId !== categoryId;
 
     return [
-      'ds-roadmap-category-section relative transition-all',
+      'ds-roadmap-category-section [padding:clamp(14px,_2vw,_20px)] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-xl)] [background:color-mix(in_srgb,_var(--ds-bg-elevated)_68%,_transparent)] [box-shadow:inset_0_1px_0_rgba(255,_255,_255,_0.04)] [content-visibility:auto] [contain-intrinsic-block-size:auto_420px] [&.is-drop-target]:[border-color:var(--ds-border-strong)] [&.is-drop-target]:[background:var(--ds-accent-soft)] [&.is-drop-target]:[box-shadow:var(--ds-shadow-glow)] [&.is-dragged]:[opacity:0.58] relative transition-all',
       isDropTarget ? 'is-drop-target' : '',
       isDragged ? 'is-dragged' : '',
     ]
@@ -1244,8 +1244,8 @@ const Roadmap: React.FC<RoadmapProps> = ({
 
   return (
     <>
-      <div className="ds-container ds-roadmap-shell">
-        <div className="ds-card ds-roadmap-hero-card">
+      <div className="ds-container [width:min(1280px,_calc(100%_-_48px))] [margin-inline:auto] max-[760px]:[width:min(100%_-_32px,_1280px)] ds-roadmap-shell [display:grid] [gap:var(--ds-space-8)] [&_.roadmap-project-count-badge]:[display:inline-flex] [&_.roadmap-project-count-badge]:[align-items:center] [&_.roadmap-project-count-badge]:[gap:7px] [&_.roadmap-project-count-badge]:![border:1px_solid_var(--ds-border-default)] [&_.roadmap-project-count-badge]:![border-radius:var(--ds-radius-pill)] [&_.roadmap-project-count-badge]:![background:var(--ds-bg-soft)] [&_.roadmap-project-count-badge]:![color:var(--ds-text-strong)] [&_.roadmap-project-count-badge]:[font-weight:800] [&_.roadmap-filter-summary-badge]:[display:inline-flex] [&_.roadmap-filter-summary-badge]:[align-items:center] [&_.roadmap-filter-summary-badge]:[gap:7px] [&_.roadmap-filter-summary-badge]:![border:1px_solid_var(--ds-border-default)] [&_.roadmap-filter-summary-badge]:![border-radius:var(--ds-radius-pill)] [&_.roadmap-filter-summary-badge]:![background:var(--ds-bg-soft)] [&_.roadmap-filter-summary-badge]:![color:var(--ds-text-strong)] [&_.roadmap-filter-summary-badge]:[font-weight:800] [&_.roadmap-filter-secondary-button]:[display:inline-flex] [&_.roadmap-filter-secondary-button]:[align-items:center] [&_.roadmap-filter-secondary-button]:[gap:7px] [&_.roadmap-filter-secondary-button]:![border:1px_solid_var(--ds-border-default)] [&_.roadmap-filter-secondary-button]:![border-radius:var(--ds-radius-pill)] [&_.roadmap-filter-secondary-button]:![background:var(--ds-bg-soft)] [&_.roadmap-filter-secondary-button]:![color:var(--ds-text-strong)] [&_.roadmap-filter-secondary-button]:[font-weight:800] [&_.roadmap-time-header]:![border:1px_solid_var(--ds-border-default)] [&_.roadmap-time-header]:![border-radius:12px] [&_.roadmap-time-header]:![background:linear-gradient(_135deg,_color-mix(in_srgb,_var(--ds-accent)_30%,_var(--ds-bg-elevated-strong)),_color-mix(in_srgb,_var(--ds-accent-2)_22%,_var(--ds-bg-elevated))_)] [&_.roadmap-time-header]:[box-shadow:inset_0_1px_0_rgba(255,_255,_255,_0.08)] [&_.roadmap-time-header]:![color:var(--ds-text-strong)] [&_.compact-project-card]:[content-visibility:auto] [&_.compact-project-card]:[contain-intrinsic-block-size:auto_190px] [&_.bg-slate-800.opacity-30]:![background:var(--ds-bg-soft)] [&_.bg-slate-800.opacity-30]:![opacity:1] [&_.roadmap-project-bar]:![border-color:rgba(255,_255,_255,_0.42)] [&_.roadmap-project-bar]:[box-shadow:0_10px_28px_color-mix(in_srgb,_var(--ds-bg-page)_52%,_transparent)] [&_.roadmap-project-bar]:![opacity:0.92] [&_.roadmap-project-label]:![background:rgba(0,_0,_0,_0.34)] [&_.roadmap-project-label]:![color:#ffffff] [&_.roadmap-filters-shell]:![border-color:var(--ds-border-default)] [&_.roadmap-filters-shell]:![background:linear-gradient(_180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated)_)] [&_.roadmap-filters-shell]:![box-shadow:var(--ds-shadow-card)] [&_.roadmap-filter-panel]:![border-color:var(--ds-border-default)] [&_.roadmap-filter-panel]:![background:linear-gradient(_180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated)_)] [&_.roadmap-filter-panel]:![box-shadow:var(--ds-shadow-card)] [&_.roadmap-filter-subpanel]:![border-color:var(--ds-border-default)] [&_.roadmap-filter-subpanel]:![background:linear-gradient(_180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated)_)] [&_.roadmap-filter-subpanel]:![box-shadow:var(--ds-shadow-card)] [&_.roadmap-filter-footer]:![border-color:var(--ds-border-default)] [&_.roadmap-filter-footer]:![background:linear-gradient(_180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated)_)] [&_.roadmap-filter-footer]:![box-shadow:var(--ds-shadow-card)] [&_.roadmap-filter-stat]:![border-color:var(--ds-border-default)] [&_.roadmap-filter-stat]:![background:linear-gradient(_180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated)_)] [&_.roadmap-filter-stat]:![box-shadow:var(--ds-shadow-card)] [&_.compact-project-card]:![border-color:var(--ds-border-default)] [&_.compact-project-card]:![background:linear-gradient(_180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated)_)] [&_.compact-project-card]:![box-shadow:var(--ds-shadow-card)] [&_.roadmap-filter-chip]:![border-color:var(--ds-border-default)] [&_.roadmap-filter-chip]:![background:var(--ds-bg-soft)] [&_.roadmap-filter-chip]:![color:var(--ds-text-default)] [&_.roadmap-filter-chip:hover]:![border-color:var(--ds-border-strong)] [&_.roadmap-filter-chip:hover]:![background:var(--ds-bg-muted)] [&_.roadmap-filter-chip:hover]:![color:var(--ds-text-strong)] [&_.roadmap-filter-chip-active]:![border-color:var(--ds-border-strong)] [&_.roadmap-filter-chip-active]:![background:var(--ds-accent-soft)] [&_.roadmap-filter-chip-active]:![color:var(--ds-accent-strong)] [&_.roadmap-filter-input]:![border-color:var(--ds-border-default)] [&_.roadmap-filter-input]:![background:var(--ds-bg-elevated-strong)] [&_.roadmap-filter-input]:![color:var(--ds-text-strong)] [&_:is(.text-white,_.text-slate-100)]:![color:var(--ds-text-strong)] [&_:is(.text-slate-200,_.text-slate-300,_.text-gray-200,_.text-gray-300)]:![color:var(--ds-text-default)] [&_:is(.text-slate-400,_.text-slate-500,_.text-gray-400)]:![color:var(--ds-text-muted)] [&_.compact-project-card]:[min-height:100%] [&_.compact-project-card]:![border-radius:var(--ds-radius-md)] [&_.compact-project-card:hover]:![border-color:var(--ds-border-strong)] [&_.compact-project-card:hover]:![box-shadow:var(--ds-shadow-card),_var(--ds-shadow-glow)] [&_.compact-project-card_h3]:![color:var(--ds-text-strong)] [&_.compact-project-card_p]:![color:var(--ds-text-default)] [&_.compact-project-card_.text-slate-300]:![color:var(--ds-text-default)] max-[760px]:[gap:var(--ds-space-5)]">
+        <div className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-roadmap-hero-card [border-radius:var(--ds-radius-xl)] [padding:clamp(24px,_4vw,_36px)] [&_.text-slate-300]:![color:var(--ds-text-default)] [&_.text-white]:![color:var(--ds-text-strong)]">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-4">
               <p className="text-xs font-semibold uppercase tracking-[0.35em] text-sky-300/90">
@@ -1267,7 +1267,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
               </p>
             </div>
             <div className="grid w-full gap-3 text-xs text-slate-300 sm:w-auto sm:text-sm md:grid-cols-2">
-              <div className="ds-roadmap-stat-card rounded-2xl border px-4 py-3 text-center">
+              <div className="ds-roadmap-stat-card [&_.text-white]:![color:var(--ds-text-strong)] ![border-color:var(--ds-border-default)] [background:var(--ds-bg-soft)] [color:var(--ds-text-default)] rounded-2xl border px-4 py-3 text-center">
                 <span className="block text-2xl font-semibold text-white">
                   {displayedProjects.length}
                 </span>
@@ -1277,20 +1277,20 @@ const Roadmap: React.FC<RoadmapProps> = ({
           </div>
         </div>
 
-        <div className="ds-card ds-roadmap-toolbar">
+        <div className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-roadmap-toolbar [border-radius:var(--ds-radius-xl)] [&_.text-slate-300]:![color:var(--ds-text-default)] [padding:clamp(16px,_3vw,_22px)] max-[760px]:[&_.flex.w-full.flex-wrap]:[width:100%]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             {/* View mode + View scale buttons */}
             <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:gap-3">
-              <div className="ds-roadmap-segmented">
+              <div className="ds-roadmap-segmented [display:inline-flex] [align-items:center] [gap:6px] [padding:5px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:var(--ds-bg-soft)] max-[760px]:[width:100%]">
                 <button
-                  className={`ds-roadmap-segment ${viewMode === 'timeline' ? 'is-active' : ''}`}
+                  className={`ds-roadmap-segment [display:inline-flex] [min-height:42px] [align-items:center] [justify-content:center] [border:1px_solid_transparent] [border-radius:12px] [background:transparent] [color:var(--ds-text-default)] [font-size:0.875rem] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out),_color_var(--ds-duration-base)_var(--ds-ease-out)] [padding-inline:15px] hover:[border-color:var(--ds-border-strong)] hover:[color:var(--ds-text-strong)] hover:[transform:translateY(-1px)] [&.is-active]:[border-color:var(--ds-border-strong)] [&.is-active]:[background:linear-gradient(135deg,_var(--ds-accent),_var(--ds-accent-2))] [&.is-active]:[box-shadow:var(--ds-shadow-glow)] [&.is-active]:[color:var(--ds-text-inverse)] max-[760px]:[flex:1_1_0] ${viewMode === 'timeline' ? 'is-active' : ''}`}
                   onClick={() => setViewMode('timeline')}
                   title="Zeitstrahl"
                 >
                   Zeitstrahl
                 </button>
                 <button
-                  className={`ds-roadmap-segment ${viewMode === 'tiles' ? 'is-active' : ''}`}
+                  className={`ds-roadmap-segment [display:inline-flex] [min-height:42px] [align-items:center] [justify-content:center] [border:1px_solid_transparent] [border-radius:12px] [background:transparent] [color:var(--ds-text-default)] [font-size:0.875rem] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out),_color_var(--ds-duration-base)_var(--ds-ease-out)] [padding-inline:15px] hover:[border-color:var(--ds-border-strong)] hover:[color:var(--ds-text-strong)] hover:[transform:translateY(-1px)] [&.is-active]:[border-color:var(--ds-border-strong)] [&.is-active]:[background:linear-gradient(135deg,_var(--ds-accent),_var(--ds-accent-2))] [&.is-active]:[box-shadow:var(--ds-shadow-glow)] [&.is-active]:[color:var(--ds-text-inverse)] max-[760px]:[flex:1_1_0] ${viewMode === 'tiles' ? 'is-active' : ''}`}
                   onClick={() => setViewMode('tiles')}
                   title="Kachelansicht"
                 >
@@ -1298,25 +1298,25 @@ const Roadmap: React.FC<RoadmapProps> = ({
                 </button>
               </div>
               <button
-                className={`ds-roadmap-scale-button ${viewType === 'quarters' ? 'is-active' : ''}`}
+                className={`ds-roadmap-scale-button [display:inline-flex] [min-height:42px] [align-items:center] [justify-content:center] [border:1px_solid_transparent] [border-radius:12px] [background:transparent] [color:var(--ds-text-default)] [font-size:0.875rem] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out),_color_var(--ds-duration-base)_var(--ds-ease-out)] [padding-inline:15px] [flex:1_1_auto] [border-color:var(--ds-border-subtle)] [background:color-mix(in_srgb,_var(--ds-bg-elevated)_70%,_transparent)] hover:[border-color:var(--ds-border-strong)] hover:[color:var(--ds-text-strong)] hover:[transform:translateY(-1px)] [&.is-active]:[border-color:var(--ds-border-strong)] [&.is-active]:[background:linear-gradient(135deg,_var(--ds-accent),_var(--ds-accent-2))] [&.is-active]:[box-shadow:var(--ds-shadow-glow)] [&.is-active]:[color:var(--ds-text-inverse)] max-[760px]:[flex:1_1_0] ${viewType === 'quarters' ? 'is-active' : ''}`}
                 onClick={() => setViewType('quarters')}
               >
                 Quartale
               </button>
               <button
-                className={`ds-roadmap-scale-button ${viewType === 'months' ? 'is-active' : ''}`}
+                className={`ds-roadmap-scale-button [display:inline-flex] [min-height:42px] [align-items:center] [justify-content:center] [border:1px_solid_transparent] [border-radius:12px] [background:transparent] [color:var(--ds-text-default)] [font-size:0.875rem] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out),_color_var(--ds-duration-base)_var(--ds-ease-out)] [padding-inline:15px] [flex:1_1_auto] [border-color:var(--ds-border-subtle)] [background:color-mix(in_srgb,_var(--ds-bg-elevated)_70%,_transparent)] hover:[border-color:var(--ds-border-strong)] hover:[color:var(--ds-text-strong)] hover:[transform:translateY(-1px)] [&.is-active]:[border-color:var(--ds-border-strong)] [&.is-active]:[background:linear-gradient(135deg,_var(--ds-accent),_var(--ds-accent-2))] [&.is-active]:[box-shadow:var(--ds-shadow-glow)] [&.is-active]:[color:var(--ds-text-inverse)] max-[760px]:[flex:1_1_0] ${viewType === 'months' ? 'is-active' : ''}`}
                 onClick={() => setViewType('months')}
               >
                 Monate
               </button>
               <button
-                className={`ds-roadmap-scale-button ${viewType === 'weeks' ? 'is-active' : ''}`}
+                className={`ds-roadmap-scale-button [display:inline-flex] [min-height:42px] [align-items:center] [justify-content:center] [border:1px_solid_transparent] [border-radius:12px] [background:transparent] [color:var(--ds-text-default)] [font-size:0.875rem] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out),_color_var(--ds-duration-base)_var(--ds-ease-out)] [padding-inline:15px] [flex:1_1_auto] [border-color:var(--ds-border-subtle)] [background:color-mix(in_srgb,_var(--ds-bg-elevated)_70%,_transparent)] hover:[border-color:var(--ds-border-strong)] hover:[color:var(--ds-text-strong)] hover:[transform:translateY(-1px)] [&.is-active]:[border-color:var(--ds-border-strong)] [&.is-active]:[background:linear-gradient(135deg,_var(--ds-accent),_var(--ds-accent-2))] [&.is-active]:[box-shadow:var(--ds-shadow-glow)] [&.is-active]:[color:var(--ds-text-inverse)] max-[760px]:[flex:1_1_0] ${viewType === 'weeks' ? 'is-active' : ''}`}
                 onClick={() => setViewType('weeks')}
               >
                 Wochen
               </button>
               <button
-                className={`ds-roadmap-scale-button ${viewType === 'years' ? 'is-active' : ''}`}
+                className={`ds-roadmap-scale-button [display:inline-flex] [min-height:42px] [align-items:center] [justify-content:center] [border:1px_solid_transparent] [border-radius:12px] [background:transparent] [color:var(--ds-text-default)] [font-size:0.875rem] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out),_color_var(--ds-duration-base)_var(--ds-ease-out)] [padding-inline:15px] [flex:1_1_auto] [border-color:var(--ds-border-subtle)] [background:color-mix(in_srgb,_var(--ds-bg-elevated)_70%,_transparent)] hover:[border-color:var(--ds-border-strong)] hover:[color:var(--ds-text-strong)] hover:[transform:translateY(-1px)] [&.is-active]:[border-color:var(--ds-border-strong)] [&.is-active]:[background:linear-gradient(135deg,_var(--ds-accent),_var(--ds-accent-2))] [&.is-active]:[box-shadow:var(--ds-shadow-glow)] [&.is-active]:[color:var(--ds-text-inverse)] max-[760px]:[flex:1_1_0] ${viewType === 'years' ? 'is-active' : ''}`}
                 onClick={() => setViewType('years')}
               >
                 Jahre
@@ -1327,7 +1327,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
             <div className="flex w-full flex-wrap items-center justify-center gap-3 md:justify-end">
               <button
                 type="button"
-                className="ds-roadmap-export-button"
+                className="ds-roadmap-export-button [display:inline-flex] [min-height:42px] [align-items:center] [justify-content:center] [gap:9px] [padding:9px_16px] [border:1px_solid_color-mix(in_srgb,_#22c55e_72%,_var(--ds-border-default))] [border-radius:12px] [background:linear-gradient(135deg,_#15803d,_#166534)] [box-shadow:0_10px_22px_rgb(21_128_61_/_20%)] [color:#fff] [font-size:0.875rem] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_opacity_var(--ds-duration-base)_var(--ds-ease-out)] [&:hover:not(:disabled)]:[box-shadow:0_13px_28px_rgb(21_128_61_/_30%)] [&:hover:not(:disabled)]:[transform:translateY(-1px)] disabled:[cursor:not-allowed] disabled:[opacity:0.5] max-[760px]:[width:100%]"
                 onClick={handleExcelExport}
                 disabled={filteredProjects.length === 0 || isExporting}
                 title="Aktuell sichtbare Projekte als Excel-Datei exportieren"
@@ -1339,17 +1339,20 @@ const Roadmap: React.FC<RoadmapProps> = ({
             </div>
           </div>
           {exportError && (
-            <p className="ds-roadmap-export-error" role="alert">
+            <p
+              className="ds-roadmap-export-error [margin:var(--ds-space-3)_0_0] [color:var(--ds-danger)] [font-size:0.875rem] [font-weight:700] [text-align:right] max-[760px]:[text-align:left]"
+              role="alert"
+            >
               {exportError}
             </p>
           )}
         </div>
 
         {/* Mobile categories toggle button */}
-        <div className="ds-roadmap-mobile-category-toggle">
+        <div className="ds-roadmap-mobile-category-toggle [display:none] max-[760px]:[display:block]">
           <button
             onClick={() => setMobileCategoriesOpen(!mobileCategoriesOpen)}
-            className="ds-roadmap-mobile-button"
+            className="ds-roadmap-mobile-button [display:flex] [width:100%] [min-height:48px] [align-items:center] [justify-content:space-between] [padding-inline:16px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:var(--ds-bg-elevated)] [color:var(--ds-text-strong)] [font-weight:800]"
           >
             <span>Kategorien auswählen</span>
             {mobileCategoriesOpen ? <FaTimes /> : <FaBars />}
@@ -1357,11 +1360,11 @@ const Roadmap: React.FC<RoadmapProps> = ({
         </div>
 
         {/* Responsive layout - stack on mobile, side-by-side on larger screens */}
-        <div className="ds-roadmap-layout relative">
+        <div className="ds-roadmap-layout [display:flex] [gap:var(--ds-space-6)] [align-items:flex-start] max-[1100px]:[flex-direction:column] relative">
           {/* Sidebar with categories - collapsible on mobile */}
           <div
             ref={sidebarRef}
-            className={`ds-roadmap-sidebar ${mobileCategoriesOpen ? 'is-open' : ''}`}
+            className={`ds-roadmap-sidebar [flex:0_0_260px] max-[1100px]:[width:100%] max-[1100px]:[flex-basis:auto] max-[760px]:[position:absolute] max-[760px]:[inset:0_0_auto] max-[760px]:[z-index:5] max-[760px]:[display:none] max-[760px]:[padding:var(--ds-space-4)] max-[760px]:[border:1px_solid_var(--ds-border-default)] max-[760px]:[border-radius:var(--ds-radius-xl)] max-[760px]:[background:color-mix(in_srgb,_var(--ds-bg-page)_92%,_transparent)] max-[760px]:[box-shadow:var(--ds-shadow-card)] max-[760px]:[backdrop-filter:blur(18px)] max-[760px]:[&.is-open]:[display:block] ${mobileCategoriesOpen ? 'is-open' : ''}`}
           >
             <CategorySidebar
               categories={categories}
@@ -1371,13 +1374,16 @@ const Roadmap: React.FC<RoadmapProps> = ({
           </div>
 
           {/* Main content area */}
-          <div className="ds-roadmap-content">
-            <div className="ds-roadmap-scroll" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="ds-roadmap-content [min-width:0] [flex:1_1_auto] [overflow:hidden]">
+            <div
+              className="ds-roadmap-scroll [overflow-x:auto] [padding-bottom:var(--ds-space-4)]"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
               <div
-                className={`ds-roadmap-canvas ${viewType === 'months' || viewType === 'weeks' ? 'is-wide' : ''}`}
+                className={`ds-roadmap-canvas [min-width:100%] max-[1100px]:[&.is-wide]:[min-width:800px] ${viewType === 'months' || viewType === 'weeks' ? 'is-wide' : ''}`}
               >
                 {/* Advanced Filters Bar */}
-                <div className="ds-roadmap-filter-slot">
+                <div className="ds-roadmap-filter-slot [margin-bottom:var(--ds-space-4)]">
                   <RoadmapFilters
                     filterText={filterText}
                     onFilterTextChange={setFilterText}
@@ -1465,8 +1471,8 @@ const Roadmap: React.FC<RoadmapProps> = ({
                 </div>
 
                 {hasReorderControls() && (
-                  <div className="ds-roadmap-admin-banner">
-                    <span className="ds-roadmap-admin-pill">
+                  <div className="ds-roadmap-admin-banner [margin-bottom:var(--ds-space-4)] [display:flex] [flex-wrap:wrap] [align-items:center] [gap:var(--ds-space-3)] [padding:14px_16px] [border:1px_solid_var(--ds-border-strong)] [border-radius:var(--ds-radius-md)] [background:var(--ds-accent-soft)] [color:var(--ds-text-strong)] [font-size:0.875rem]">
+                    <span className="ds-roadmap-admin-pill [display:inline-flex] [align-items:center] [gap:7px] ![border:1px_solid_var(--ds-border-default)] ![border-radius:var(--ds-radius-pill)] ![background:var(--ds-bg-soft)] ![color:var(--ds-text-strong)] [font-weight:800] [padding:6px_11px]">
                       <FiGripVertical className="h-4 w-4" />
                       Admin-Modus
                     </span>
@@ -1475,17 +1481,23 @@ const Roadmap: React.FC<RoadmapProps> = ({
                       and Drop neu anordnen.
                     </span>
                     {(isSavingCategoryOrder || isSavingProjectOrder) && (
-                      <span className="ds-roadmap-saving-pill">Speichert...</span>
+                      <span className="ds-roadmap-saving-pill [display:inline-flex] [align-items:center] [gap:7px] ![border:1px_solid_var(--ds-border-default)] ![border-radius:var(--ds-radius-pill)] ![background:var(--ds-bg-soft)] ![color:var(--ds-text-strong)] [font-weight:800] [padding:6px_11px]">
+                        Speichert...
+                      </span>
                     )}
                   </div>
                 )}
 
                 {categoryOrderError && (
-                  <div className="ds-roadmap-error-banner">{categoryOrderError}</div>
+                  <div className="ds-roadmap-error-banner [margin-bottom:var(--ds-space-4)] [display:flex] [flex-wrap:wrap] [align-items:center] [gap:var(--ds-space-3)] [padding:14px_16px] [border:1px_solid_var(--ds-border-strong)] [border-radius:var(--ds-radius-md)] [background:var(--ds-accent-soft)] [color:var(--ds-text-strong)] [font-size:0.875rem] [border-color:color-mix(in_srgb,_var(--ds-danger)_58%,_var(--ds-border-default))] [background:color-mix(in_srgb,_var(--ds-danger)_12%,_transparent)]">
+                    {categoryOrderError}
+                  </div>
                 )}
 
                 {projectOrderError && (
-                  <div className="ds-roadmap-error-banner">{projectOrderError}</div>
+                  <div className="ds-roadmap-error-banner [margin-bottom:var(--ds-space-4)] [display:flex] [flex-wrap:wrap] [align-items:center] [gap:var(--ds-space-3)] [padding:14px_16px] [border:1px_solid_var(--ds-border-strong)] [border-radius:var(--ds-radius-md)] [background:var(--ds-accent-soft)] [color:var(--ds-text-strong)] [font-size:0.875rem] [border-color:color-mix(in_srgb,_var(--ds-danger)_58%,_var(--ds-border-default))] [background:color-mix(in_srgb,_var(--ds-danger)_12%,_transparent)]">
+                    {projectOrderError}
+                  </div>
                 )}
                 {/* Quarter/Month/Week headers */}
 
@@ -1493,7 +1505,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
                   <>
                     {/* Quarter/Month/Week headers */}
                     {viewType === 'quarters' ? (
-                      <div className="ds-roadmap-time-grid is-quarters">
+                      <div className="ds-roadmap-time-grid [margin-bottom:var(--ds-space-4)] [display:grid] [gap:10px] [&.is-quarters]:[grid-template-columns:repeat(4,_minmax(0,_1fr))] [&.is-months]:[grid-template-columns:repeat(12,_minmax(54px,_1fr))] [&.is-years]:[grid-template-columns:repeat(5,_minmax(0,_1fr))] [&.is-weeks]:![gap:4px] [&.is-weeks]:[overflow-x:auto] max-[760px]:[&.is-quarters]:[gap:6px] max-[760px]:[&.is-years]:[gap:6px] max-[760px]:[&.is-months]:[overflow-x:auto] is-quarters">
                         <div
                           className="roadmap-time-header p-2 md:p-3 rounded-lg text-center font-semibold text-xs md:text-sm"
                           style={{ background: 'linear-gradient(to right, #eab308, #d97706)' }}
@@ -1520,7 +1532,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
                         </div>
                       </div>
                     ) : viewType === 'months' ? (
-                      <div className="ds-roadmap-time-grid is-months">
+                      <div className="ds-roadmap-time-grid [margin-bottom:var(--ds-space-4)] [display:grid] [gap:10px] [&.is-quarters]:[grid-template-columns:repeat(4,_minmax(0,_1fr))] [&.is-months]:[grid-template-columns:repeat(12,_minmax(54px,_1fr))] [&.is-years]:[grid-template-columns:repeat(5,_minmax(0,_1fr))] [&.is-weeks]:![gap:4px] [&.is-weeks]:[overflow-x:auto] max-[760px]:[&.is-quarters]:[gap:6px] max-[760px]:[&.is-years]:[gap:6px] max-[760px]:[&.is-months]:[overflow-x:auto] is-months">
                         <div
                           className="roadmap-time-header p-1 md:p-2 rounded-lg text-center font-semibold text-xs"
                           style={{ background: 'linear-gradient(to right, #eab308, #e3a008)' }}
@@ -1596,7 +1608,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
                       </div>
                     ) : viewType === 'weeks' ? (
                       <div
-                        className="ds-roadmap-time-grid is-weeks"
+                        className="ds-roadmap-time-grid [margin-bottom:var(--ds-space-4)] [display:grid] [gap:10px] [&.is-quarters]:[grid-template-columns:repeat(4,_minmax(0,_1fr))] [&.is-months]:[grid-template-columns:repeat(12,_minmax(54px,_1fr))] [&.is-years]:[grid-template-columns:repeat(5,_minmax(0,_1fr))] [&.is-weeks]:![gap:4px] [&.is-weeks]:[overflow-x:auto] max-[760px]:[&.is-quarters]:[gap:6px] max-[760px]:[&.is-years]:[gap:6px] max-[760px]:[&.is-months]:[overflow-x:auto] is-weeks"
                         style={{
                           display: 'grid',
                           gridTemplateColumns: `repeat(${getISOWeeksInYear(currentYear)}, minmax(30px, 1fr))`,
@@ -1621,7 +1633,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
                         ))}
                       </div>
                     ) : (
-                      <div className="ds-roadmap-time-grid is-years">
+                      <div className="ds-roadmap-time-grid [margin-bottom:var(--ds-space-4)] [display:grid] [gap:10px] [&.is-quarters]:[grid-template-columns:repeat(4,_minmax(0,_1fr))] [&.is-months]:[grid-template-columns:repeat(12,_minmax(54px,_1fr))] [&.is-years]:[grid-template-columns:repeat(5,_minmax(0,_1fr))] [&.is-weeks]:![gap:4px] [&.is-weeks]:[overflow-x:auto] max-[760px]:[&.is-quarters]:[gap:6px] max-[760px]:[&.is-years]:[gap:6px] max-[760px]:[&.is-months]:[overflow-x:auto] is-years">
                         <div
                           className="roadmap-time-header p-2 md:p-3 rounded-lg text-center font-semibold text-xs md:text-sm"
                           style={{ background: 'linear-gradient(to right, #eab308, #d97706)' }}
@@ -1662,7 +1674,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
                 {viewMode === 'timeline' && (
                   <>
                     {/* Project timeline bars grouped by Bereich (category) */}
-                    <div className="ds-roadmap-category-stack relative">
+                    <div className="ds-roadmap-category-stack [display:grid] [gap:var(--ds-space-6)] relative">
                       {visibleCategoryIds.map((catId) => {
                         const groupProjects = orderedProjectsByCategory[catId] || [];
                         return (
@@ -1679,7 +1691,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
                                   draggable={!isSavingCategoryOrder}
                                   onDragStart={(event) => handleCategoryDragStart(event, catId)}
                                   onDragEnd={handleCategoryDragEnd}
-                                  className="ds-roadmap-drag-handle"
+                                  className="ds-roadmap-drag-handle [display:inline-flex] [align-items:center] [gap:7px] ![border:1px_solid_var(--ds-border-default)] ![border-radius:var(--ds-radius-pill)] ![background:var(--ds-bg-soft)] ![color:var(--ds-text-strong)] [font-weight:800] [padding:6px_11px] [cursor:grab] [font-size:0.75rem] active:[cursor:grabbing]"
                                   aria-label={`Kategorie ${getCategoryName(catId)} verschieben`}
                                   title="Kategorie verschieben"
                                 >
@@ -1842,7 +1854,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
                 )}
 
                 {viewMode === 'tiles' && (
-                  <div className="ds-roadmap-category-stack">
+                  <div className="ds-roadmap-category-stack [display:grid] [gap:var(--ds-space-6)]">
                     {visibleCategoryIds.map((catId) => {
                       const groupProjects = orderedProjectsByCategory[catId] || [];
                       return (
@@ -1858,7 +1870,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
                                 draggable={!isSavingCategoryOrder}
                                 onDragStart={(event) => handleCategoryDragStart(event, catId)}
                                 onDragEnd={handleCategoryDragEnd}
-                                className="ds-roadmap-drag-handle"
+                                className="ds-roadmap-drag-handle [display:inline-flex] [align-items:center] [gap:7px] ![border:1px_solid_var(--ds-border-default)] ![border-radius:var(--ds-radius-pill)] ![background:var(--ds-bg-soft)] ![color:var(--ds-text-strong)] [font-weight:800] [padding:6px_11px] [cursor:grab] [font-size:0.75rem] active:[cursor:grabbing]"
                                 aria-label={`Kategorie ${getCategoryName(catId)} verschieben`}
                                 title="Kategorie verschieben"
                               >
@@ -1936,7 +1948,7 @@ const Roadmap: React.FC<RoadmapProps> = ({
         {/* Enhanced Hover Popup (Rich Tooltip) */}
         {hoveredProject && (
           <div
-            className="theme-roadmap-tooltip ds-roadmap-tooltip fixed z-50 w-[300px] pointer-events-none rounded-xl border border-slate-800/70 bg-gradient-to-b from-slate-950/95 to-slate-900/95 p-3 text-white shadow-2xl shadow-slate-950/50 backdrop-blur-sm md:w-[360px] md:p-4 animate-fadeIn"
+            className="theme-roadmap-tooltip ds-roadmap-tooltip ![border-color:var(--ds-border-default)] ![background:linear-gradient(_180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated)_)] ![box-shadow:var(--ds-shadow-soft),_var(--ds-shadow-glow)] ![color:var(--ds-text-strong)] [&_:is(.text-white,_.text-slate-100,_.text-slate-200,_.text-gray-200)]:![color:var(--ds-text-strong)] [&_:is(.text-gray-300,_.text-gray-400)]:![color:var(--ds-text-muted)] [&_a]:![color:var(--ds-accent-strong)] fixed z-50 w-[300px] pointer-events-none rounded-xl border border-slate-800/70 bg-gradient-to-b from-slate-950/95 to-slate-900/95 p-3 text-white shadow-2xl shadow-slate-950/50 backdrop-blur-sm md:w-[360px] md:p-4 animate-fadeIn"
             style={{
               top: Math.min(tooltipPosition.y + 16, window.innerHeight - 380),
               left: Math.min(tooltipPosition.x + 16, window.innerWidth - 380),

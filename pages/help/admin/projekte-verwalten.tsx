@@ -59,32 +59,52 @@ const ProjekteVerwalten = () => {
       ]}
       actions={
         <>
-          <Link className="ds-button ds-button-primary" href="/admin">
+          <Link
+            className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-primary [background:linear-gradient(_135deg,_var(--ds-accent),_var(--ds-accent-2)_58%,_var(--ds-accent-strong)_)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-inverse)]"
+            href="/admin"
+          >
             Projekte im Adminbereich öffnen
-            <FiArrowRight className="ds-icon-sm" />
+            <FiArrowRight className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
           </Link>
-          <Link className="ds-button ds-button-secondary" href="/help/admin">
+          <Link
+            className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)]"
+            href="/help/admin"
+          >
             Zur Admin-Übersicht
           </Link>
         </>
       }
     >
       <section aria-labelledby="anlegen-heading">
-        <div className="ds-section-header">
+        <div className="ds-section-header [display:flex] [align-items:end] [justify-content:space-between] [gap:var(--ds-space-6)] [margin-bottom:24px]">
           <div>
-            <p className="ds-panel-label">Neues Projekt</p>
-            <h2 id="anlegen-heading" className="ds-section-title">
+            <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+              Neues Projekt
+            </p>
+            <h2
+              id="anlegen-heading"
+              className="ds-section-title [margin:0] [color:var(--ds-text-strong)] [font-size:2rem] [letter-spacing:-0.04em]"
+            >
               In fünf kontrollierten Schritten anlegen
             </h2>
           </div>
         </div>
-        <div className="ds-steps">
+        <div className="ds-steps [display:grid] [gap:14px]">
           {projectSteps.map((step, index) => (
-            <article key={step.title} className="ds-step">
-              <span className="ds-step-number">{String(index + 1).padStart(2, '0')}</span>
+            <article
+              key={step.title}
+              className="ds-step [display:grid] [grid-template-columns:64px_1fr] [align-items:start] [gap:var(--ds-space-4)] [padding:20px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:color-mix(in_srgb,_var(--ds-bg-elevated-strong)_80%,_transparent)] max-[760px]:[grid-template-columns:1fr]"
+            >
+              <span className="ds-step-number [display:grid] [width:48px] [height:48px] [place-items:center] [border:1px_solid_var(--ds-border-strong)] [border-radius:50%] [background:var(--ds-accent-soft)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-accent-strong)] [font-size:1rem] [font-weight:900]">
+                {String(index + 1).padStart(2, '0')}
+              </span>
               <div>
-                <h3 className="ds-step-title">{step.title}</h3>
-                <p className="ds-step-copy">{step.description}</p>
+                <h3 className="ds-step-title [margin:0_0_8px] [color:var(--ds-text-strong)] [font-size:1rem] [font-weight:850]">
+                  {step.title}
+                </h3>
+                <p className="ds-step-copy [margin:0] [color:var(--ds-text-default)] [font-size:0.875rem] [line-height:1.55]">
+                  {step.description}
+                </p>
               </div>
             </article>
           ))}
@@ -92,29 +112,43 @@ const ProjekteVerwalten = () => {
       </section>
 
       <section className="grid gap-5 md:grid-cols-2" aria-label="Projektarten">
-        <article className="ds-card ds-help-card">
-          <div className="ds-help-card-header">
-            <div className="ds-help-card-icon" aria-hidden="true">
-              <FiCheckCircle className="ds-icon-sm" />
+        <article className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-help-card [display:flex] [min-height:278px] [flex-direction:column] [padding:24px] [border-radius:var(--ds-radius-xl)] [transition:transform_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out)] hover:[border-color:var(--ds-border-strong)] hover:[box-shadow:var(--ds-shadow-soft),_var(--ds-shadow-glow)] hover:[transform:translateY(-2px)]">
+          <div className="ds-help-card-header [display:flex] [align-items:center] [justify-content:space-between] [gap:var(--ds-space-3)] [margin-bottom:24px]">
+            <div
+              className="ds-help-card-icon [display:grid] [width:44px] [height:44px] [place-items:center] [border:1px_solid_var(--ds-border-default)] [border-radius:15px] [background:var(--ds-accent-soft)] [color:var(--ds-accent-strong)]"
+              aria-hidden="true"
+            >
+              <FiCheckCircle className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
             </div>
-            <span className="ds-help-card-badge">Weniger Pflichtfelder</span>
+            <span className="ds-help-card-badge [display:inline-flex] [align-items:center] [min-height:30px] [padding-inline:10px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-pill)] [background:var(--ds-bg-soft)] [color:var(--ds-text-muted)] [font-size:0.6875rem] [font-weight:850] [letter-spacing:0.12em] [text-transform:uppercase]">
+              Weniger Pflichtfelder
+            </span>
           </div>
-          <h2 className="ds-help-card-title">Kurzzeitprojekt</h2>
-          <p className="ds-help-card-copy">
+          <h2 className="ds-help-card-title [margin:0] [color:var(--ds-text-strong)] [font-size:1.125rem] [font-weight:850] [letter-spacing:-0.02em]">
+            Kurzzeitprojekt
+          </h2>
+          <p className="ds-help-card-copy [margin:14px_0_0] [color:var(--ds-text-default)] [font-size:0.9rem] [line-height:1.65]">
             Geeignet für kompakte Vorhaben. Projektleitung, Budget, Phase, Rückblick und Ausblick
             können optional ergänzt werden. Verwenden Sie diese Art nicht nur, um fehlende Angaben
             bei einem langfristigen Projekt zu umgehen.
           </p>
         </article>
-        <article className="ds-card ds-help-card">
-          <div className="ds-help-card-header">
-            <div className="ds-help-card-icon" aria-hidden="true">
-              <FiEdit3 className="ds-icon-sm" />
+        <article className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-help-card [display:flex] [min-height:278px] [flex-direction:column] [padding:24px] [border-radius:var(--ds-radius-xl)] [transition:transform_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out)] hover:[border-color:var(--ds-border-strong)] hover:[box-shadow:var(--ds-shadow-soft),_var(--ds-shadow-glow)] hover:[transform:translateY(-2px)]">
+          <div className="ds-help-card-header [display:flex] [align-items:center] [justify-content:space-between] [gap:var(--ds-space-3)] [margin-bottom:24px]">
+            <div
+              className="ds-help-card-icon [display:grid] [width:44px] [height:44px] [place-items:center] [border:1px_solid_var(--ds-border-default)] [border-radius:15px] [background:var(--ds-accent-soft)] [color:var(--ds-accent-strong)]"
+              aria-hidden="true"
+            >
+              <FiEdit3 className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
             </div>
-            <span className="ds-help-card-badge">Erweiterte Pflichtfelder</span>
+            <span className="ds-help-card-badge [display:inline-flex] [align-items:center] [min-height:30px] [padding-inline:10px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-pill)] [background:var(--ds-bg-soft)] [color:var(--ds-text-muted)] [font-size:0.6875rem] [font-weight:850] [letter-spacing:0.12em] [text-transform:uppercase]">
+              Erweiterte Pflichtfelder
+            </span>
           </div>
-          <h2 className="ds-help-card-title">Langzeitprojekt</h2>
-          <p className="ds-help-card-copy">
+          <h2 className="ds-help-card-title [margin:0] [color:var(--ds-text-strong)] [font-size:1.125rem] [font-weight:850] [letter-spacing:-0.02em]">
+            Langzeitprojekt
+          </h2>
+          <p className="ds-help-card-copy [margin:14px_0_0] [color:var(--ds-text-default)] [font-size:0.9rem] [line-height:1.65]">
             Erfordert zusätzlich Projektleitung, Budget, „Bisher“, „In Zukunft“ und geplante
             Umsetzung. Phase, Meilenstein, Team, Links, Badges und weitere Felder erhöhen die
             Aussagekraft, wenn sie aktuell gehalten werden.
@@ -123,22 +157,30 @@ const ProjekteVerwalten = () => {
       </section>
 
       <section aria-labelledby="aktualisieren-heading">
-        <div className="ds-section-header">
+        <div className="ds-section-header [display:flex] [align-items:end] [justify-content:space-between] [gap:var(--ds-space-6)] [margin-bottom:24px]">
           <div>
-            <p className="ds-panel-label">Bestehendes Projekt</p>
-            <h2 id="aktualisieren-heading" className="ds-section-title">
+            <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+              Bestehendes Projekt
+            </p>
+            <h2
+              id="aktualisieren-heading"
+              className="ds-section-title [margin:0] [color:var(--ds-text-strong)] [font-size:2rem] [letter-spacing:-0.04em]"
+            >
               Gezielt aktualisieren statt alles neu erfassen
             </h2>
           </div>
-          <p className="ds-section-copy">
+          <p className="ds-section-copy [max-width:620px] [margin:10px_0_0] [color:var(--ds-text-muted)] [line-height:1.65]">
             Ändern Sie zuerst die Informationen, die Nutzende für Entscheidungen brauchen: Status,
             Zeitraum, Fortschritt, Phase, Meilenstein und Verantwortung.
           </p>
         </div>
-        <div className="ds-help-list">
-          <div className="ds-help-list-item">
-            <div className="ds-help-list-icon" aria-hidden="true">
-              <FiEdit3 className="ds-icon-sm" />
+        <div className="ds-help-list [display:grid] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-xl)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)]">
+          <div className="ds-help-list-item [display:grid] [grid-template-columns:auto_minmax(0,_1fr)_auto] [align-items:center] [gap:var(--ds-space-4)] [padding:22px_24px] [color:var(--ds-text-default)] [transition:background_var(--ds-duration-fast)_var(--ds-ease-out),_color_var(--ds-duration-fast)_var(--ds-ease-out)] [&+.ds-help-list-item]:[border-top:1px_solid_var(--ds-border-default)] hover:[background:var(--ds-bg-soft)] hover:[color:var(--ds-text-strong)] [&_h3]:[margin:0] [&_h3]:[color:var(--ds-text-strong)] [&_h3]:[font-size:1rem] [&_h3]:[font-weight:850] [&_p]:[margin:6px_0_0] [&_p]:[color:var(--ds-text-muted)] [&_p]:[font-size:0.875rem] [&_p]:[line-height:1.55] max-[760px]:[grid-template-columns:1fr]">
+            <div
+              className="ds-help-list-icon [display:grid] [width:44px] [height:44px] [place-items:center] [border:1px_solid_var(--ds-border-default)] [border-radius:15px] [background:var(--ds-accent-soft)] [color:var(--ds-accent-strong)]"
+              aria-hidden="true"
+            >
+              <FiEdit3 className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
             </div>
             <div>
               <h3>Bearbeiten</h3>
@@ -148,9 +190,12 @@ const ProjekteVerwalten = () => {
               </p>
             </div>
           </div>
-          <div className="ds-help-list-item">
-            <div className="ds-help-list-icon" aria-hidden="true">
-              <FiCheckCircle className="ds-icon-sm" />
+          <div className="ds-help-list-item [display:grid] [grid-template-columns:auto_minmax(0,_1fr)_auto] [align-items:center] [gap:var(--ds-space-4)] [padding:22px_24px] [color:var(--ds-text-default)] [transition:background_var(--ds-duration-fast)_var(--ds-ease-out),_color_var(--ds-duration-fast)_var(--ds-ease-out)] [&+.ds-help-list-item]:[border-top:1px_solid_var(--ds-border-default)] hover:[background:var(--ds-bg-soft)] hover:[color:var(--ds-text-strong)] [&_h3]:[margin:0] [&_h3]:[color:var(--ds-text-strong)] [&_h3]:[font-size:1rem] [&_h3]:[font-weight:850] [&_p]:[margin:6px_0_0] [&_p]:[color:var(--ds-text-muted)] [&_p]:[font-size:0.875rem] [&_p]:[line-height:1.55] max-[760px]:[grid-template-columns:1fr]">
+            <div
+              className="ds-help-list-icon [display:grid] [width:44px] [height:44px] [place-items:center] [border:1px_solid_var(--ds-border-default)] [border-radius:15px] [background:var(--ds-accent-soft)] [color:var(--ds-accent-strong)]"
+              aria-hidden="true"
+            >
+              <FiCheckCircle className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
             </div>
             <div>
               <h3>Abschließen</h3>
@@ -160,9 +205,12 @@ const ProjekteVerwalten = () => {
               </p>
             </div>
           </div>
-          <div className="ds-help-list-item">
-            <div className="ds-help-list-icon" aria-hidden="true">
-              <FiTrash2 className="ds-icon-sm" />
+          <div className="ds-help-list-item [display:grid] [grid-template-columns:auto_minmax(0,_1fr)_auto] [align-items:center] [gap:var(--ds-space-4)] [padding:22px_24px] [color:var(--ds-text-default)] [transition:background_var(--ds-duration-fast)_var(--ds-ease-out),_color_var(--ds-duration-fast)_var(--ds-ease-out)] [&+.ds-help-list-item]:[border-top:1px_solid_var(--ds-border-default)] hover:[background:var(--ds-bg-soft)] hover:[color:var(--ds-text-strong)] [&_h3]:[margin:0] [&_h3]:[color:var(--ds-text-strong)] [&_h3]:[font-size:1rem] [&_h3]:[font-weight:850] [&_p]:[margin:6px_0_0] [&_p]:[color:var(--ds-text-muted)] [&_p]:[font-size:0.875rem] [&_p]:[line-height:1.55] max-[760px]:[grid-template-columns:1fr]">
+            <div
+              className="ds-help-list-icon [display:grid] [width:44px] [height:44px] [place-items:center] [border:1px_solid_var(--ds-border-default)] [border-radius:15px] [background:var(--ds-accent-soft)] [color:var(--ds-accent-strong)]"
+              aria-hidden="true"
+            >
+              <FiTrash2 className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
             </div>
             <div>
               <h3>Löschen</h3>
@@ -176,23 +224,37 @@ const ProjekteVerwalten = () => {
         </div>
       </section>
 
-      <section className="ds-card ds-help-support-panel" aria-labelledby="spiegel-heading">
+      <section
+        className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-help-support-panel [display:flex] [align-items:center] [justify-content:space-between] [gap:var(--ds-space-6)] [padding:32px] [border-radius:var(--ds-radius-xl)] max-[1100px]:[align-items:flex-start] max-[1100px]:[flex-direction:column]"
+        aria-labelledby="spiegel-heading"
+      >
         <div>
-          <p className="ds-panel-label">Read-only Spiegelung</p>
-          <h2 id="spiegel-heading" className="ds-section-title">
+          <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+            Read-only Spiegelung
+          </p>
+          <h2
+            id="spiegel-heading"
+            className="ds-section-title [margin:0] [color:var(--ds-text-strong)] [font-size:2rem] [letter-spacing:-0.04em]"
+          >
             Gespiegelte Projekte in der Quellinstanz pflegen
           </h2>
-          <p className="ds-section-copy">
+          <p className="ds-section-copy [max-width:620px] [margin:10px_0_0] [color:var(--ds-text-muted)] [line-height:1.65]">
             Bei einem gespiegelten Projekt zeigt die Adminliste „Nur lesen“. Suchen Sie die im
             Projekt-Detail genannte Quellinstanz und nehmen Sie die Änderung dort vor. Falls Ihnen
             dort die Berechtigung fehlt, wenden Sie sich an deren zuständige Administration.
           </p>
         </div>
-        <div className="ds-actions ds-help-support-actions">
-          <Link className="ds-button ds-button-primary" href="/roadmap">
+        <div className="ds-actions [display:flex] [flex-wrap:wrap] [align-items:center] [gap:var(--ds-space-4)] [margin-top:30px] max-[760px]:[&_.ds-button]:[width:100%] ds-help-support-actions [flex:0_0_auto] [margin-top:0]">
+          <Link
+            className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-primary [background:linear-gradient(_135deg,_var(--ds-accent),_var(--ds-accent-2)_58%,_var(--ds-accent-strong)_)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-inverse)]"
+            href="/roadmap"
+          >
             Ergebnis prüfen
           </Link>
-          <Link className="ds-button ds-button-secondary" href="/help/projekte-melden">
+          <Link
+            className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)]"
+            href="/help/projekte-melden"
+          >
             Korrektur melden
           </Link>
         </div>

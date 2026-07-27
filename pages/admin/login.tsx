@@ -209,42 +209,57 @@ const AdminLogin: React.FC = () => {
         <title>Anmeldung | JSDoIT Roadmap</title>
       </Head>
 
-      <div className="ds-page-shell">
+      <div className="ds-page-shell before:[position:absolute] before:[inset:0] before:[z-index:0] before:[pointer-events:none] before:[background-image:linear-gradient(var(--ds-grid-line)_1px,_transparent_1px),_linear-gradient(90deg,_var(--ds-grid-line)_1px,_transparent_1px)] before:[background-size:56px_56px] before:[mask-image:linear-gradient(to_bottom,_black,_rgba(0,_0,_0,_0.72),_transparent_98%)] after:[position:absolute] after:[right:-10%] after:[bottom:-25%] after:[left:-10%] after:[z-index:0] after:[height:38vh] after:[pointer-events:none] after:[background:radial-gradient(ellipse_at_center,_var(--ds-hero-glow-a),_transparent_62%)] after:[filter:blur(12px)] [position:relative] [isolation:isolate] [display:flex] [min-height:100vh] [flex-direction:column] [overflow:hidden] [background:radial-gradient(circle_at_7%_18%,_var(--ds-hero-glow-a),_transparent_31%),_radial-gradient(circle_at_70%_8%,_var(--ds-hero-glow-b),_transparent_28%),_radial-gradient(circle_at_48%_86%,_var(--ds-hero-glow-c),_transparent_26%),_linear-gradient(135deg,_var(--ds-bg-page),_var(--ds-bg-page-2))] [color:var(--ds-text-default)] [font-family:var(--ds-font-sans)] [&>*]:[position:relative] [&>*]:[z-index:1]">
         <SiteHeader activeRoute="admin" />
 
-        <main className="ds-page-main ds-login-page-main">
-          <section className="ds-container ds-login-layout">
-            <div className="ds-login-hero">
-              <div className="ds-eyebrow">
-                <FiShield className="ds-icon-sm" />
+        <main className="ds-page-main [flex:1] ds-login-page-main [display:flex] [align-items:center] [padding-block:clamp(44px,_7vw,_88px)]">
+          <section className="ds-container [width:min(1280px,_calc(100%_-_48px))] [margin-inline:auto] max-[760px]:[width:min(100%_-_32px,_1280px)] ds-login-layout [display:grid] [grid-template-columns:minmax(0,_1fr)_minmax(340px,_440px)] [gap:clamp(36px,_6vw,_88px)] [align-items:center]">
+            <div className="ds-login-hero [max-width:760px]">
+              <div className="ds-eyebrow [display:inline-flex] [width:fit-content] [align-items:center] [gap:10px] [padding:9px_15px] [border:1px_solid_var(--ds-border-strong)] [border-radius:var(--ds-radius-pill)] [background:var(--ds-accent-soft)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-strong)] [font-size:0.75rem] [font-weight:850] [letter-spacing:0.22em] [text-transform:uppercase] [&_svg]:[color:var(--ds-accent-strong)]">
+                <FiShield className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
                 Administration
               </div>
 
-              <h1 className="ds-login-title">Roadmap-Instanzen sicher verwalten.</h1>
-              <p className="ds-login-copy">
+              <h1 className="ds-login-title [max-width:720px] [margin:28px_0_20px] [color:var(--ds-text-strong)] [font-size:clamp(2.5rem,_5.6vw,_4.6rem)] [font-weight:860] [letter-spacing:-0.05em] [line-height:0.98] [text-wrap:balance]">
+                Roadmap-Instanzen sicher verwalten.
+              </h1>
+              <p className="ds-login-copy [max-width:640px] [margin:0] [color:var(--ds-text-default)] [font-size:1.0625rem] [line-height:1.75]">
                 Der Zugriff erfolgt ausschließlich per Microsoft SSO. Nach der Anmeldung werden
                 Rollen und Instanzfreigaben geprüft, bevor der Adminbereich geöffnet wird.
               </p>
 
-              <div className="ds-login-checklist" aria-label="SSO Ablauf">
-                <article className="ds-login-checkitem">
-                  <span className="ds-login-checkicon" aria-hidden="true">
-                    <FiCheckCircle className="ds-icon-sm" />
+              <div
+                className="ds-login-checklist [display:grid] [max-width:620px] [gap:var(--ds-space-3)] [margin-top:34px]"
+                aria-label="SSO Ablauf"
+              >
+                <article className="ds-login-checkitem [display:flex] [gap:var(--ds-space-3)] [align-items:flex-start] [padding:18px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:color-mix(in_srgb,_var(--ds-bg-elevated-strong)_72%,_transparent)] [box-shadow:var(--ds-shadow-card)]">
+                  <span
+                    className="ds-login-checkicon [display:grid] [place-items:center] [border:1px_solid_var(--ds-border-default)] [background:var(--ds-accent-soft)] [color:var(--ds-accent-strong)] [width:38px] [height:38px] [border-radius:14px]"
+                    aria-hidden="true"
+                  >
+                    <FiCheckCircle className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
                   </span>
                   <div>
-                    <h2 className="ds-login-check-title">Single Sign-on</h2>
-                    <p className="ds-login-check-copy">
+                    <h2 className="ds-login-check-title [margin:0] [color:var(--ds-text-strong)] [font-size:0.875rem] [font-weight:850]">
+                      Single Sign-on
+                    </h2>
+                    <p className="ds-login-check-copy [margin:6px_0_0] [color:var(--ds-text-muted)] [font-size:0.875rem] [line-height:1.55]">
                       Anmeldung über die bestehende Microsoft-Entra-Session.
                     </p>
                   </div>
                 </article>
-                <article className="ds-login-checkitem">
-                  <span className="ds-login-checkicon" aria-hidden="true">
-                    <FiLock className="ds-icon-sm" />
+                <article className="ds-login-checkitem [display:flex] [gap:var(--ds-space-3)] [align-items:flex-start] [padding:18px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:color-mix(in_srgb,_var(--ds-bg-elevated-strong)_72%,_transparent)] [box-shadow:var(--ds-shadow-card)]">
+                  <span
+                    className="ds-login-checkicon [display:grid] [place-items:center] [border:1px_solid_var(--ds-border-default)] [background:var(--ds-accent-soft)] [color:var(--ds-accent-strong)] [width:38px] [height:38px] [border-radius:14px]"
+                    aria-hidden="true"
+                  >
+                    <FiLock className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
                   </span>
                   <div>
-                    <h2 className="ds-login-check-title">Instanzfreigaben</h2>
-                    <p className="ds-login-check-copy">
+                    <h2 className="ds-login-check-title [margin:0] [color:var(--ds-text-strong)] [font-size:0.875rem] [font-weight:850]">
+                      Instanzfreigaben
+                    </h2>
+                    <p className="ds-login-check-copy [margin:6px_0_0] [color:var(--ds-text-muted)] [font-size:0.875rem] [line-height:1.55]">
                       Berechtigungen werden gegen Rollen, Gruppen und Instanzen validiert.
                     </p>
                   </div>
@@ -252,29 +267,43 @@ const AdminLogin: React.FC = () => {
               </div>
             </div>
 
-            <aside className="ds-card ds-login-panel" aria-label="Microsoft SSO Anmeldung">
-              <div className="ds-login-panel-header">
-                <div className="ds-login-icon" aria-hidden="true">
-                  <FiLock className="ds-icon-md" />
+            <aside
+              className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-login-panel [padding:clamp(26px,_4vw,_36px)] [border-radius:var(--ds-radius-xl)]"
+              aria-label="Microsoft SSO Anmeldung"
+            >
+              <div className="ds-login-panel-header [display:flex] [gap:var(--ds-space-3)] [align-items:center] [margin-bottom:24px]">
+                <div
+                  className="ds-login-icon [display:grid] [place-items:center] [border:1px_solid_var(--ds-border-default)] [background:var(--ds-accent-soft)] [color:var(--ds-accent-strong)] [width:52px] [height:52px] [border-radius:18px]"
+                  aria-hidden="true"
+                >
+                  <FiLock className="ds-icon-md [flex:0_0_auto] [width:1.5rem] [height:1.5rem]" />
                 </div>
                 <div>
-                  <p className="ds-panel-label">Microsoft SSO</p>
-                  <h2 className="ds-panel-title">Anmelden</h2>
+                  <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+                    Microsoft SSO
+                  </p>
+                  <h2 className="ds-panel-title [margin:0] [color:var(--ds-text-strong)] [font-size:clamp(1.5rem,_3vw,_2.125rem)] [letter-spacing:-0.04em] [line-height:1.15]">
+                    Anmelden
+                  </h2>
                 </div>
               </div>
 
-              {error && <div className="ds-form-error ds-login-alert">{error}</div>}
+              {error && (
+                <div className="ds-form-error [margin:0] [padding:12px_14px] [border:1px_solid_color-mix(in_srgb,_var(--ds-danger)_36%,_transparent)] [border-radius:var(--ds-radius-sm)] [background:color-mix(in_srgb,_var(--ds-danger)_12%,_transparent)] [color:var(--ds-danger)] [font-size:0.875rem] [line-height:1.5] ds-login-alert [margin-bottom:18px]">
+                  {error}
+                </div>
+              )}
 
               {loading ? (
-                <div className="ds-login-loading">
+                <div className="ds-login-loading [display:grid] [justify-items:center] [gap:var(--ds-space-4)] [padding-block:34px] [text-align:center]">
                   <JSDoITLoader sizeRem={2.5} message={status || 'SSO-Session wird geprüft …'} />
-                  <p className="ds-small-text">
+                  <p className="ds-small-text [margin:0] [color:var(--ds-text-default)] [font-size:0.875rem] [line-height:1.55]">
                     Bitte einen Moment warten, während die bestehende SSO-Session geprüft wird.
                   </p>
                 </div>
               ) : (
-                <div className="ds-login-actions-panel">
-                  <p className="ds-login-panel-copy">
+                <div className="ds-login-actions-panel [display:grid] [gap:var(--ds-space-4)]">
+                  <p className="ds-login-panel-copy [margin:0] [color:var(--ds-text-default)] [font-size:0.9375rem] [line-height:1.65]">
                     Melde dich mit Microsoft SSO an, um deine Roadmap-Berechtigungen zu prüfen und
                     den Adminbereich zu öffnen.
                   </p>
@@ -282,13 +311,13 @@ const AdminLogin: React.FC = () => {
                   {entraStatus.enabled ? (
                     <button
                       onClick={startEntraPopupLogin}
-                      className="ds-button ds-button-primary ds-login-button"
+                      className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-primary [background:linear-gradient(_135deg,_var(--ds-accent),_var(--ds-accent-2)_58%,_var(--ds-accent-strong)_)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-inverse)] ds-login-button [width:100%]"
                     >
-                      <FiLogIn className="ds-icon-sm" />
+                      <FiLogIn className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
                       Mit Microsoft anmelden
                     </button>
                   ) : (
-                    <div className="ds-login-warning">
+                    <div className="ds-login-warning [padding:14px_16px] [border:1px_solid_color-mix(in_srgb,_var(--ds-warning)_42%,_transparent)] [border-radius:var(--ds-radius-sm)] [background:color-mix(in_srgb,_var(--ds-warning)_12%,_transparent)] [color:var(--ds-warning)] [font-size:0.875rem] [line-height:1.55]">
                       Microsoft SSO ist nicht konfiguriert. Bitte aktiviere die Entra-Konfiguration,
                       bevor du dich anmelden kannst.
                     </div>
@@ -299,18 +328,24 @@ const AdminLogin: React.FC = () => {
                       fetchAuthMode();
                       fetchEntraStatus();
                     }}
-                    className="ds-button ds-button-secondary ds-login-button"
+                    className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)] ds-login-button [width:100%]"
                   >
-                    <FiRefreshCw className="ds-icon-sm" />
+                    <FiRefreshCw className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
                     Status erneut prüfen
                   </button>
 
-                  {status && <p className="ds-login-status">{status}</p>}
+                  {status && (
+                    <p className="ds-login-status [margin:0] [color:var(--ds-text-muted)] [font-size:0.8125rem] [font-weight:750] [text-align:center]">
+                      {status}
+                    </p>
+                  )}
                 </div>
               )}
 
-              <div className="ds-login-note">
-                <p className="ds-login-note-title">Session-Prüfung</p>
+              <div className="ds-login-note [margin-top:26px] [padding:18px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:var(--ds-bg-soft)] [color:var(--ds-text-muted)] [font-size:0.8125rem] [line-height:1.55] [&_p:last-child]:[margin-bottom:0]">
+                <p className="ds-login-note-title [margin:0_0_8px] [color:var(--ds-text-strong)] [font-weight:850]">
+                  Session-Prüfung
+                </p>
                 <p>
                   Die Admin-Session wird serverseitig erstellt und anschließend für die aktuell
                   freigegebenen Roadmap-Instanzen verwendet.
@@ -320,17 +355,26 @@ const AdminLogin: React.FC = () => {
           </section>
         </main>
 
-        <footer className="ds-footer">
-          <div className="ds-container ds-footer-inner">
+        <footer className="ds-footer [border-top:1px_solid_var(--ds-border-subtle)] [background:color-mix(in_srgb,_var(--ds-bg-page)_82%,_transparent)] [backdrop-filter:blur(18px)]">
+          <div className="ds-container [width:min(1280px,_calc(100%_-_48px))] [margin-inline:auto] max-[760px]:[width:min(100%_-_32px,_1280px)] ds-footer-inner [display:flex] [align-items:center] [justify-content:space-between] [gap:var(--ds-space-4)] [padding-block:24px] [color:var(--ds-text-muted)] [font-size:0.875rem] max-[760px]:[align-items:flex-start] max-[760px]:[flex-direction:column]">
             <span>JSDoIT Roadmap Center</span>
-            <div className="ds-footer-links">
-              <Link className="ds-footer-link" href="/landing">
+            <div className="ds-footer-links [display:flex] [flex-wrap:wrap] [align-items:center] [gap:var(--ds-space-4)]">
+              <Link
+                className="ds-footer-link [color:var(--ds-text-muted)] [font-weight:700] [transition:color_var(--ds-duration-fast)_var(--ds-ease-out)] hover:[color:var(--ds-text-strong)]"
+                href="/landing"
+              >
                 Start
               </Link>
-              <Link className="ds-footer-link" href="/instances">
+              <Link
+                className="ds-footer-link [color:var(--ds-text-muted)] [font-weight:700] [transition:color_var(--ds-duration-fast)_var(--ds-ease-out)] hover:[color:var(--ds-text-strong)]"
+                href="/instances"
+              >
                 Instanzen
               </Link>
-              <Link className="ds-footer-link" href="/help">
+              <Link
+                className="ds-footer-link [color:var(--ds-text-muted)] [font-weight:700] [transition:color_var(--ds-duration-fast)_var(--ds-ease-out)] hover:[color:var(--ds-text-strong)]"
+                href="/help"
+              >
                 Hilfe
               </Link>
             </div>

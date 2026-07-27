@@ -116,11 +116,17 @@ const FAQ = () => {
       ]}
       actions={
         <>
-          <Link className="ds-button ds-button-primary" href="/help/erste-schritte">
+          <Link
+            className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-primary [background:linear-gradient(_135deg,_var(--ds-accent),_var(--ds-accent-2)_58%,_var(--ds-accent-strong)_)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-inverse)]"
+            href="/help/erste-schritte"
+          >
             Mit den Grundlagen starten
-            <FiArrowRight className="ds-icon-sm" />
+            <FiArrowRight className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
           </Link>
-          <Link className="ds-button ds-button-secondary" href="/support">
+          <Link
+            className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)]"
+            href="/support"
+          >
             Support kontaktieren
           </Link>
         </>
@@ -128,29 +134,40 @@ const FAQ = () => {
     >
       {groups.map((group) => (
         <section key={group.id} aria-labelledby={`faq-${group.id}`}>
-          <div className="ds-section-header">
+          <div className="ds-section-header [display:flex] [align-items:end] [justify-content:space-between] [gap:var(--ds-space-6)] [margin-bottom:24px]">
             <div>
-              <p className="ds-panel-label">FAQ</p>
-              <h2 id={`faq-${group.id}`} className="ds-section-title">
+              <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+                FAQ
+              </p>
+              <h2
+                id={`faq-${group.id}`}
+                className="ds-section-title [margin:0] [color:var(--ds-text-strong)] [font-size:2rem] [letter-spacing:-0.04em]"
+              >
                 {group.title}
               </h2>
             </div>
           </div>
           <div className="space-y-4">
             {group.questions.map((entry) => (
-              <details key={entry.question} className="ds-card group p-6 open:border-sky-500/40">
+              <details
+                key={entry.question}
+                className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] group p-6 open:border-sky-500/40"
+              >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-semibold text-white sm:text-lg">
                   <span>{entry.question}</span>
                   <FiHelpCircle
-                    className="ds-icon-sm shrink-0 text-sky-300 transition group-open:rotate-180"
+                    className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem] shrink-0 text-sky-300 transition group-open:rotate-180"
                     aria-hidden="true"
                   />
                 </summary>
                 <p className="mt-4 text-sm leading-7 text-slate-300 sm:text-base">{entry.answer}</p>
                 {entry.link && (
-                  <Link className="ds-help-link" href={entry.link.href}>
+                  <Link
+                    className="ds-help-link [display:inline-flex] [align-items:center] [gap:var(--ds-space-2)] [margin-top:auto] [padding-top:24px] [color:var(--ds-accent-strong)] [font-size:0.8125rem] [font-weight:850]"
+                    href={entry.link.href}
+                  >
                     {entry.link.label}
-                    <FiArrowRight className="ds-icon-sm" />
+                    <FiArrowRight className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
                   </Link>
                 )}
               </details>
@@ -159,23 +176,37 @@ const FAQ = () => {
         </section>
       ))}
 
-      <section className="ds-card ds-help-support-panel" aria-labelledby="support-heading">
+      <section
+        className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-help-support-panel [display:flex] [align-items:center] [justify-content:space-between] [gap:var(--ds-space-6)] [padding:32px] [border-radius:var(--ds-radius-xl)] max-[1100px]:[align-items:flex-start] max-[1100px]:[flex-direction:column]"
+        aria-labelledby="support-heading"
+      >
         <div>
-          <p className="ds-panel-label">Noch offen?</p>
-          <h2 id="support-heading" className="ds-section-title">
+          <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+            Noch offen?
+          </p>
+          <h2
+            id="support-heading"
+            className="ds-section-title [margin:0] [color:var(--ds-text-strong)] [font-size:2rem] [letter-spacing:-0.04em]"
+          >
             Eine gute Supportanfrage spart Rückfragen
           </h2>
-          <p className="ds-section-copy">
+          <p className="ds-section-copy [max-width:620px] [margin:10px_0_0] [color:var(--ds-text-muted)] [line-height:1.65]">
             Nennen Sie Instanz, Seite oder Projektlink, den gewünschten Ablauf, den tatsächlich
             beobachteten Ablauf und die genaue Fehlermeldung. Senden Sie keine Passwörter oder
             Zugangstokens.
           </p>
         </div>
-        <div className="ds-actions ds-help-support-actions">
-          <Link className="ds-button ds-button-primary" href="/support">
+        <div className="ds-actions [display:flex] [flex-wrap:wrap] [align-items:center] [gap:var(--ds-space-4)] [margin-top:30px] max-[760px]:[&_.ds-button]:[width:100%] ds-help-support-actions [flex:0_0_auto] [margin-top:0]">
+          <Link
+            className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-primary [background:linear-gradient(_135deg,_var(--ds-accent),_var(--ds-accent-2)_58%,_var(--ds-accent-strong)_)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-inverse)]"
+            href="/support"
+          >
             Support-Seite öffnen
           </Link>
-          <Link className="ds-button ds-button-secondary" href="/docs">
+          <Link
+            className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)]"
+            href="/docs"
+          >
             Technische Dokumentation
           </Link>
         </div>

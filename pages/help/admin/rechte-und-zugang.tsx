@@ -51,54 +51,80 @@ const RechteUndZugang = () => {
       ]}
       actions={
         <>
-          <Link className="ds-button ds-button-primary" href="/admin/login">
+          <Link
+            className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-primary [background:linear-gradient(_135deg,_var(--ds-accent),_var(--ds-accent-2)_58%,_var(--ds-accent-strong)_)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-inverse)]"
+            href="/admin/login"
+          >
             Microsoft-Anmeldung öffnen
-            <FiArrowRight className="ds-icon-sm" />
+            <FiArrowRight className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
           </Link>
-          <Link className="ds-button ds-button-secondary" href="/support">
+          <Link
+            className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)]"
+            href="/support"
+          >
             Zugriffsproblem melden
           </Link>
         </>
       }
     >
       <section aria-labelledby="modell-heading">
-        <div className="ds-section-header">
+        <div className="ds-section-header [display:flex] [align-items:end] [justify-content:space-between] [gap:var(--ds-space-6)] [margin-bottom:24px]">
           <div>
-            <p className="ds-panel-label">Berechtigungsmodell</p>
-            <h2 id="modell-heading" className="ds-section-title">
+            <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+              Berechtigungsmodell
+            </p>
+            <h2
+              id="modell-heading"
+              className="ds-section-title [margin:0] [color:var(--ds-text-strong)] [font-size:2rem] [letter-spacing:-0.04em]"
+            >
               Anmeldung allein gibt noch keine Admin-Rechte
             </h2>
           </div>
-          <p className="ds-section-copy">
+          <p className="ds-section-copy [max-width:620px] [margin:10px_0_0] [color:var(--ds-text-muted)] [line-height:1.65]">
             Microsoft SSO bestätigt die Identität. Erst die anschließende Rollen- und Instanzprüfung
             entscheidet über den tatsächlichen Zugriff.
           </p>
         </div>
         <div className="grid gap-5 md:grid-cols-3">
           {accessLevels.map((level) => (
-            <article key={level.title} className="ds-card ds-help-card">
-              <div className="ds-help-card-header">
-                <div className="ds-help-card-icon" aria-hidden="true">
-                  <level.icon className="ds-icon-sm" />
+            <article
+              key={level.title}
+              className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-help-card [display:flex] [min-height:278px] [flex-direction:column] [padding:24px] [border-radius:var(--ds-radius-xl)] [transition:transform_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out)] hover:[border-color:var(--ds-border-strong)] hover:[box-shadow:var(--ds-shadow-soft),_var(--ds-shadow-glow)] hover:[transform:translateY(-2px)]"
+            >
+              <div className="ds-help-card-header [display:flex] [align-items:center] [justify-content:space-between] [gap:var(--ds-space-3)] [margin-bottom:24px]">
+                <div
+                  className="ds-help-card-icon [display:grid] [width:44px] [height:44px] [place-items:center] [border:1px_solid_var(--ds-border-default)] [border-radius:15px] [background:var(--ds-accent-soft)] [color:var(--ds-accent-strong)]"
+                  aria-hidden="true"
+                >
+                  <level.icon className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
                 </div>
               </div>
-              <h3 className="ds-help-card-title">{level.title}</h3>
-              <p className="ds-help-card-copy">{level.description}</p>
+              <h3 className="ds-help-card-title [margin:0] [color:var(--ds-text-strong)] [font-size:1.125rem] [font-weight:850] [letter-spacing:-0.02em]">
+                {level.title}
+              </h3>
+              <p className="ds-help-card-copy [margin:14px_0_0] [color:var(--ds-text-default)] [font-size:0.9rem] [line-height:1.65]">
+                {level.description}
+              </p>
             </article>
           ))}
         </div>
       </section>
 
       <section aria-labelledby="vergeben-heading">
-        <div className="ds-section-header">
+        <div className="ds-section-header [display:flex] [align-items:end] [justify-content:space-between] [gap:var(--ds-space-6)] [margin-bottom:24px]">
           <div>
-            <p className="ds-panel-label">Instanz-Admin hinzufügen</p>
-            <h2 id="vergeben-heading" className="ds-section-title">
+            <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+              Instanz-Admin hinzufügen
+            </p>
+            <h2
+              id="vergeben-heading"
+              className="ds-section-title [margin:0] [color:var(--ds-text-strong)] [font-size:2rem] [letter-spacing:-0.04em]"
+            >
               Zugriff gezielt für eine Instanz vergeben
             </h2>
           </div>
         </div>
-        <div className="ds-steps">
+        <div className="ds-steps [display:grid] [gap:14px]">
           {[
             {
               title: 'Bedarf und Instanz klären',
@@ -117,20 +143,32 @@ const RechteUndZugang = () => {
               copy: 'Die Person meldet sich mit Microsoft SSO an und öffnet die Zielinstanz. Prüfen Sie, ob Admin-Dashboard und Bearbeitungsaktionen verfügbar sind.',
             },
           ].map((step, index) => (
-            <article key={step.title} className="ds-step">
-              <span className="ds-step-number">{String(index + 1).padStart(2, '0')}</span>
+            <article
+              key={step.title}
+              className="ds-step [display:grid] [grid-template-columns:64px_1fr] [align-items:start] [gap:var(--ds-space-4)] [padding:20px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:color-mix(in_srgb,_var(--ds-bg-elevated-strong)_80%,_transparent)] max-[760px]:[grid-template-columns:1fr]"
+            >
+              <span className="ds-step-number [display:grid] [width:48px] [height:48px] [place-items:center] [border:1px_solid_var(--ds-border-strong)] [border-radius:50%] [background:var(--ds-accent-soft)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-accent-strong)] [font-size:1rem] [font-weight:900]">
+                {String(index + 1).padStart(2, '0')}
+              </span>
               <div>
-                <h3 className="ds-step-title">{step.title}</h3>
-                <p className="ds-step-copy">{step.copy}</p>
+                <h3 className="ds-step-title [margin:0_0_8px] [color:var(--ds-text-strong)] [font-size:1rem] [font-weight:850]">
+                  {step.title}
+                </h3>
+                <p className="ds-step-copy [margin:0] [color:var(--ds-text-default)] [font-size:0.875rem] [line-height:1.55]">
+                  {step.copy}
+                </p>
               </div>
             </article>
           ))}
         </div>
-        <div className="ds-note">
-          <span className="ds-note-icon" aria-hidden="true">
+        <div className="ds-note [display:grid] [grid-template-columns:48px_1fr] [align-items:center] [gap:var(--ds-space-4)] [margin-top:18px] [padding:18px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(_135deg,_var(--ds-accent-soft),_color-mix(in_srgb,_var(--ds-bg-elevated)_86%,_transparent)_)]">
+          <span
+            className="ds-note-icon [display:grid] [width:40px] [height:40px] [place-items:center] [border:1px_solid_var(--ds-border-strong)] [border-radius:50%] [background:var(--ds-accent-soft)] [color:var(--ds-accent-strong)] [font-weight:900]"
+            aria-hidden="true"
+          >
             i
           </span>
-          <p className="ds-step-copy">
+          <p className="ds-step-copy [margin:0] [color:var(--ds-text-default)] [font-size:0.875rem] [line-height:1.55]">
             Entfernen Sie nicht mehr benötigte Instanz-Admins über „Entfernen“. Die Anwendung fragt
             vor dem Entfernen nochmals nach einer Bestätigung.
           </p>
@@ -138,27 +176,37 @@ const RechteUndZugang = () => {
       </section>
 
       <section className="grid gap-5 md:grid-cols-2" aria-label="Anmeldung und Fehlerhilfe">
-        <article className="ds-card ds-help-card">
-          <div className="ds-help-card-header">
-            <div className="ds-help-card-icon" aria-hidden="true">
-              <FiLock className="ds-icon-sm" />
+        <article className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-help-card [display:flex] [min-height:278px] [flex-direction:column] [padding:24px] [border-radius:var(--ds-radius-xl)] [transition:transform_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out)] hover:[border-color:var(--ds-border-strong)] hover:[box-shadow:var(--ds-shadow-soft),_var(--ds-shadow-glow)] hover:[transform:translateY(-2px)]">
+          <div className="ds-help-card-header [display:flex] [align-items:center] [justify-content:space-between] [gap:var(--ds-space-3)] [margin-bottom:24px]">
+            <div
+              className="ds-help-card-icon [display:grid] [width:44px] [height:44px] [place-items:center] [border:1px_solid_var(--ds-border-default)] [border-radius:15px] [background:var(--ds-accent-soft)] [color:var(--ds-accent-strong)]"
+              aria-hidden="true"
+            >
+              <FiLock className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
             </div>
           </div>
-          <h2 className="ds-help-card-title">Sicher anmelden</h2>
-          <p className="ds-help-card-copy">
+          <h2 className="ds-help-card-title [margin:0] [color:var(--ds-text-strong)] [font-size:1.125rem] [font-weight:850] [letter-spacing:-0.02em]">
+            Sicher anmelden
+          </h2>
+          <p className="ds-help-card-copy [margin:14px_0_0] [color:var(--ds-text-default)] [font-size:0.9rem] [line-height:1.65]">
             Nutzen Sie Ihr persönliches Microsoft-Konto. Teilen Sie keine Sitzung, kein Passwort und
             keinen Zugangstoken. Wird das Anmelde-Popup blockiert, erlauben Sie Popups für diese
             Website und versuchen Sie es erneut.
           </p>
         </article>
-        <article className="ds-card ds-help-card">
-          <div className="ds-help-card-header">
-            <div className="ds-help-card-icon" aria-hidden="true">
-              <FiShield className="ds-icon-sm" />
+        <article className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-help-card [display:flex] [min-height:278px] [flex-direction:column] [padding:24px] [border-radius:var(--ds-radius-xl)] [transition:transform_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out)] hover:[border-color:var(--ds-border-strong)] hover:[box-shadow:var(--ds-shadow-soft),_var(--ds-shadow-glow)] hover:[transform:translateY(-2px)]">
+          <div className="ds-help-card-header [display:flex] [align-items:center] [justify-content:space-between] [gap:var(--ds-space-3)] [margin-bottom:24px]">
+            <div
+              className="ds-help-card-icon [display:grid] [width:44px] [height:44px] [place-items:center] [border:1px_solid_var(--ds-border-default)] [border-radius:15px] [background:var(--ds-accent-soft)] [color:var(--ds-accent-strong)]"
+              aria-hidden="true"
+            >
+              <FiShield className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
             </div>
           </div>
-          <h2 className="ds-help-card-title">Zugriffsfehler eingrenzen</h2>
-          <p className="ds-help-card-copy">
+          <h2 className="ds-help-card-title [margin:0] [color:var(--ds-text-strong)] [font-size:1.125rem] [font-weight:850] [letter-spacing:-0.02em]">
+            Zugriffsfehler eingrenzen
+          </h2>
+          <p className="ds-help-card-copy [margin:14px_0_0] [color:var(--ds-text-default)] [font-size:0.9rem] [line-height:1.65]">
             Nennen Sie dem Support Ihre geschäftliche Benutzerkennung, die betroffene Instanz, den
             aufgerufenen Link und den exakten Meldungstext. Senden Sie niemals Kennwörter oder
             Tokens mit.
@@ -166,23 +214,37 @@ const RechteUndZugang = () => {
         </article>
       </section>
 
-      <section className="ds-card ds-help-support-panel" aria-labelledby="prinzip-heading">
+      <section
+        className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-help-support-panel [display:flex] [align-items:center] [justify-content:space-between] [gap:var(--ds-space-6)] [padding:32px] [border-radius:var(--ds-radius-xl)] max-[1100px]:[align-items:flex-start] max-[1100px]:[flex-direction:column]"
+        aria-labelledby="prinzip-heading"
+      >
         <div>
-          <p className="ds-panel-label">Minimalprinzip</p>
-          <h2 id="prinzip-heading" className="ds-section-title">
+          <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+            Minimalprinzip
+          </p>
+          <h2
+            id="prinzip-heading"
+            className="ds-section-title [margin:0] [color:var(--ds-text-strong)] [font-size:2rem] [letter-spacing:-0.04em]"
+          >
             So viel Zugriff wie nötig, so wenig wie möglich
           </h2>
-          <p className="ds-section-copy">
+          <p className="ds-section-copy [max-width:620px] [margin:10px_0_0] [color:var(--ds-text-muted)] [line-height:1.65]">
             Lesender Zugriff reicht, wenn eine Person Roadmaps nur ansehen muss. Admin-Rechte sind
             für aktive Pflegeaufgaben gedacht und sollten bei Rollenwechsel oder Aufgabenende
             zeitnah entfernt werden.
           </p>
         </div>
-        <div className="ds-actions ds-help-support-actions">
-          <Link className="ds-button ds-button-primary" href="/admin">
+        <div className="ds-actions [display:flex] [flex-wrap:wrap] [align-items:center] [gap:var(--ds-space-4)] [margin-top:30px] max-[760px]:[&_.ds-button]:[width:100%] ds-help-support-actions [flex:0_0_auto] [margin-top:0]">
+          <Link
+            className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-primary [background:linear-gradient(_135deg,_var(--ds-accent),_var(--ds-accent-2)_58%,_var(--ds-accent-strong)_)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-inverse)]"
+            href="/admin"
+          >
             Admin-Liste prüfen
           </Link>
-          <Link className="ds-button ds-button-secondary" href="/help/faq">
+          <Link
+            className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)]"
+            href="/help/faq"
+          >
             Zugriffs-FAQ
           </Link>
         </div>
