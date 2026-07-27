@@ -143,7 +143,7 @@ export const exportRoadmapToExcel = async ({
   year,
   instanceSlug = '',
 }: ExportRoadmapToExcelOptions): Promise<void> => {
-  const { Workbook } = await import('exceljs');
+  const { Workbook } = await import('@mui/x-internal-exceljs-fork');
   const workbook = new Workbook();
   workbook.creator = 'JSDoIT Roadmap Center';
   workbook.created = new Date();
