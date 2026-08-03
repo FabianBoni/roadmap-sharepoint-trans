@@ -97,7 +97,7 @@ const LandingPage = () => {
 
               <h1 className="ds-hero-title [max-width:760px] [margin:28px_0_22px] [color:var(--ds-text-strong)] [font-size:clamp(2.625rem,_5.8vw,_4.75rem)] [font-weight:860] [letter-spacing:-0.06em] [line-height:0.98] [text-wrap:balance]">
                 Roadmaps, Prioritäten und Instanzen in einer{' '}
-                <span className="ds-accent-text bg-clip-text text-transparent [-webkit-text-fill-color:transparent] [background:linear-gradient(_90deg,_var(--ds-text-strong),_var(--ds-accent-strong),_var(--ds-accent-2)_)]">
+                <span className="ds-accent-text bg-clip-text text-transparent [-webkit-text-fill-color:transparent] [background-image:linear-gradient(_90deg,_var(--ds-text-strong),_var(--ds-accent-strong),_var(--ds-accent-2)_)]">
                   klaren Einstiegsebene
                 </span>
               </h1>
