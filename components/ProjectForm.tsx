@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Project, Category, InstanceBadgeOption, ProjectLink, TeamMember } from '../types';
 const uuidv4 = (): string => crypto.randomUUID();
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { FaTrash, FaPlus } from 'react-icons/fa';
-import { clientDataService } from '@/utils/clientDataService';
-import JSDoITLoader from './JSDoITLoader';
+import SharePointUserPicker, { type SharePointUserOption } from './SharePointUserPicker';
 import { normalizeCategoryId } from '@/utils/categoryUtils';
+import { getCurrentBrowserInstanceSlug } from '@/utils/auth';
 import RichTextEditor from './RichTextEditor';
 import ToggleSwitch from './ToggleSwitch';
 import {
@@ -19,6 +19,7 @@ interface ProjectFormProps {
   initialProject?: Project;
   categories: Category[];
   instanceBadgeOptions?: InstanceBadgeOption[];
+  instanceSlug?: string | null;
   onSubmit: (project: Project) => void;
   onCancel: () => void;
 }
@@ -93,6 +94,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   initialProject,
   categories,
   instanceBadgeOptions = [],
+  instanceSlug = null,
   onSubmit,
   onCancel,
 }) => {
@@ -138,10 +140,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     initialProject?.naechster_meilenstein || ''
   );
 
-  // Team member search functionality
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<TeamMember[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const pickerInstanceSlug = instanceSlug?.trim() || getCurrentBrowserInstanceSlug();
 
   // Teammitglieder
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(() => {
@@ -202,47 +201,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   // Validierung
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Team member search functionality
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const debouncedSearch = useCallback((query: string) => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    const trimmed = query.trim();
-    if (!trimmed) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const results = await clientDataService.searchUsers(trimmed);
-        setSearchResults(results);
-      } catch (error) {
-        console.error('Error searching for users:', error);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Auto-search when query changes
-  useEffect(() => {
-    debouncedSearch(searchQuery);
-  }, [searchQuery, debouncedSearch]);
 
   // Sync when initialProject changes (edit mode populates after load)
   useEffect(() => {
@@ -305,28 +263,29 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   }, [initialProject, categories]);
 
   // Function to add a team member to the project
-  const handleAddTeamMember = (member: TeamMember) => {
+  const handleAddTeamMember = (user: SharePointUserOption) => {
+    const name = user.displayName || user.label;
     // Check if member is already added
-    const isAlreadyAdded = teamMembers.some(
-      (m) => m.name.toLowerCase() === member.name.toLowerCase()
-    );
+    const isAlreadyAdded = teamMembers.some((member) => {
+      if (member.userIdentifier && user.value) {
+        return member.userIdentifier.toLowerCase() === user.value.toLowerCase();
+      }
+      return member.name.toLowerCase() === name.toLowerCase();
+    });
 
     if (isAlreadyAdded) return;
 
     // Create a new team member object
-    const newMember = {
+    const newMember: TeamMember = {
       id: `temp-${uuidv4()}`,
-      name: member.name,
+      name,
       role: 'Teammitglied', // Default role
+      userIdentifier: user.value,
       projectId: initialProject?.id || '',
     };
 
     // Update the team members state
     setTeamMembers((prevMembers) => [...prevMembers, newMember]);
-
-    // Clear search
-    setSearchQuery('');
-    setSearchResults([]);
   };
 
   // Function to remove a team member from the project
@@ -918,44 +877,12 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
             <div className="mt-2">
               <h3 className="text-lg font-medium mb-2">Team-Mitglieder (optional)</h3>
               <div className="rounded-3xl border border-slate-800/70 bg-slate-950/70 p-5">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Nach Benutzern suchen..."
-                    className="w-full rounded-2xl border border-slate-800/70 bg-slate-950 px-4 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-400/30"
-                  />
-                  {isSearching && (
-                    <div className="absolute right-2 top-1.5">
-                      <JSDoITLoader
-                        sizeRem={0.7}
-                        message=""
-                        showGlow={false}
-                        className="flex-row gap-1 px-0 py-0 text-sky-200"
-                      />
-                    </div>
-                  )}
-
-                  {searchResults.length > 0 && (
-                    <div className="absolute z-10 mt-2 max-h-60 w-full overflow-y-auto rounded-2xl border border-slate-800/70 bg-slate-950/95 shadow-xl shadow-slate-950/40 backdrop-blur">
-                      <ul>
-                        {searchResults.map((user) => (
-                          <li
-                            key={user.id || user.name}
-                            className="flex cursor-pointer items-center justify-between border-b border-slate-800/60 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-900/80 last:border-0"
-                            onClick={() => handleAddTeamMember(user)}
-                          >
-                            <span>{user.name}</span>
-                            <span className="text-xs font-semibold uppercase tracking-[0.3em] text-sky-300">
-                              Hinzufügen
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
+                <SharePointUserPicker
+                  instanceSlug={pickerInstanceSlug}
+                  placeholder="Nach Benutzern suchen …"
+                  onSelect={handleAddTeamMember}
+                  emptyMessage="Keine passenden SharePoint-Benutzer gefunden."
+                />
 
                 <div className="mt-5">
                   <h4 className="text-sm font-medium mb-2">Aktuelle Team-Mitglieder:</h4>
@@ -1236,44 +1163,12 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
           <div className="mt-6">
             <h3 className="text-lg font-medium mb-2">Team-Mitglieder</h3>
             <div className="rounded-3xl border border-slate-800/70 bg-slate-950/70 p-5">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Nach Benutzern suchen..."
-                  className="w-full rounded-2xl border border-slate-800/70 bg-slate-950 px-4 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-400/30"
-                />
-                {isSearching && (
-                  <div className="absolute right-2 top-1.5">
-                    <JSDoITLoader
-                      sizeRem={0.7}
-                      message=""
-                      showGlow={false}
-                      className="flex-row gap-1 px-0 py-0 text-sky-200"
-                    />
-                  </div>
-                )}
-
-                {searchResults.length > 0 && (
-                  <div className="absolute z-10 mt-2 max-h-60 w-full overflow-y-auto rounded-2xl border border-slate-800/70 bg-slate-950/95 shadow-xl shadow-slate-950/40 backdrop-blur">
-                    <ul>
-                      {searchResults.map((user) => (
-                        <li
-                          key={user.id || user.name}
-                          className="flex cursor-pointer items-center justify-between border-b border-slate-800/60 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-900/80 last:border-0"
-                          onClick={() => handleAddTeamMember(user)}
-                        >
-                          <span>{user.name}</span>
-                          <span className="text-xs font-semibold uppercase tracking-[0.3em] text-sky-300">
-                            Hinzufügen
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
+              <SharePointUserPicker
+                instanceSlug={pickerInstanceSlug}
+                placeholder="Nach Benutzern suchen …"
+                onSelect={handleAddTeamMember}
+                emptyMessage="Keine passenden SharePoint-Benutzer gefunden."
+              />
 
               <div className="mt-5">
                 <h4 className="text-sm font-medium mb-2">Aktuelle Team-Mitglieder:</h4>

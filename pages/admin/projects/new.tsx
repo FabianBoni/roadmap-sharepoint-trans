@@ -9,9 +9,12 @@ import ProjectForm from '@/components/ProjectForm';
 import withAdminAuth from '@/components/withAdminAuth';
 import { Category, InstanceBadgeOption, Project } from '@/types';
 import { buildInstanceAwareUrl } from '@/utils/auth';
+import { INSTANCE_QUERY_PARAM } from '@/utils/instanceConfig';
 
 const NewProjectPage: FC = () => {
   const router = useRouter();
+  const instanceQuery = router.query?.[INSTANCE_QUERY_PARAM];
+  const instanceSlug = Array.isArray(instanceQuery) ? instanceQuery[0] : instanceQuery || null;
   const [categories, setCategories] = useState<Category[]>([]);
   const [instanceBadgeOptions, setInstanceBadgeOptions] = useState<InstanceBadgeOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,6 +120,7 @@ const NewProjectPage: FC = () => {
           <ProjectForm
             categories={categories}
             instanceBadgeOptions={instanceBadgeOptions}
+            instanceSlug={instanceSlug}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
           />

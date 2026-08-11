@@ -22,6 +22,8 @@ type Attachment = {
 const EditProjectPage: FC = () => {
   const router = useRouter();
   const { id } = router.query;
+  const instanceQuery = router.query?.[INSTANCE_QUERY_PARAM];
+  const instanceSlug = Array.isArray(instanceQuery) ? instanceQuery[0] : instanceQuery || null;
 
   const [project, setProject] = useState<Project | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -483,6 +485,7 @@ const EditProjectPage: FC = () => {
               }}
               categories={categories}
               instanceBadgeOptions={instanceBadgeOptions}
+              instanceSlug={instanceSlug}
               onSubmit={handleSubmit}
               onCancel={handleCancel}
             />
