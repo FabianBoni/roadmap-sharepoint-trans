@@ -18,6 +18,7 @@ import { getInternalApiBaseUrl } from '@/utils/internalApiBaseUrl';
 import {
   buildSharePointPeoplePickerRequest,
   parseSharePointPeoplePickerResponse,
+  searchSharePointSiteUsers,
 } from '@/utils/sharePointPeoplePicker';
 
 type NodeRequireFn = typeof require;
@@ -4179,11 +4180,10 @@ class ClientDataService {
               ? Object.keys(data.d as Record<string, unknown>)
               : [],
         });
-        return [];
       }
 
       // Map user data to TeamMember format
-      return clientPeoplePickerData.map((item: any) => {
+      const peoplePickerUsers = (clientPeoplePickerData || []).map((item: any) => {
         // Extract display name - usually in format "Lastname, Firstname"
         let displayName = item.DisplayText || '';
 
@@ -4202,6 +4202,40 @@ class ClientDataService {
           imageUrl: null,
         };
       });
+      if (peoplePickerUsers.some((user) => user.name.trim())) {
+        return peoplePickerUsers;
+      }
+
+      // Some SharePoint web applications restrict the tenant-wide People Picker
+      // but still expose users already known to the current site collection.
+      const siteUsersEndpoint = `${webUrl}/_api/web/siteusers?$select=Id,Title,Email,LoginName,PrincipalType&$top=5000`;
+      const siteUsersResponse = await this.spFetch(siteUsersEndpoint, {
+        headers: { Accept: 'application/json;odata=nometadata' },
+        credentials: 'same-origin',
+      });
+      if (!siteUsersResponse.ok) return [];
+
+      const siteUsersText = await siteUsersResponse.text().catch(() => '');
+      let siteUsersPayload: unknown = siteUsersText;
+      if (siteUsersText) {
+        try {
+          siteUsersPayload = JSON.parse(siteUsersText.replace(/^\uFEFF/, '').trim());
+        } catch {
+          // Atom/XML responses are parsed by extractSharePointUsersArray.
+        }
+      }
+
+      return searchSharePointSiteUsers(
+        this.extractSharePointUsersArray(siteUsersPayload),
+        trimmedQuery
+      ).map((user) => ({
+        id: user.loginName || user.email || user.id || `user-${Date.now()}`,
+        name: user.displayName,
+        role: 'Teammitglied',
+        email: user.email,
+        userIdentifier: user.loginName || user.email,
+        imageUrl: null,
+      }));
     } catch (error) {
       console.error('Error searching users:', error);
       return [];
