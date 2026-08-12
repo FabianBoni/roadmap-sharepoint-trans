@@ -32,6 +32,19 @@ test('production PM2 service survives self-hosted runner process cleanup', () =>
   );
 });
 
+test('production deployment verifies the global SharePoint People Picker after restart', () => {
+  const workflow = read('.github/workflows/deploy.yml');
+  const smokeTest = read('scripts/smoke-test-sharepoint-people-picker.mjs');
+  assert.match(
+    workflow,
+    /- name: Verify local readiness[\s\S]*?- name: Verify SharePoint People Picker[\s\S]*?yarn smoke:people-picker/
+  );
+  assert.match(smokeTest, /sharePointDirectory: 'global'/);
+  assert.match(smokeTest, /roadmapInstance: instanceSlug/);
+  assert.match(smokeTest, /x-roadmap-internal-signature/);
+  assert.match(smokeTest, /People Picker smoke test returned no named users/);
+});
+
 test('production deployment maps every SSO GitHub Environment secret explicitly', () => {
   const workflow = read('.github/workflows/deploy.yml');
   for (const secret of [
