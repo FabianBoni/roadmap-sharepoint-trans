@@ -92,23 +92,29 @@ test('SharePoint People Picker uses a global connection independent from the roa
   assert.equal(source.hosts.length, 0);
 });
 
-test('SharePoint People Picker global connection fails closed without a global URL', () => {
+test('SharePoint People Picker uses the active instance site as directory entry point', () => {
   const instance = {
     id: 1,
     slug: 'sanitaet',
     displayName: 'Sanitaet',
     hosts: [],
     sharePoint: {
-      siteUrlDev: 'https://wrong.example/sites/sanitaet',
-      siteUrlProd: 'https://wrong.example/sites/sanitaet',
-      strategy: 'kerberos',
+      siteUrlDev: 'https://sharepoint.example/sites/sanitaet-dev',
+      siteUrlProd: 'https://sharepoint.example/sites/sanitaet',
+      strategy: 'delegated',
+      allowSelfSigned: true,
+      trustedCaPath: '/instance/ca.pem',
     },
   } satisfies RoadmapInstanceConfig;
 
-  assert.throws(
-    () => buildGlobalSharePointPeoplePickerInstance(instance, {}),
-    /Global SharePoint People Picker URL is missing/
-  );
+  const source = buildGlobalSharePointPeoplePickerInstance(instance, {
+    NODE_ENV: 'production',
+  });
+
+  assert.equal(source.sharePoint.siteUrlProd, 'https://sharepoint.example/sites/sanitaet');
+  assert.equal(source.sharePoint.strategy, 'delegated');
+  assert.equal(source.sharePoint.allowSelfSigned, true);
+  assert.equal(source.sharePoint.trustedCaPath, '/instance/ca.pem');
   assert.equal(
     isSharePointPeoplePickerPath(
       '/_api/SP.UI.ApplicationPages.ClientPeoplePickerWebServiceInterface.clientPeoplePickerSearchUser'
@@ -123,4 +129,23 @@ test('SharePoint People Picker global connection fails closed without a global U
     '/api/sharepoint/_api/SP.UI.ApplicationPages.ClientPeoplePickerWebServiceInterface.clientPeoplePickerSearchUser'
   );
   assert.equal(proxyUrl.searchParams.get('sharePointDirectory'), 'global');
+});
+
+test('SharePoint People Picker fails closed when neither global nor instance URL exists', () => {
+  const instance = {
+    id: 1,
+    slug: 'empty',
+    displayName: 'Empty',
+    hosts: [],
+    sharePoint: {
+      siteUrlDev: '',
+      siteUrlProd: '',
+      strategy: 'kerberos',
+    },
+  } satisfies RoadmapInstanceConfig;
+
+  assert.throws(
+    () => buildGlobalSharePointPeoplePickerInstance(instance, {}),
+    /SharePoint People Picker URL is missing/
+  );
 });

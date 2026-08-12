@@ -23,9 +23,14 @@ export const isSharePointPeoplePickerPath = (path: string): boolean =>
 const isProductionEnvironment = (value: string): boolean =>
   ['production', 'prod', 'live'].includes(value.trim().toLowerCase());
 
-const resolveGlobalPeoplePickerSiteUrl = (environment: PeoplePickerEnvironment): string => {
+const resolveGlobalPeoplePickerSiteUrl = (
+  currentInstance: RoadmapInstanceConfig,
+  environment: PeoplePickerEnvironment
+): { siteUrl: string; usesInstanceConnection: boolean } => {
   const explicit = String(environment.SP_PEOPLE_PICKER_SITE_URL || '').trim();
-  if (explicit) return explicit.replace(/\/+$/, '');
+  if (explicit) {
+    return { siteUrl: explicit.replace(/\/+$/, ''), usesInstanceConnection: false };
+  }
 
   const deploymentEnv = String(
     environment.NEXT_PUBLIC_DEPLOYMENT_ENV || environment.NODE_ENV || 'development'
@@ -35,30 +40,55 @@ const resolveGlobalPeoplePickerSiteUrl = (environment: PeoplePickerEnvironment):
       environment.NEXT_PUBLIC_SHAREPOINT_SITE_URL_DEV
     : environment.NEXT_PUBLIC_SHAREPOINT_SITE_URL_DEV ||
       environment.NEXT_PUBLIC_SHAREPOINT_SITE_URL_PROD;
-  const siteUrl = String(configured || '').trim();
+  const configuredSiteUrl = String(configured || '').trim();
+  if (configuredSiteUrl) {
+    return {
+      siteUrl: configuredSiteUrl.replace(/\/+$/, ''),
+      usesInstanceConnection: false,
+    };
+  }
+
+  const instanceSiteUrl = isProductionEnvironment(deploymentEnv)
+    ? currentInstance.sharePoint.siteUrlProd || currentInstance.sharePoint.siteUrlDev
+    : currentInstance.sharePoint.siteUrlDev || currentInstance.sharePoint.siteUrlProd;
+  const siteUrl = String(instanceSiteUrl || '').trim();
   if (!siteUrl) {
     throw new Error(
-      'Global SharePoint People Picker URL is missing. Set SP_PEOPLE_PICKER_SITE_URL.'
+      'SharePoint People Picker URL is missing. Configure the instance site or SP_PEOPLE_PICKER_SITE_URL.'
     );
   }
-  return siteUrl.replace(/\/+$/, '');
+  return { siteUrl: siteUrl.replace(/\/+$/, ''), usesInstanceConnection: true };
 };
 
 /**
- * Build a complete, site-independent SharePoint connection for directory search.
- * No value is inherited from the active roadmap instance except inert identity fields.
+ * Build a SharePoint connection for tenant-wide directory search. A dedicated picker site
+ * takes precedence; otherwise the active instance site is only used as the API entry point.
  */
 export const buildGlobalSharePointPeoplePickerInstance = (
   currentInstance: RoadmapInstanceConfig,
   environment: PeoplePickerEnvironment = process.env
 ): RoadmapInstanceConfig => {
-  const siteUrl = resolveGlobalPeoplePickerSiteUrl(environment);
+  const { siteUrl, usesInstanceConnection } = resolveGlobalPeoplePickerSiteUrl(
+    currentInstance,
+    environment
+  );
   const deploymentEnv = String(
     environment.NEXT_PUBLIC_DEPLOYMENT_ENV || environment.NODE_ENV || 'development'
   );
   const trustedCaPath = String(
-    environment.SP_PEOPLE_PICKER_TRUSTED_CA_PATH || environment.SP_TRUSTED_CA_PATH || ''
+    environment.SP_PEOPLE_PICKER_TRUSTED_CA_PATH ||
+      environment.SP_TRUSTED_CA_PATH ||
+      (usesInstanceConnection ? currentInstance.sharePoint.trustedCaPath : '') ||
+      ''
   ).trim();
+  const allowSelfSigned =
+    environment.SP_PEOPLE_PICKER_ALLOW_SELF_SIGNED !== undefined
+      ? environment.SP_PEOPLE_PICKER_ALLOW_SELF_SIGNED === 'true'
+      : environment.SP_ALLOW_SELF_SIGNED !== undefined
+        ? environment.SP_ALLOW_SELF_SIGNED === 'true'
+        : usesInstanceConnection
+          ? Boolean(currentInstance.sharePoint.allowSelfSigned)
+          : false;
 
   return {
     id: currentInstance.id,
@@ -70,12 +100,10 @@ export const buildGlobalSharePointPeoplePickerInstance = (
       siteUrlDev: siteUrl,
       siteUrlProd: siteUrl,
       strategy: normalizeSharePointStrategy(
-        environment.SP_PEOPLE_PICKER_STRATEGY,
-        environment.SP_STRATEGY
+        environment.SP_PEOPLE_PICKER_STRATEGY || environment.SP_STRATEGY,
+        usesInstanceConnection ? currentInstance.sharePoint.strategy : undefined
       ),
-      allowSelfSigned:
-        environment.SP_PEOPLE_PICKER_ALLOW_SELF_SIGNED === 'true' ||
-        environment.SP_ALLOW_SELF_SIGNED === 'true',
+      allowSelfSigned,
       trustedCaPath: trustedCaPath || null,
     },
   };
