@@ -18,8 +18,6 @@ import { getInternalApiBaseUrl } from '@/utils/internalApiBaseUrl';
 import {
   buildSharePointPeoplePickerRequest,
   parseSharePointPeoplePickerResponse,
-  SHAREPOINT_PEOPLE_PICKER_GLOBAL_SCOPE,
-  SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM,
 } from '@/utils/sharePointPeoplePicker';
 
 type NodeRequireFn = typeof require;
@@ -4144,12 +4142,7 @@ class ClientDataService {
 
       const webUrl = this.getWebUrl();
 
-      // Use the global SharePoint directory context. The active roadmap site is
-      // only the authorization context and must not constrain user discovery.
-      const scope = new URLSearchParams({
-        [SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM]: SHAREPOINT_PEOPLE_PICKER_GLOBAL_SCOPE,
-      });
-      const endpoint = `${webUrl}/_api/SP.UI.ApplicationPages.ClientPeoplePickerWebServiceInterface.clientPeoplePickerSearchUser?${scope}`;
+      const endpoint = `${webUrl}/_api/SP.UI.ApplicationPages.ClientPeoplePickerWebServiceInterface.clientPeoplePickerSearchUser`;
 
       const searchRequest = buildSharePointPeoplePickerRequest(trimmedQuery);
 
@@ -4206,6 +4199,7 @@ class ClientDataService {
       return peoplePickerUsers.filter((user) => user.name.trim());
     } catch (error) {
       console.error('Error searching users:', error);
+      if (typeof window === 'undefined') throw error;
       return [];
     }
   }

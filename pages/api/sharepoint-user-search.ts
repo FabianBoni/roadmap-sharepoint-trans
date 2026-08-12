@@ -3,6 +3,7 @@ import { requireUserSession } from '@/utils/apiAuth';
 import { clientDataService } from '@/utils/clientDataService';
 import { getInstanceConfigFromRequest } from '@/utils/instanceConfig';
 import { isAdminSessionAllowedForInstance } from '@/utils/instanceAccessServer';
+import { getSharePointPeoplePickerSourceInstance } from '@/utils/sharePointPeoplePickerSource';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 
 type SharePointUserOption = {
@@ -101,7 +102,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const users = await clientDataService.withInstance(instance.slug, () =>
+    const sourceInstance = await getSharePointPeoplePickerSourceInstance(instance);
+    res.setHeader('X-SharePoint-People-Picker-Instance', sourceInstance.slug);
+    const users = await clientDataService.withInstance(sourceInstance.slug, () =>
       clientDataService.searchUsers(query)
     );
 
@@ -115,8 +118,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ).values()
       ).slice(0, 20),
     });
-  } catch {
-    console.error('[sharepoint-user-search] failed to search users');
+  } catch (error) {
+    console.error('[sharepoint-user-search] failed to search users', {
+      instance: instance.slug,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return res.status(500).json({ error: 'Failed to search users' });
   }
 }

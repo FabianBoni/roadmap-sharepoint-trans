@@ -1,8 +1,5 @@
 type PeoplePickerRecord = Record<string, unknown>;
 
-export const SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM = 'sharePointDirectory';
-export const SHAREPOINT_PEOPLE_PICKER_GLOBAL_SCOPE = 'global';
-
 export type SharePointPeoplePickerRequest = {
   queryParams: {
     AllowEmailAddresses: boolean;

@@ -4,7 +4,7 @@ import {
   buildSharePointPeoplePickerRequest,
   parseSharePointPeoplePickerResponse,
 } from '../../utils/sharePointPeoplePicker';
-import { resolveSharePointPeoplePickerSiteUrl } from '../../utils/sharepointEnv';
+import { resolveSharePointPeoplePickerSourceSlug } from '../../utils/sharePointPeoplePickerSource';
 
 const entity = {
   Key: 'i:0#.w|domain\\fabian.boni',
@@ -57,18 +57,18 @@ test('SharePoint People Picker treats an empty successful response as no matches
   assert.equal(parseSharePointPeoplePickerResponse({}), null);
 });
 
-test('SharePoint People Picker uses a global site context instead of the roadmap site', () => {
+test('SharePoint People Picker uses a dedicated instance instead of the roadmap instance', () => {
   assert.equal(
-    resolveSharePointPeoplePickerSiteUrl(null, {
-      SP_PEOPLE_PICKER_SITE_URL: 'https://sharepoint.example/sites/directory/',
+    resolveSharePointPeoplePickerSourceSlug('sanitaet', {
+      SP_PEOPLE_PICKER_INSTANCE_SLUG: 'Directory-Source',
     }),
-    'https://sharepoint.example/sites/directory'
+    'directory-source'
   );
   assert.equal(
-    resolveSharePointPeoplePickerSiteUrl({ deploymentEnv: 'production' } as never, {
-      NEXT_PUBLIC_SHAREPOINT_SITE_URL_DEV: 'https://sharepoint.example/sites/dev',
-      NEXT_PUBLIC_SHAREPOINT_SITE_URL_PROD: 'https://sharepoint.example/sites/global',
+    resolveSharePointPeoplePickerSourceSlug('sanitaet', {
+      DEFAULT_ROADMAP_INSTANCE: 'bdm-projekte',
     }),
-    'https://sharepoint.example/sites/global'
+    'bdm-projekte'
   );
+  assert.equal(resolveSharePointPeoplePickerSourceSlug('sanitaet', {}), 'sanitaet');
 });
