@@ -10,6 +10,7 @@ import SiteHeader from '@/components/SiteHeader';
 import Head from 'next/head';
 import { prefixBasePath } from '@/utils/nextBasePath';
 import SupportChatLauncher from '@/components/SupportChatLauncher';
+import AiEndpointHealthBanner from '@/components/AiEndpointHealthBanner';
 
 function RoadmapApp({ Component, pageProps }: AppProps): JSX.Element {
   const router = useRouter();
@@ -41,6 +42,7 @@ function RoadmapApp({ Component, pageProps }: AppProps): JSX.Element {
   if (maintenanceModeEnabled) {
     return (
       <>
+        <AiEndpointHealthBanner />
         <Head>
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <link rel="stylesheet" href={prefixBasePath('/maintenance.css')} />
@@ -105,6 +107,7 @@ function RoadmapApp({ Component, pageProps }: AppProps): JSX.Element {
 
   return (
     <>
+      <AiEndpointHealthBanner />
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
