@@ -3,8 +3,8 @@ import test from 'node:test';
 import {
   buildSharePointPeoplePickerRequest,
   parseSharePointPeoplePickerResponse,
-  searchSharePointSiteUsers,
 } from '../../utils/sharePointPeoplePicker';
+import { resolveSharePointPeoplePickerSiteUrl } from '../../utils/sharepointEnv';
 
 const entity = {
   Key: 'i:0#.w|domain\\fabian.boni',
@@ -18,7 +18,7 @@ test('SharePoint People Picker request omits nullable optional CSOM fields', () 
     queryParams: {
       AllowEmailAddresses: true,
       AllowMultipleEntities: false,
-      AllUrlZones: false,
+      AllUrlZones: true,
       MaximumEntitySuggestions: 20,
       PrincipalSource: 15,
       PrincipalType: 1,
@@ -57,47 +57,18 @@ test('SharePoint People Picker treats an empty successful response as no matches
   assert.equal(parseSharePointPeoplePickerResponse({}), null);
 });
 
-test('SharePoint People Picker falls back to matching users known to the current site', () => {
-  assert.deepEqual(
-    searchSharePointSiteUsers(
-      [
-        {
-          Id: 17,
-          Title: 'Boni, Fabian',
-          Email: 'fabian.boni@jsd.bs.ch',
-          LoginName: 'i:0#.w|domain\\fabian.boni',
-          PrincipalType: 1,
-        },
-        {
-          Id: 23,
-          Title: 'Roadmap Owners',
-          LoginName: 'Roadmap Owners',
-          PrincipalType: 8,
-        },
-      ],
-      'fabian'
-    ),
-    [
-      {
-        id: '17',
-        displayName: 'Fabian Boni',
-        email: 'fabian.boni@jsd.bs.ch',
-        loginName: 'i:0#.w|domain\\fabian.boni',
-      },
-    ]
+test('SharePoint People Picker uses a global site context instead of the roadmap site', () => {
+  assert.equal(
+    resolveSharePointPeoplePickerSiteUrl(null, {
+      SP_PEOPLE_PICKER_SITE_URL: 'https://sharepoint.example/sites/directory/',
+    }),
+    'https://sharepoint.example/sites/directory'
   );
-});
-
-test('SharePoint site-user fallback matches email and rejects short queries', () => {
-  const users = [
-    {
-      Id: 17,
-      Title: 'Fabian Boni',
-      Email: 'fabian.boni@jsd.bs.ch',
-      LoginName: 'i:0#.w|domain\\fabian.boni',
-    },
-  ];
-  assert.equal(searchSharePointSiteUsers(users, 'fa').length, 1);
-  assert.equal(searchSharePointSiteUsers(users, 'jsd.bs.ch').length, 1);
-  assert.deepEqual(searchSharePointSiteUsers(users, 'f'), []);
+  assert.equal(
+    resolveSharePointPeoplePickerSiteUrl({ deploymentEnv: 'production' } as never, {
+      NEXT_PUBLIC_SHAREPOINT_SITE_URL_DEV: 'https://sharepoint.example/sites/dev',
+      NEXT_PUBLIC_SHAREPOINT_SITE_URL_PROD: 'https://sharepoint.example/sites/global',
+    }),
+    'https://sharepoint.example/sites/global'
+  );
 });

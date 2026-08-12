@@ -18,7 +18,8 @@ import { getInternalApiBaseUrl } from '@/utils/internalApiBaseUrl';
 import {
   buildSharePointPeoplePickerRequest,
   parseSharePointPeoplePickerResponse,
-  searchSharePointSiteUsers,
+  SHAREPOINT_PEOPLE_PICKER_GLOBAL_SCOPE,
+  SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM,
 } from '@/utils/sharePointPeoplePicker';
 
 type NodeRequireFn = typeof require;
@@ -4143,11 +4144,12 @@ class ClientDataService {
 
       const webUrl = this.getWebUrl();
 
-      // Using SharePoint's People Picker API to search users across the entire environment
-      const endpoint = `${webUrl}/_api/SP.UI.ApplicationPages.ClientPeoplePickerWebServiceInterface.clientPeoplePickerSearchUser`;
-
-      // Get request digest for this POST operation
-      const requestDigest = await this.getRequestDigest();
+      // Use the global SharePoint directory context. The active roadmap site is
+      // only the authorization context and must not constrain user discovery.
+      const scope = new URLSearchParams({
+        [SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM]: SHAREPOINT_PEOPLE_PICKER_GLOBAL_SCOPE,
+      });
+      const endpoint = `${webUrl}/_api/SP.UI.ApplicationPages.ClientPeoplePickerWebServiceInterface.clientPeoplePickerSearchUser?${scope}`;
 
       const searchRequest = buildSharePointPeoplePickerRequest(trimmedQuery);
 
@@ -4156,7 +4158,6 @@ class ClientDataService {
         headers: {
           Accept: 'application/json;odata=verbose',
           'Content-Type': 'application/json;odata=verbose',
-          'X-RequestDigest': requestDigest,
         },
         body: JSON.stringify(searchRequest),
         credentials: 'same-origin',
@@ -4202,40 +4203,7 @@ class ClientDataService {
           imageUrl: null,
         };
       });
-      if (peoplePickerUsers.some((user) => user.name.trim())) {
-        return peoplePickerUsers;
-      }
-
-      // Some SharePoint web applications restrict the tenant-wide People Picker
-      // but still expose users already known to the current site collection.
-      const siteUsersEndpoint = `${webUrl}/_api/web/siteusers?$select=Id,Title,Email,LoginName,PrincipalType&$top=5000`;
-      const siteUsersResponse = await this.spFetch(siteUsersEndpoint, {
-        headers: { Accept: 'application/json;odata=nometadata' },
-        credentials: 'same-origin',
-      });
-      if (!siteUsersResponse.ok) return [];
-
-      const siteUsersText = await siteUsersResponse.text().catch(() => '');
-      let siteUsersPayload: unknown = siteUsersText;
-      if (siteUsersText) {
-        try {
-          siteUsersPayload = JSON.parse(siteUsersText.replace(/^\uFEFF/, '').trim());
-        } catch {
-          // Atom/XML responses are parsed by extractSharePointUsersArray.
-        }
-      }
-
-      return searchSharePointSiteUsers(
-        this.extractSharePointUsersArray(siteUsersPayload),
-        trimmedQuery
-      ).map((user) => ({
-        id: user.loginName || user.email || user.id || `user-${Date.now()}`,
-        name: user.displayName,
-        role: 'Teammitglied',
-        email: user.email,
-        userIdentifier: user.loginName || user.email,
-        imageUrl: null,
-      }));
+      return peoplePickerUsers.filter((user) => user.name.trim());
     } catch (error) {
       console.error('Error searching users:', error);
       return [];

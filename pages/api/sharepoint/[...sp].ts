@@ -1,6 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment, @typescript-eslint/no-require-imports */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { resolveSharePointSiteUrl } from '@/utils/sharepointEnv';
+import {
+  resolveSharePointPeoplePickerSiteUrl,
+  resolveSharePointSiteUrl,
+} from '@/utils/sharepointEnv';
+import {
+  SHAREPOINT_PEOPLE_PICKER_GLOBAL_SCOPE,
+  SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM,
+} from '@/utils/sharePointPeoplePicker';
 import { getSharePointAuthHeaders, SharePointAuthContext } from '@/utils/spAuth';
 import { normalizeSharePointStrategy } from '@/utils/sharePointStrategy';
 import { getPrimaryCredentials } from '@/utils/userCredentials';
@@ -502,9 +509,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   res.setHeader('X-Roadmap-Instance', instance.slug);
 
-  const site = resolveSharePointSiteUrl(instance);
   const segments = (req.query.sp as string[] | undefined) || [];
   const apiPath = '/' + segments.join('/');
+  const isPeoplePickerRequest =
+    /^\/_api\/SP\.UI\.ApplicationPages\.ClientPeoplePickerWebServiceInterface\.clientPeoplePickerSearchUser$/i.test(
+      apiPath
+    );
+  const requestedPeoplePickerScope = Array.isArray(req.query[SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM])
+    ? req.query[SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM][0]
+    : req.query[SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM];
+  const useGlobalPeoplePickerContext =
+    isPeoplePickerRequest && requestedPeoplePickerScope === SHAREPOINT_PEOPLE_PICKER_GLOBAL_SCOPE;
+  const site = useGlobalPeoplePickerContext
+    ? resolveSharePointPeoplePickerSiteUrl(instance)
+    : resolveSharePointSiteUrl(instance);
   const qIndex = req.url?.indexOf('?') ?? -1;
   // Preserve raw encoded query string; earlier decoding attempts may trigger 'Invalid argument' before request
   let query = '';
@@ -513,7 +531,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const filtered = rawQuery.split('&').filter((segment) => {
       if (!segment) return false;
       const key = segment.split('=')[0];
-      return key !== INSTANCE_QUERY_PARAM;
+      return (
+        key !== INSTANCE_QUERY_PARAM &&
+        key !== encodeURIComponent(SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM)
+      );
     });
     query = filtered.length ? `?${filtered.join('&')}` : '';
   }
