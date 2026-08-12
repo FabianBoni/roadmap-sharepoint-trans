@@ -15,6 +15,12 @@ import {
 import { isTrustedInternalApiRequest } from '@/utils/internalApiAuth';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
+import {
+  buildGlobalSharePointPeoplePickerInstance,
+  isSharePointPeoplePickerPath,
+  SHAREPOINT_PEOPLE_PICKER_GLOBAL_SCOPE,
+  SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM,
+} from '@/utils/sharePointPeoplePickerSource';
 
 export const config = {
   api: {
@@ -502,9 +508,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   res.setHeader('X-Roadmap-Instance', instance.slug);
 
-  const site = resolveSharePointSiteUrl(instance);
   const segments = (req.query.sp as string[] | undefined) || [];
   const apiPath = '/' + segments.join('/');
+  const requestedPeoplePickerScope = Array.isArray(req.query[SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM])
+    ? req.query[SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM][0]
+    : req.query[SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM];
+  const usesGlobalPeoplePickerConnection =
+    isSharePointPeoplePickerPath(apiPath) &&
+    requestedPeoplePickerScope === SHAREPOINT_PEOPLE_PICKER_GLOBAL_SCOPE;
+  let connectionInstance = instance;
+  try {
+    if (usesGlobalPeoplePickerConnection) {
+      connectionInstance = buildGlobalSharePointPeoplePickerInstance(instance);
+      res.setHeader('X-SharePoint-People-Picker-Context', 'global');
+    }
+  } catch (error) {
+    console.error('[sharepoint proxy] invalid global People Picker connection', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return res.status(503).json({ error: 'SharePoint People Picker is not configured' });
+  }
+  const site = resolveSharePointSiteUrl(connectionInstance);
   const qIndex = req.url?.indexOf('?') ?? -1;
   // Preserve raw encoded query string; earlier decoding attempts may trigger 'Invalid argument' before request
   let query = '';
@@ -513,7 +537,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const filtered = rawQuery.split('&').filter((segment) => {
       if (!segment) return false;
       const key = segment.split('=')[0];
-      return key !== INSTANCE_QUERY_PARAM;
+      return (
+        key !== INSTANCE_QUERY_PARAM &&
+        key !== encodeURIComponent(SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM)
+      );
     });
     query = filtered.length ? `?${filtered.join('&')}` : '';
   }
@@ -565,13 +592,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const strategy = normalizeSharePointStrategy(
-      instance?.sharePoint?.strategy,
+      connectionInstance.sharePoint.strategy,
       process.env.SP_STRATEGY
     );
     const useCurlKerberos = strategy === 'kerberos';
     const effectiveCredentials = getPrimaryCredentials();
     const caPath = (
-      instance?.sharePoint?.trustedCaPath ||
+      connectionInstance.sharePoint.trustedCaPath ||
       process.env.SP_TRUSTED_CA_PATH ||
       ''
     ).trim();
@@ -616,7 +643,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (process.env.SP_PROXY_DEBUG === 'true') {
         // eslint-disable-next-line no-console
         console.info('[sharepoint proxy] kerberos identity', {
-          instance: instance.slug,
+          instance: connectionInstance.slug,
           userNormalized: serviceUser !== serviceUserRaw,
           credentialMode: serviceUser ? 'env-service-user' : 'process-identity',
           passwordConfigured: Boolean(servicePass),
@@ -789,7 +816,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             if (ciAttempt.authFailure?.status === 401 && canUseNtlmFallback) {
               if (process.env.SP_PROXY_DEBUG === 'true') {
                 console.warn('[sharepoint proxy] contextinfo negotiate 401; trying NTLM fallback', {
-                  instance: instance.slug,
+                  instance: connectionInstance.slug,
                   targetUrl,
                 });
               }
@@ -878,7 +905,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (writeAttempt.authFailure?.status === 401 && canUseNtlmFallback) {
             if (process.env.SP_PROXY_DEBUG === 'true') {
               console.warn('[sharepoint proxy] write negotiate 401; trying NTLM fallback', {
-                instance: instance.slug,
+                instance: connectionInstance.slug,
                 targetUrl,
                 method,
               });
@@ -892,7 +919,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               res.setHeader('x-sp-curl-auth', 'ntlm-fallback');
               if (process.env.SP_PROXY_DEBUG === 'true') {
                 console.warn('[sharepoint proxy] write NTLM fallback succeeded', {
-                  instance: instance.slug,
+                  instance: connectionInstance.slug,
                   targetUrl,
                   method,
                 });
@@ -1163,7 +1190,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const canUseNtlmFallback =
         ntlmFallbackEnabled && serviceUser && servicePass && !allowCurlFallbackToFetch;
       const primaryAuthScheme: CurlAuthScheme =
-        canUseNtlmFallback && prefersNtlm(instance.slug, targetUrl) ? 'ntlm' : 'negotiate';
+        canUseNtlmFallback && prefersNtlm(connectionInstance.slug, targetUrl)
+          ? 'ntlm'
+          : 'negotiate';
 
       const attempt = await executeReadCurl(primaryAuthScheme);
       let effectiveOutput = attempt.output;
@@ -1173,21 +1202,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       let ntlmAttempted = primaryAuthScheme === 'ntlm';
       let ntlmFailureStatus: number | null = null;
       let ntlmFailureSnippet: string | null = null;
-      let kerberosFailureCount = getKerberosFailureCount(instance.slug, targetUrl);
+      let kerberosFailureCount = getKerberosFailureCount(connectionInstance.slug, targetUrl);
 
       if (primaryAuthScheme === 'negotiate') {
         if (currentAuthFailure?.status === 401) {
-          kerberosFailureCount = incrementKerberosFailureCount(instance.slug, targetUrl);
+          kerberosFailureCount = incrementKerberosFailureCount(connectionInstance.slug, targetUrl);
         } else {
-          resetKerberosFailureCount(instance.slug, targetUrl);
+          resetKerberosFailureCount(connectionInstance.slug, targetUrl);
           kerberosFailureCount = 0;
           if (!currentAuthFailure)
-            setPreferredCurlAuthScheme(instance.slug, targetUrl, 'negotiate');
+            setPreferredCurlAuthScheme(connectionInstance.slug, targetUrl, 'negotiate');
         }
       } else if (!currentAuthFailure) {
-        resetKerberosFailureCount(instance.slug, targetUrl);
+        resetKerberosFailureCount(connectionInstance.slug, targetUrl);
         kerberosFailureCount = 0;
-        setPreferredCurlAuthScheme(instance.slug, targetUrl, 'ntlm');
+        setPreferredCurlAuthScheme(connectionInstance.slug, targetUrl, 'ntlm');
         res.setHeader('x-sp-curl-auth', 'ntlm-preferred');
       }
 
@@ -1204,7 +1233,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ntlmAttempted = true;
           if (process.env.SP_PROXY_DEBUG === 'true') {
             console.warn('[sharepoint proxy] curl kerberos 401; trying NTLM fallback', {
-              instance: instance.slug,
+              instance: connectionInstance.slug,
               targetUrl,
               kerberosFailureCount,
               fallbackThreshold: ntlmFallbackThreshold,
@@ -1212,7 +1241,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         } else if (process.env.SP_PROXY_DEBUG === 'true') {
           console.warn('[sharepoint proxy] preferred NTLM failed; retrying negotiate', {
-            instance: instance.slug,
+            instance: connectionInstance.slug,
             targetUrl,
           });
         }
@@ -1228,21 +1257,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             if (secondaryAuthScheme === 'ntlm') {
               res.setHeader('x-sp-curl-auth', 'ntlm-fallback');
-              resetKerberosFailureCount(instance.slug, targetUrl);
+              resetKerberosFailureCount(connectionInstance.slug, targetUrl);
               kerberosFailureCount = 0;
-              setPreferredCurlAuthScheme(instance.slug, targetUrl, 'ntlm');
+              setPreferredCurlAuthScheme(connectionInstance.slug, targetUrl, 'ntlm');
               if (process.env.SP_PROXY_DEBUG === 'true') {
                 console.warn('[sharepoint proxy] curl kerberos 401; NTLM fallback succeeded', {
-                  instance: instance.slug,
+                  instance: connectionInstance.slug,
                   targetUrl,
                   kerberosFailureCount,
                 });
               }
             } else {
-              setPreferredCurlAuthScheme(instance.slug, targetUrl, 'negotiate');
+              setPreferredCurlAuthScheme(connectionInstance.slug, targetUrl, 'negotiate');
               if (process.env.SP_PROXY_DEBUG === 'true') {
                 console.warn('[sharepoint proxy] negotiate recovery succeeded after NTLM failure', {
-                  instance: instance.slug,
+                  instance: connectionInstance.slug,
                   targetUrl,
                 });
               }
@@ -1254,7 +1283,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               ntlmFailureSnippet = secondaryFailure.snippet;
               if (process.env.SP_PROXY_DEBUG === 'true') {
                 console.warn('[sharepoint proxy] NTLM fallback failed', {
-                  instance: instance.slug,
+                  instance: connectionInstance.slug,
                   targetUrl,
                   status: secondaryFailure.status,
                   snippet: secondaryFailure.snippet,
@@ -1262,21 +1291,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 });
               }
             } else {
-              setPreferredCurlAuthScheme(instance.slug, targetUrl, 'negotiate');
+              setPreferredCurlAuthScheme(connectionInstance.slug, targetUrl, 'negotiate');
             }
           }
         } catch {
           if (secondaryAuthScheme === 'ntlm') {
             if (process.env.SP_PROXY_DEBUG === 'true') {
               console.warn('[sharepoint proxy] NTLM fallback execution failed', {
-                instance: instance.slug,
+                instance: connectionInstance.slug,
                 targetUrl,
                 kerberosFailureCount,
               });
             }
           } else if (process.env.SP_PROXY_DEBUG === 'true') {
             console.warn('[sharepoint proxy] negotiate recovery execution failed', {
-              instance: instance.slug,
+              instance: connectionInstance.slug,
               targetUrl,
             });
           }
@@ -1288,7 +1317,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         process.env.SP_PROXY_DEBUG === 'true'
       ) {
         console.warn('[sharepoint proxy] kerberos 401 observed; NTLM fallback deferred', {
-          instance: instance.slug,
+          instance: connectionInstance.slug,
           targetUrl,
           kerberosFailureCount,
           fallbackThreshold: ntlmFallbackThreshold,
@@ -1310,7 +1339,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.warn(
             '[sharepoint proxy] curl kerberos unauthorized, falling back to fetch auth',
             {
-              instance: instance.slug,
+              instance: connectionInstance.slug,
               targetUrl,
               strategy,
             }
@@ -1385,7 +1414,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
       res.setHeader('x-sp-proxy-mode', 'delegated');
     } else {
-      authContext = await getSharePointAuthHeaders(instance);
+      authContext = await getSharePointAuthHeaders(connectionInstance);
       authHeaders = authContext.headers;
     }
 

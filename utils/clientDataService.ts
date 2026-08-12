@@ -19,6 +19,7 @@ import {
   buildSharePointPeoplePickerRequest,
   parseSharePointPeoplePickerResponse,
 } from '@/utils/sharePointPeoplePicker';
+import { buildGlobalSharePointPeoplePickerProxyUrl } from '@/utils/sharePointPeoplePickerSource';
 
 type NodeRequireFn = typeof require;
 type AsyncLocalStorageCtor = new <T>() => AsyncLocalStorage<T>;
@@ -4142,7 +4143,7 @@ class ClientDataService {
 
       const webUrl = this.getWebUrl();
 
-      const endpoint = `${webUrl}/_api/SP.UI.ApplicationPages.ClientPeoplePickerWebServiceInterface.clientPeoplePickerSearchUser`;
+      const endpoint = buildGlobalSharePointPeoplePickerProxyUrl(webUrl);
 
       const searchRequest = buildSharePointPeoplePickerRequest(trimmedQuery);
 

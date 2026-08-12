@@ -4,7 +4,12 @@ import {
   buildSharePointPeoplePickerRequest,
   parseSharePointPeoplePickerResponse,
 } from '../../utils/sharePointPeoplePicker';
-import { resolveSharePointPeoplePickerSourceSlug } from '../../utils/sharePointPeoplePickerSource';
+import {
+  buildGlobalSharePointPeoplePickerProxyUrl,
+  buildGlobalSharePointPeoplePickerInstance,
+  isSharePointPeoplePickerPath,
+} from '../../utils/sharePointPeoplePickerSource';
+import type { RoadmapInstanceConfig } from '../../types/roadmapInstance';
 
 const entity = {
   Key: 'i:0#.w|domain\\fabian.boni',
@@ -57,18 +62,65 @@ test('SharePoint People Picker treats an empty successful response as no matches
   assert.equal(parseSharePointPeoplePickerResponse({}), null);
 });
 
-test('SharePoint People Picker uses a dedicated instance instead of the roadmap instance', () => {
-  assert.equal(
-    resolveSharePointPeoplePickerSourceSlug('sanitaet', {
-      SP_PEOPLE_PICKER_INSTANCE_SLUG: 'Directory-Source',
-    }),
-    'directory-source'
+test('SharePoint People Picker uses a global connection independent from the roadmap instance', () => {
+  const sanitaet = {
+    id: 17,
+    slug: 'sanitaet',
+    displayName: 'Sanitaet',
+    deploymentEnv: 'production',
+    hosts: ['sanitaet.example'],
+    sharePoint: {
+      siteUrlDev: 'https://wrong.example/sites/sanitaet-dev',
+      siteUrlProd: 'https://wrong.example/sites/sanitaet',
+      strategy: 'delegated',
+      allowSelfSigned: true,
+      trustedCaPath: '/wrong/ca.pem',
+    },
+  } satisfies RoadmapInstanceConfig;
+  const source = buildGlobalSharePointPeoplePickerInstance(sanitaet, {
+    NODE_ENV: 'production',
+    SP_PEOPLE_PICKER_SITE_URL: 'https://sharepoint.example/sites/directory/',
+    SP_PEOPLE_PICKER_STRATEGY: 'kerberos',
+    SP_PEOPLE_PICKER_TRUSTED_CA_PATH: '/trusted/global-ca.pem',
+  });
+
+  assert.equal(source.slug, '__sharepoint-people-picker__');
+  assert.equal(source.sharePoint.siteUrlProd, 'https://sharepoint.example/sites/directory');
+  assert.equal(source.sharePoint.strategy, 'kerberos');
+  assert.equal(source.sharePoint.allowSelfSigned, false);
+  assert.equal(source.sharePoint.trustedCaPath, '/trusted/global-ca.pem');
+  assert.equal(source.hosts.length, 0);
+});
+
+test('SharePoint People Picker global connection fails closed without a global URL', () => {
+  const instance = {
+    id: 1,
+    slug: 'sanitaet',
+    displayName: 'Sanitaet',
+    hosts: [],
+    sharePoint: {
+      siteUrlDev: 'https://wrong.example/sites/sanitaet',
+      siteUrlProd: 'https://wrong.example/sites/sanitaet',
+      strategy: 'kerberos',
+    },
+  } satisfies RoadmapInstanceConfig;
+
+  assert.throws(
+    () => buildGlobalSharePointPeoplePickerInstance(instance, {}),
+    /Global SharePoint People Picker URL is missing/
   );
   assert.equal(
-    resolveSharePointPeoplePickerSourceSlug('sanitaet', {
-      DEFAULT_ROADMAP_INSTANCE: 'bdm-projekte',
-    }),
-    'bdm-projekte'
+    isSharePointPeoplePickerPath(
+      '/_api/SP.UI.ApplicationPages.ClientPeoplePickerWebServiceInterface.clientPeoplePickerSearchUser'
+    ),
+    true
   );
-  assert.equal(resolveSharePointPeoplePickerSourceSlug('sanitaet', {}), 'sanitaet');
+  const proxyUrl = new URL(
+    buildGlobalSharePointPeoplePickerProxyUrl('http://127.0.0.1:3000/api/sharepoint/')
+  );
+  assert.equal(
+    proxyUrl.pathname,
+    '/api/sharepoint/_api/SP.UI.ApplicationPages.ClientPeoplePickerWebServiceInterface.clientPeoplePickerSearchUser'
+  );
+  assert.equal(proxyUrl.searchParams.get('sharePointDirectory'), 'global');
 });
