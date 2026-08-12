@@ -524,15 +524,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let connectionInstance = instance;
   try {
     if (usesGlobalPeoplePickerConnection) {
-      const sourceSlug = resolveSharePointPeoplePickerSourceSlug(instance.slug);
-      const sourceInstance =
-        sourceSlug === instance.slug ? instance : await getInstanceConfigBySlug(sourceSlug);
-      if (!sourceInstance) {
-        throw new Error(`Configured People Picker source instance not found: ${sourceSlug}`);
+      const hasConfiguredSite = Boolean(String(process.env.SP_PEOPLE_PICKER_SITE_URL || '').trim());
+      let sourceInstance = instance;
+      let sourceLabel = 'configured-site';
+      if (!hasConfiguredSite) {
+        const sourceSlug = resolveSharePointPeoplePickerSourceSlug(instance.slug);
+        const resolvedSource =
+          sourceSlug === instance.slug ? instance : await getInstanceConfigBySlug(sourceSlug);
+        if (!resolvedSource) {
+          throw new Error(`Configured People Picker source instance not found: ${sourceSlug}`);
+        }
+        sourceInstance = resolvedSource;
+        sourceLabel = resolvedSource.slug;
       }
       connectionInstance = buildGlobalSharePointPeoplePickerInstance(sourceInstance);
       res.setHeader('X-SharePoint-People-Picker-Context', 'global');
-      res.setHeader('X-SharePoint-People-Picker-Source', sourceInstance.slug);
+      res.setHeader('X-SharePoint-People-Picker-Source', sourceLabel);
     }
   } catch (error) {
     console.error('[sharepoint proxy] invalid global People Picker connection', {

@@ -12,9 +12,12 @@ const instanceSlug = String(process.env.SP_PEOPLE_PICKER_SMOKE_INSTANCE || 'sani
   .trim()
   .toLowerCase();
 const query = String(process.env.SP_PEOPLE_PICKER_SMOKE_QUERY || 'fabian').trim();
-const expectedSource = String(process.env.SP_PEOPLE_PICKER_INSTANCE_SLUG || '')
-  .trim()
-  .toLowerCase();
+const hasConfiguredSite = Boolean(String(process.env.SP_PEOPLE_PICKER_SITE_URL || '').trim());
+const expectedSource = hasConfiguredSite
+  ? 'configured-site'
+  : String(process.env.SP_PEOPLE_PICKER_INSTANCE_SLUG || '')
+      .trim()
+      .toLowerCase();
 if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(instanceSlug)) {
   throw new Error('SP_PEOPLE_PICKER_SMOKE_INSTANCE is invalid.');
 }
