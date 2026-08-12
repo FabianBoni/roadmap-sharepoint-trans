@@ -8,6 +8,7 @@ import {
   buildGlobalSharePointPeoplePickerProxyUrl,
   buildGlobalSharePointPeoplePickerInstance,
   isSharePointPeoplePickerPath,
+  resolveSharePointPeoplePickerSourceSlug,
 } from '../../utils/sharePointPeoplePickerSource';
 import type { RoadmapInstanceConfig } from '../../types/roadmapInstance';
 
@@ -90,6 +91,30 @@ test('SharePoint People Picker uses a global connection independent from the roa
   assert.equal(source.sharePoint.allowSelfSigned, false);
   assert.equal(source.sharePoint.trustedCaPath, '/trusted/global-ca.pem');
   assert.equal(source.hosts.length, 0);
+});
+
+test('SharePoint People Picker uses one configured directory source for every roadmap instance', () => {
+  assert.equal(
+    resolveSharePointPeoplePickerSourceSlug('sanitaet', {
+      SP_PEOPLE_PICKER_INSTANCE_SLUG: 'BDM-Projekte',
+      DEFAULT_ROADMAP_INSTANCE: 'ignored-default',
+    }),
+    'bdm-projekte'
+  );
+  assert.equal(
+    resolveSharePointPeoplePickerSourceSlug('sanitaet', {
+      DEFAULT_ROADMAP_INSTANCE: 'bdm-projekte',
+    }),
+    'bdm-projekte'
+  );
+  assert.equal(resolveSharePointPeoplePickerSourceSlug('sanitaet', {}), 'sanitaet');
+  assert.throws(
+    () =>
+      resolveSharePointPeoplePickerSourceSlug('sanitaet', {
+        SP_PEOPLE_PICKER_INSTANCE_SLUG: '../invalid',
+      }),
+    /source instance slug is invalid/
+  );
 });
 
 test('SharePoint People Picker uses the active instance site as directory entry point', () => {

@@ -4,7 +4,11 @@ import { resolveSharePointSiteUrl } from '@/utils/sharepointEnv';
 import { getSharePointAuthHeaders, SharePointAuthContext } from '@/utils/spAuth';
 import { normalizeSharePointStrategy } from '@/utils/sharePointStrategy';
 import { getPrimaryCredentials } from '@/utils/userCredentials';
-import { getInstanceConfigFromRequest, INSTANCE_QUERY_PARAM } from '@/utils/instanceConfig';
+import {
+  getInstanceConfigBySlug,
+  getInstanceConfigFromRequest,
+  INSTANCE_QUERY_PARAM,
+} from '@/utils/instanceConfig';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { sharePointHttpsAgent, sharePointDispatcher } from '@/utils/httpsAgent';
 import { requireUserSession } from '@/utils/apiAuth';
@@ -18,6 +22,7 @@ import { pipeline } from 'stream/promises';
 import {
   buildGlobalSharePointPeoplePickerInstance,
   isSharePointPeoplePickerPath,
+  resolveSharePointPeoplePickerSourceSlug,
   SHAREPOINT_PEOPLE_PICKER_GLOBAL_SCOPE,
   SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM,
 } from '@/utils/sharePointPeoplePickerSource';
@@ -519,8 +524,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   let connectionInstance = instance;
   try {
     if (usesGlobalPeoplePickerConnection) {
-      connectionInstance = buildGlobalSharePointPeoplePickerInstance(instance);
+      const sourceSlug = resolveSharePointPeoplePickerSourceSlug(instance.slug);
+      const sourceInstance =
+        sourceSlug === instance.slug ? instance : await getInstanceConfigBySlug(sourceSlug);
+      if (!sourceInstance) {
+        throw new Error(`Configured People Picker source instance not found: ${sourceSlug}`);
+      }
+      connectionInstance = buildGlobalSharePointPeoplePickerInstance(sourceInstance);
       res.setHeader('X-SharePoint-People-Picker-Context', 'global');
+      res.setHeader('X-SharePoint-People-Picker-Source', sourceInstance.slug);
     }
   } catch (error) {
     console.error('[sharepoint proxy] invalid global People Picker connection', {

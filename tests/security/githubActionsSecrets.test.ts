@@ -41,6 +41,12 @@ test('production deployment verifies the global SharePoint People Picker after r
   );
   assert.match(smokeTest, /sharePointDirectory: 'global'/);
   assert.match(smokeTest, /roadmapInstance: instanceSlug/);
+  assert.match(smokeTest, /x-sharepoint-people-picker-source/);
+  assert.match(
+    workflow,
+    /SP_PEOPLE_PICKER_INSTANCE_SLUG: \$\{\{ vars\.SP_PEOPLE_PICKER_INSTANCE_SLUG \}\}/
+  );
+  assert.match(workflow, /'SP_PEOPLE_PICKER_INSTANCE_SLUG'/);
   assert.match(smokeTest, /x-roadmap-internal-signature/);
   assert.match(smokeTest, /People Picker smoke test returned no named users/);
 });

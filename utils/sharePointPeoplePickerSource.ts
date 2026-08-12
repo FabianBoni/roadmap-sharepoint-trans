@@ -3,6 +3,8 @@ import { normalizeSharePointStrategy } from '@/utils/sharePointStrategy';
 
 type PeoplePickerEnvironment = Record<string, string | undefined>;
 
+const INSTANCE_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
+
 export const SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM = 'sharePointDirectory';
 export const SHAREPOINT_PEOPLE_PICKER_GLOBAL_SCOPE = 'global';
 export const SHAREPOINT_PEOPLE_PICKER_API_PATH =
@@ -19,6 +21,27 @@ export const isSharePointPeoplePickerPath = (path: string): boolean =>
   /^\/_api\/SP\.UI\.ApplicationPages\.ClientPeoplePickerWebServiceInterface\.clientPeoplePickerSearchUser$/i.test(
     path
   );
+
+/**
+ * Resolve the roadmap instance whose SharePoint web is used solely as the directory API entry
+ * point. Authorization continues to use the active roadmap instance in the proxy handler.
+ */
+export const resolveSharePointPeoplePickerSourceSlug = (
+  currentInstanceSlug: string,
+  environment: PeoplePickerEnvironment = process.env
+): string => {
+  const configured = String(
+    environment.SP_PEOPLE_PICKER_INSTANCE_SLUG ||
+      environment.DEFAULT_ROADMAP_INSTANCE ||
+      currentInstanceSlug
+  )
+    .trim()
+    .toLowerCase();
+  if (!INSTANCE_SLUG_PATTERN.test(configured)) {
+    throw new Error('SharePoint People Picker source instance slug is invalid.');
+  }
+  return configured;
+};
 
 const isProductionEnvironment = (value: string): boolean =>
   ['production', 'prod', 'live'].includes(value.trim().toLowerCase());

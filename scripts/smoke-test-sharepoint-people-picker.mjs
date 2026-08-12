@@ -12,11 +12,17 @@ const instanceSlug = String(process.env.SP_PEOPLE_PICKER_SMOKE_INSTANCE || 'sani
   .trim()
   .toLowerCase();
 const query = String(process.env.SP_PEOPLE_PICKER_SMOKE_QUERY || 'fabian').trim();
+const expectedSource = String(process.env.SP_PEOPLE_PICKER_INSTANCE_SLUG || '')
+  .trim()
+  .toLowerCase();
 if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(instanceSlug)) {
   throw new Error('SP_PEOPLE_PICKER_SMOKE_INSTANCE is invalid.');
 }
 if (query.length < 2 || query.length > 100) {
   throw new Error('SP_PEOPLE_PICKER_SMOKE_QUERY must contain 2 to 100 characters.');
+}
+if (expectedSource && !/^[a-z0-9][a-z0-9-]{0,62}$/.test(expectedSource)) {
+  throw new Error('SP_PEOPLE_PICKER_INSTANCE_SLUG is invalid.');
 }
 
 const apiPath =
@@ -78,6 +84,12 @@ try {
   if (context !== 'global') {
     throw new Error(`People Picker smoke test used unexpected context: ${context || 'missing'}`);
   }
+  const source = response.headers.get('x-sharepoint-people-picker-source');
+  if (!source || (expectedSource && source !== expectedSource)) {
+    throw new Error(
+      `People Picker smoke test used unexpected source: ${source || 'missing'} (expected ${expectedSource || 'configured source'}).`
+    );
+  }
 
   const entities = parseEntities(payload).filter(
     (entity) => entity && typeof entity === 'object' && String(entity.DisplayText || '').trim()
@@ -88,7 +100,7 @@ try {
 
   // eslint-disable-next-line no-console
   console.log(
-    `People Picker smoke test passed for ${instanceSlug}: ${entities.length} result(s), context=${context}.`
+    `People Picker smoke test passed for ${instanceSlug}: ${entities.length} result(s), context=${context}, source=${source}.`
   );
 } finally {
   clearTimeout(timeout);
