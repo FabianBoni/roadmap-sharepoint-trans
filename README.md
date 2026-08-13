@@ -51,6 +51,7 @@ SharePoint-backed roadmap application built with Next.js 15 (pages router), Type
 
 ## Implementation Documentation
 
+- [`docs/CI_CD_PIPELINE_PORTING_SPEC.md`](docs/CI_CD_PIPELINE_PORTING_SPEC.md): LLM-ready contract for reproducing the repository's branch validation, security gates, protected self-hosted deployment, and sanitized mirror in another repository.
 - [`docs/SSO_PORTING_SPEC.md`](docs/SSO_PORTING_SPEC.md): canonical, LLM-ready specification for reproducing the current Microsoft Entra SSO flow in another application.
 - [`docs/ENTRA_SSO_IMPLEMENTATION.md`](docs/ENTRA_SSO_IMPLEMENTATION.md): architecture narrative and implementation history.
 - [`docs/SECURITY_AUDIT_REPORT.md`](docs/SECURITY_AUDIT_REPORT.md): authoritative findings, remediations, residual external actions, and verification evidence.

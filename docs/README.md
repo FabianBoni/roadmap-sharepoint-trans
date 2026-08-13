@@ -4,6 +4,7 @@ This project uses environment variables for SharePoint auth, app config, and dep
 
 Additional auth documentation:
 
+- `docs/CI_CD_PIPELINE_PORTING_SPEC.md`: LLM-ready implementation contract for porting the CI/CD trust model, workflow ordering, deployment runner, secret materialization, database migration, PM2 restart, and sanitized mirror.
 - `docs/SSO_PORTING_SPEC.md`: canonical, implementation-ready contract for porting the current Entra SSO architecture into another application, including exact flows, data contracts, security invariants, tests, and known limits.
 - `docs/ENTRA_SSO_IMPLEMENTATION.md`: end-to-end description of the Entra SSO flow in this repo and how to reproduce it in other repos.
 - `docs/SSO_SECURITY_AUDIT_REPORT.md`: audit findings, implemented remediations, verification evidence, and the NTLM/Kerberos boundary.
