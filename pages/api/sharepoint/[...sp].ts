@@ -28,6 +28,7 @@ import {
 } from '@/utils/sharePointPeoplePickerSource';
 import {
   extractSharePointDigest,
+  getSharePointAuthFailureStatus,
   getSharePointWriteFailure,
   getSafeRequestDigest,
   isUsableSharePointContextInfoResponse,
@@ -381,7 +382,12 @@ export function isAllowedPath(path: string, method = 'GET', trustedInternal = fa
   if (!ALLOWED_LISTS.has(decodedTitle) && !ALLOWED_LISTS.has(rawTitle)) {
     // Permission probes are created and deleted only by signed internal provisioning calls.
     // They must never expose list subresources or become available through browser requests.
-    return trustedInternal && method === 'POST' && isPermissionProbe && operation === '';
+    return (
+      trustedInternal &&
+      (method === 'GET' || method === 'POST') &&
+      isPermissionProbe &&
+      operation === ''
+    );
   }
   return (
     operation === '' ||
@@ -996,6 +1002,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (writeAttempt.authFailure) {
             return res.status(writeAttempt.authFailure.status).json({
               error: writeAttempt.authFailure.status === 403 ? 'Forbidden' : 'Unauthorized',
+              upstreamStatus: writeAttempt.status.statusCode,
+              authScheme: writeAttempt.authScheme,
             });
           }
 
@@ -1210,7 +1218,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         statusCode: number
       ): { status: number; snippet: string } | null => {
         if (statusCode >= 400) {
-          return { status: statusCode, snippet: payloadSnippet(payload) || `http ${statusCode}` };
+          const authStatus = getSharePointAuthFailureStatus(statusCode);
+          return authStatus
+            ? { status: authStatus, snippet: payloadSnippet(payload) || `http ${statusCode}` }
+            : null;
         }
 
         if (statusCode >= 300 && statusCode < 400 && typeof payload === 'string') {
@@ -1456,6 +1467,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (res.getHeader('x-sp-proxy-mode') === 'curl-fallback-to-fetch') {
         // Continue below into fetch-based auth path.
       } else {
+        if (negotiatedStatus.statusCode >= 400) {
+          res.setHeader('x-sp-proxy-mode', 'curl');
+          res.setHeader('x-sp-proxy-ms', String(duration));
+          const upstreamPayload = wantsBinaryRequest
+            ? negotiatedStatus.payloadText
+            : normalizeSharePointODataPayload(normalized, /odata=nometadata/i.test(clientAccept));
+          if (typeof upstreamPayload === 'string') {
+            return res.status(negotiatedStatus.statusCode).send(upstreamPayload);
+          }
+          return res.status(negotiatedStatus.statusCode).json(upstreamPayload);
+        }
+
         if (wantsBinaryRequest && Buffer.isBuffer(normalized)) {
           const negotiatedContentType =
             'contentType' in negotiatedStatus ? negotiatedStatus.contentType : undefined;

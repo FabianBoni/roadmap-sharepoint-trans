@@ -96,6 +96,12 @@ export interface SharePointWriteFailure {
   upstreamStatus: number;
 }
 
+/** Only real HTTP authentication statuses may trigger an authentication fallback. */
+export function getSharePointAuthFailureStatus(upstreamStatus: number): 401 | 403 | null {
+  if (upstreamStatus === 401 || upstreamStatus === 403) return upstreamStatus;
+  return null;
+}
+
 const containsODataError = (payload: unknown): boolean => {
   if (typeof payload === 'string') {
     const value = payload.trim();

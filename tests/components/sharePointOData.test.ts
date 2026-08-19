@@ -2,11 +2,19 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   extractSharePointDigest,
+  getSharePointAuthFailureStatus,
   getSharePointWriteFailure,
   getSafeRequestDigest,
   isUsableSharePointContextInfoResponse,
   normalizeSharePointODataPayload,
 } from '../../utils/sharePointOData';
+
+test('classifies only 401 and 403 as HTTP authentication failures', () => {
+  assert.equal(getSharePointAuthFailureStatus(400), null);
+  assert.equal(getSharePointAuthFailureStatus(404), null);
+  assert.equal(getSharePointAuthFailureStatus(401), 401);
+  assert.equal(getSharePointAuthFailureStatus(403), 403);
+});
 
 test('normalizes flat and verbose list entities for nometadata clients', () => {
   const list = { Title: 'Projects', ItemCount: 7 };

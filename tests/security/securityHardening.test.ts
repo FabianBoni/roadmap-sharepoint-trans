@@ -163,6 +163,7 @@ test('SharePoint operation allowlist rejects arbitrary list subresources', () =>
   const probe = "/_api/web/lists/getByTitle('RoadmapHealthProbe_mszx62ep')";
   assert.equal(isAllowedPath(probe, 'POST', false), false);
   assert.equal(isAllowedPath(probe, 'POST', true), true);
+  assert.equal(isAllowedPath(probe, 'GET', true), true);
   assert.equal(isAllowedPath(`${probe}/items`, 'POST', true), false);
   const proxy = read('pages/api/sharepoint/[...sp].ts');
   assert.match(proxy, /trustedProxyAddresses\.has\(req\.socket\.remoteAddress/);

@@ -103,7 +103,7 @@ export type SharePointListDeleteResult = {
 const readError = async (resp: Response): Promise<string> => {
   try {
     const text = await resp.text();
-    return text.slice(0, 500);
+    return `HTTP ${resp.status}: ${text.slice(0, 500)}`;
   } catch (error) {
     return error instanceof Error ? error.message : 'Unbekannter Fehler';
   }
