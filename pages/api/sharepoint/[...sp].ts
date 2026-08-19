@@ -828,12 +828,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
           const status = extractCurlStatusAndBody(output.stdout);
           const payload = parseWritePayload(status.payloadText);
+          const redirectFailure = getSharePointWriteFailure(status.statusCode, payload);
           return {
             authScheme,
             output,
             status,
             payload,
-            authFailure: detectWriteAuthFailure(payload, status.statusCode),
+            authFailure:
+              detectWriteAuthFailure(payload, status.statusCode) ??
+              (redirectFailure?.reason === 'redirect'
+                ? { status: 401, snippet: `http ${status.statusCode} redirect` }
+                : null),
           };
         };
 
@@ -936,34 +941,53 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           targetUrl,
         ];
         try {
+          const primaryWriteAuthScheme: CurlAuthScheme =
+            canUseNtlmFallback && prefersNtlm(connectionInstance.slug, targetUrl)
+              ? 'ntlm'
+              : 'negotiate';
           let writeAttempt = await runWriteCurl(
-            'negotiate',
-            buildWriteArgs('negotiate'),
+            primaryWriteAuthScheme,
+            buildWriteArgs(primaryWriteAuthScheme),
             bodyBuffer ?? bodyString ?? undefined
           );
           if (writeAttempt.authFailure?.status === 401 && canUseNtlmFallback) {
+            const secondaryWriteAuthScheme: CurlAuthScheme =
+              primaryWriteAuthScheme === 'ntlm' ? 'negotiate' : 'ntlm';
             if (process.env.SP_PROXY_DEBUG === 'true') {
-              console.warn('[sharepoint proxy] write negotiate 401; trying NTLM fallback', {
+              console.warn('[sharepoint proxy] write auth failed; trying secondary scheme', {
                 instance: connectionInstance.slug,
                 targetUrl,
                 method,
+                primaryAuthScheme: primaryWriteAuthScheme,
+                secondaryAuthScheme: secondaryWriteAuthScheme,
               });
             }
             writeAttempt = await runWriteCurl(
-              'ntlm',
-              buildWriteArgs('ntlm'),
+              secondaryWriteAuthScheme,
+              buildWriteArgs(secondaryWriteAuthScheme),
               bodyBuffer ?? bodyString ?? undefined
             );
             if (!writeAttempt.authFailure) {
-              res.setHeader('x-sp-curl-auth', 'ntlm-fallback');
+              setPreferredCurlAuthScheme(
+                connectionInstance.slug,
+                targetUrl,
+                secondaryWriteAuthScheme
+              );
+              res.setHeader(
+                'x-sp-curl-auth',
+                secondaryWriteAuthScheme === 'ntlm' ? 'ntlm-fallback' : 'negotiate-recovery'
+              );
               if (process.env.SP_PROXY_DEBUG === 'true') {
-                console.warn('[sharepoint proxy] write NTLM fallback succeeded', {
+                console.warn('[sharepoint proxy] write secondary auth succeeded', {
                   instance: connectionInstance.slug,
                   targetUrl,
                   method,
+                  authScheme: secondaryWriteAuthScheme,
                 });
               }
             }
+          } else if (!writeAttempt.authFailure) {
+            setPreferredCurlAuthScheme(connectionInstance.slug, targetUrl, primaryWriteAuthScheme);
           }
 
           if (writeAttempt.authFailure) {

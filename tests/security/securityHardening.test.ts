@@ -166,6 +166,8 @@ test('SharePoint operation allowlist rejects arbitrary list subresources', () =>
   assert.equal(isAllowedPath(`${probe}/items`, 'POST', true), false);
   const proxy = read('pages/api/sharepoint/[...sp].ts');
   assert.match(proxy, /trustedProxyAddresses\.has\(req\.socket\.remoteAddress/);
+  assert.match(proxy, /redirectFailure\?\.reason === 'redirect'/);
+  assert.match(proxy, /secondaryWriteAuthScheme/);
   assert.doesNotMatch(proxy, /kerberosIdentity,/);
 });
 
