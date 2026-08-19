@@ -1,5 +1,25 @@
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 
+export function normalizeSharePointSiteUrl(value: string): string {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) throw new Error('SharePoint site URL is missing');
+
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  let parsed: URL;
+  try {
+    parsed = new URL(withScheme);
+  } catch {
+    throw new Error('SharePoint site URL is invalid');
+  }
+  if (!['https:', 'http:'].includes(parsed.protocol) || !parsed.hostname) {
+    throw new Error('SharePoint site URL must use HTTP or HTTPS');
+  }
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new Error('SharePoint site URL must not contain credentials, a query or a fragment');
+  }
+  return parsed.toString().replace(/\/+$/, '');
+}
+
 // Utility to resolve the correct SharePoint Site URL based on the active roadmap instance.
 // Falls back to the global environment configuration if no instance is supplied.
 export function resolveSharePointSiteUrl(instance?: RoadmapInstanceConfig | null): string {
@@ -18,5 +38,5 @@ export function resolveSharePointSiteUrl(instance?: RoadmapInstanceConfig | null
     instance?.sharePoint.siteUrlProd || process.env.NEXT_PUBLIC_SHAREPOINT_SITE_URL_PROD || dev;
 
   const chosen = isProd ? prod : dev;
-  return chosen.replace(/\/$/, '');
+  return normalizeSharePointSiteUrl(chosen);
 }
