@@ -32,18 +32,33 @@ const findDigest = (payload) => {
   );
 };
 
-const getInstanceSlugs = async () => {
-  if (configuredSlug) return [configuredSlug];
+const getInstances = async () => {
+  const where = configuredSlug ? { slug: configuredSlug } : undefined;
   const instances = await prisma.roadmapInstance.findMany({
     orderBy: { slug: 'asc' },
-    select: { slug: true },
+    select: {
+      slug: true,
+      deploymentEnv: true,
+      sharePointSiteUrlDev: true,
+      sharePointSiteUrlProd: true,
+    },
+    where,
   });
   if (instances.length === 0)
     throw new Error('No roadmap instances exist for the contextinfo test.');
-  return instances.map(({ slug }) => slug);
+  return instances;
 };
 
-const verifyInstance = async (instanceSlug) => {
+const getConfiguredSite = (instance) => {
+  const environment = String(instance.deploymentEnv || '').toLowerCase();
+  const production = ['production', 'prod', 'live'].includes(environment);
+  return production
+    ? instance.sharePointSiteUrlProd || instance.sharePointSiteUrlDev
+    : instance.sharePointSiteUrlDev;
+};
+
+const verifyInstance = async (instance) => {
+  const instanceSlug = instance.slug;
   const target = `${apiPath}?roadmapInstance=${encodeURIComponent(instanceSlug)}`;
   const timestamp = String(Date.now());
   const signature = createHmac('sha256', secret)
@@ -70,8 +85,9 @@ const verifyInstance = async (instanceSlug) => {
         : '';
       const reason =
         typeof payload?.reason === 'string' && payload.reason ? ` reason=${payload.reason}` : '';
+      const site = getConfiguredSite(instance);
       throw new Error(
-        `Contextinfo for ${instanceSlug} returned HTTP ${response.status}.${upstream}${reason}`
+        `Contextinfo for ${instanceSlug} (${site}) returned HTTP ${response.status}.${upstream}${reason}`
       );
     }
     if (!findDigest(payload)) {
@@ -85,8 +101,8 @@ const verifyInstance = async (instanceSlug) => {
 };
 
 try {
-  const instanceSlugs = await getInstanceSlugs();
-  for (const instanceSlug of instanceSlugs) await verifyInstance(instanceSlug);
+  const instances = await getInstances();
+  for (const instance of instances) await verifyInstance(instance);
 } finally {
   await prisma.$disconnect();
 }
