@@ -68,6 +68,28 @@ const runKinit = async (principal: string, password: string, cacheName: string):
   });
 };
 
+const hasUsableKerberosTicket = async (cacheName: string): Promise<boolean> =>
+  new Promise<boolean>((resolve) => {
+    const child = spawn('klist', ['-s', '-c', cacheName], {
+      env: { ...process.env, KRB5CCNAME: cacheName },
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    let settled = false;
+    const finish = (usable: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(usable);
+    };
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish(false);
+    }, 5_000);
+    child.once('error', () => finish(false));
+    child.once('close', (code) => finish(code === 0));
+  });
+
 export async function ensureKerberosTicket(options: {
   username: string;
   password: string;
@@ -86,8 +108,11 @@ export async function ensureKerberosTicket(options: {
   ) {
     try {
       await stat(ticketState.cacheName.replace(/^FILE:/, ''));
-      process.env.KRB5CCNAME = ticketState.cacheName;
-      return ticketState.cacheName;
+      if (await hasUsableKerberosTicket(ticketState.cacheName)) {
+        process.env.KRB5CCNAME = ticketState.cacheName;
+        return ticketState.cacheName;
+      }
+      ticketState = null;
     } catch {
       ticketState = null;
     }
