@@ -671,8 +671,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Kerberos/SPNEGO via curl (default for kerberos strategy).
     if (useCurlKerberos) {
-      // In negotiate mode curl uses configured service credentials when provided,
-      // otherwise the process Kerberos identity.
+      // Negotiate uses the process Kerberos identity. Explicit service credentials
+      // are reserved for NTLM fallback; passing them to curl --negotiate breaks SSPI
+      // authentication on Windows even when the process already has a valid ticket.
       const serviceUserRaw = (effectiveCredentials?.username || '').trim();
       const serviceUser = serviceUserRaw.replace(/\\+/g, '\\');
       const servicePass = effectiveCredentials?.password || '';
@@ -685,7 +686,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           passwordConfigured: Boolean(servicePass),
         });
       }
-      const cred = serviceUser ? `${serviceUser}:${servicePass}` : ':';
+      const ntlmCredentials = serviceUser ? `${serviceUser}:${servicePass}` : ':';
+      const credentialsForScheme = (authScheme: CurlAuthScheme) =>
+        authScheme === 'negotiate' ? ':' : ntlmCredentials;
       const targetUrl = buildSharePointTargetUrl(site, fullPath);
       const clientAccept =
         typeof req.headers['accept'] === 'string'
@@ -717,7 +720,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (caPath) headArgs.unshift('--cacert', caPath);
           if (process.env.SP_CURL_VERBOSE === 'true') headArgs.unshift('-v');
           try {
-            await runCurl(headArgs, { timeout: 15000, credentials: cred });
+            await runCurl(headArgs, { timeout: 15000, credentials: ':' });
             res.setHeader('x-sp-proxy-mode', 'curl');
             return res.status(200).json({ ok: true });
           } catch (e: any) {
@@ -824,7 +827,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const output = await runCurl(args, {
             timeout: 20000,
             input,
-            credentials: cred,
+            credentials: credentialsForScheme(authScheme),
           });
           const status = extractCurlStatusAndBody(output.stdout);
           const payload = parseWritePayload(status.payloadText);
@@ -1255,7 +1258,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               '\n__SP_HTTP_STATUS__:%{http_code}\n__SP_CONTENT_TYPE__:%{content_type}\n__SP_CONTENT_LENGTH__:%{size_download}';
           }
 
-          const output = await runCurlBuffer(args, { timeout: 15000, credentials: cred });
+          const output = await runCurlBuffer(args, {
+            timeout: 15000,
+            credentials: credentialsForScheme(authScheme),
+          });
           const status = extractCurlBinaryStatusAndBody(output.stdout);
           return {
             authScheme,
@@ -1268,7 +1274,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         const output = await runCurl(makeReadCurlArgs(authScheme), {
           timeout: 15000,
-          credentials: cred,
+          credentials: credentialsForScheme(authScheme),
         });
         const status = extractCurlStatusAndBody(output.stdout);
         const payload = parseCurlPayload(status.payloadText);

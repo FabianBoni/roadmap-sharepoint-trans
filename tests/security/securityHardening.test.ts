@@ -168,6 +168,7 @@ test('SharePoint operation allowlist rejects arbitrary list subresources', () =>
   assert.match(proxy, /trustedProxyAddresses\.has\(req\.socket\.remoteAddress/);
   assert.match(proxy, /redirectFailure\?\.reason === 'redirect'/);
   assert.match(proxy, /secondaryWriteAuthScheme/);
+  assert.match(proxy, /authScheme === 'negotiate' \? ':' : ntlmCredentials/);
   assert.doesNotMatch(proxy, /kerberosIdentity,/);
 });
 
