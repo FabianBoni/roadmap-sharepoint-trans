@@ -76,12 +76,13 @@ const defaultForm: AdminFormState = {
   hostsInput: '',
 };
 
-type SharePointListStatus = 'created' | 'ensured' | 'missing' | 'unknown';
+type SharePointListStatus = 'created' | 'ensured' | 'missing' | 'error' | 'unknown';
 
 const listStatusLabels: Record<SharePointListStatus, string> = {
   created: 'neu erstellt',
   ensured: 'vorhanden',
   missing: 'fehlend',
+  error: 'Fehler',
   unknown: 'offen',
 };
 
@@ -89,6 +90,7 @@ const listStatusStyles: Record<SharePointListStatus, string> = {
   created: 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/40',
   ensured: 'bg-sky-500/10 text-sky-200 border border-sky-400/40',
   missing: 'bg-rose-500/10 text-rose-200 border border-rose-500/40',
+  error: 'bg-amber-500/15 text-amber-100 border border-amber-400/50',
   unknown: 'bg-slate-700/30 text-slate-200 border border-slate-700/50',
 };
 
@@ -206,6 +208,104 @@ const getErrorDetailLines = (error: unknown): string[] | null => {
   return extracted.length > 0 ? extracted : null;
 };
 
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const inspectListActionPayload = (
+  payload: unknown,
+  fallbackMessage: string
+): { message: string; details: unknown } | null => {
+  const response = asRecord(payload);
+  if (!response) return { message: fallbackMessage, details: null };
+
+  const result = asRecord(response.result);
+  const health = result && asRecord(result.permissions) ? result : null;
+  const lists = asRecord(health?.lists ?? result?.lists);
+  const issues: string[] = [];
+
+  const permissions = asRecord(health?.permissions);
+  if (permissions && permissions.status !== 'ok') {
+    issues.push(
+      typeof permissions.message === 'string'
+        ? permissions.message
+        : `Berechtigungsprüfung: ${String(permissions.status ?? 'unbekannt')}`
+    );
+  }
+  const compatibility = asRecord(health?.compatibility);
+  if (compatibility?.status === 'error') {
+    const errors = Array.isArray(compatibility.errors) ? compatibility.errors : [];
+    issues.push(...errors.map(String));
+  }
+  const errors = asRecord(lists?.errors);
+  if (errors) {
+    Object.entries(errors).forEach(([key, message]) => issues.push(`${key}: ${String(message)}`));
+  }
+  const missing = Array.isArray(lists?.missing) ? lists.missing.map(String) : [];
+  if (missing.length > 0) issues.push(`Fehlende Listen: ${missing.join(', ')}`);
+  const mismatches = asRecord(lists?.schemaMismatches);
+  if (mismatches) {
+    Object.entries(mismatches).forEach(([list, rawMismatch]) => {
+      const mismatch = asRecord(rawMismatch);
+      if (!mismatch) return;
+      const missingFields = Array.isArray(mismatch.missing) ? mismatch.missing.map(String) : [];
+      const typeMismatches = Array.isArray(mismatch.typeMismatches) ? mismatch.typeMismatches : [];
+      const unexpected = Array.isArray(mismatch.unexpected) ? mismatch.unexpected.map(String) : [];
+      if (missingFields.length) issues.push(`${list}: fehlend: ${missingFields.join(', ')}`);
+      typeMismatches.forEach((rawField) => {
+        const field = asRecord(rawField);
+        if (field) {
+          issues.push(
+            `${list}.${String(field.field ?? '?')}: ${String(field.actual ?? '?')} statt ${String(field.expected ?? '?')}`
+          );
+        }
+      });
+      if (unexpected.length) issues.push(`${list}: unerwartet: ${unexpected.join(', ')}`);
+    });
+  }
+  if (Array.isArray(result?.errors)) issues.push(...result.errors.map(String));
+  if (
+    typeof result?.status === 'string' &&
+    result.status !== 'deleted' &&
+    result.status !== 'missing'
+  ) {
+    issues.push(`Unerwarteter Listenstatus: ${result.status}`);
+  }
+
+  const explicitlyFailed = response.ok === false;
+  if (!explicitlyFailed && issues.length === 0 && !response.error) return null;
+  const message =
+    typeof response.error === 'string' && response.error.trim()
+      ? response.error
+      : issues[0] || fallbackMessage;
+  return {
+    message,
+    details: response.details ?? (issues.length > 0 ? { messages: issues } : response.result),
+  };
+};
+
+const createListActionError = (failure: {
+  message: string;
+  details: unknown;
+}): Error & { detailLines?: string[]; details?: unknown } => {
+  const error = new Error(failure.message) as Error & {
+    detailLines?: string[];
+    details?: unknown;
+  };
+  const detailLines = extractDetailMessages(failure.details);
+  error.detailLines = detailLines.length ? detailLines : undefined;
+  error.details = failure.details;
+  return error;
+};
+
+const getReturnedInstance = (payload: unknown): RoadmapInstanceSummary | null => {
+  const instance = asRecord(asRecord(payload)?.instance);
+  return instance && typeof instance.slug === 'string'
+    ? (instance as unknown as RoadmapInstanceSummary)
+    : null;
+};
+
 const resolveListStatus = (
   health: RoadmapInstanceSummary['health'],
   def: (typeof SHAREPOINT_LIST_DEFINITIONS)[number]
@@ -217,6 +317,14 @@ const resolveListStatus = (
   );
   const matches = (value: string) => identifiers.includes(value.toLowerCase());
   if (missing.some(matches)) return 'missing';
+  const relatedError = Object.keys(health.lists.errors ?? {}).some((key) => {
+    const normalized = key.toLowerCase().replace(/^(action|overview|schema):/, '');
+    return identifiers.some(
+      (identifier) => normalized === identifier || normalized.startsWith(`${identifier}.`)
+    );
+  });
+  const relatedSchemaMismatch = Object.keys(health.lists.schemaMismatches ?? {}).some(matches);
+  if (relatedError || relatedSchemaMismatch) return 'error';
   if (created.some(matches)) return 'created';
   if (ensured.some(matches)) return 'ensured';
   return 'unknown';
@@ -722,6 +830,14 @@ const AdminInstancesPage = () => {
     });
   };
 
+  const applyReturnedInstance = (payload: unknown) => {
+    const returnedInstance = getReturnedInstance(payload);
+    if (!returnedInstance) return;
+    setInstances((current) =>
+      current.map((entry) => (entry.slug === returnedInstance.slug ? returnedInstance : entry))
+    );
+  };
+
   const ensureAllListsForInstance = async (instance: RoadmapInstanceSummary) => {
     const slug = instance.slug;
     setListActionPending(slug, '__all__', true);
@@ -733,18 +849,14 @@ const AdminInstancesPage = () => {
         body: JSON.stringify({ key: '__all__' }),
       });
       const payload = await resp.json().catch(() => null);
-      if (!resp.ok) {
-        const err = new Error(payload?.error || 'Fehler beim Anlegen der Listen') as Error & {
-          detailLines?: string[];
-          details?: unknown;
-        };
-        const detailLines = extractDetailMessages(payload?.details);
-        err.detailLines = detailLines.length ? detailLines : undefined;
-        err.details = payload?.details;
-        throw err;
+      const failure = inspectListActionPayload(payload, 'Fehler beim Anlegen der Listen');
+      applyReturnedInstance(payload);
+      await Promise.all([fetchListOverview(slug), fetchInstances()]);
+      if (!resp.ok || failure) {
+        throw createListActionError(
+          failure ?? { message: 'Fehler beim Anlegen der Listen', details: payload }
+        );
       }
-      await fetchListOverview(slug);
-      await fetchInstances();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unbekannter Fehler';
       const detailLines = getErrorDetailLines(err);
@@ -865,18 +977,14 @@ const AdminInstancesPage = () => {
         body: JSON.stringify({ key: entry.key }),
       });
       const payload = await resp.json().catch(() => null);
-      if (!resp.ok) {
-        const err = new Error(payload?.error || 'Fehler beim Anlegen der Liste') as Error & {
-          detailLines?: string[];
-          details?: unknown;
-        };
-        const detailLines = extractDetailMessages(payload?.details);
-        err.detailLines = detailLines.length ? detailLines : undefined;
-        err.details = payload?.details;
-        throw err;
+      const failure = inspectListActionPayload(payload, 'Fehler beim Anlegen der Liste');
+      applyReturnedInstance(payload);
+      await Promise.all([fetchListOverview(slug), fetchInstances()]);
+      if (!resp.ok || failure) {
+        throw createListActionError(
+          failure ?? { message: 'Fehler beim Anlegen der Liste', details: payload }
+        );
       }
-      await fetchListOverview(slug);
-      await fetchInstances();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unbekannter Fehler';
       const detailLines = getErrorDetailLines(err);
@@ -906,18 +1014,14 @@ const AdminInstancesPage = () => {
         body: JSON.stringify({ key: entry.key }),
       });
       const payload = await resp.json().catch(() => null);
-      if (!resp.ok) {
-        const err = new Error(payload?.error || 'Fehler beim Löschen der Liste') as Error & {
-          detailLines?: string[];
-          details?: unknown;
-        };
-        const detailLines = extractDetailMessages(payload?.details);
-        err.detailLines = detailLines.length ? detailLines : undefined;
-        err.details = payload?.details;
-        throw err;
+      const failure = inspectListActionPayload(payload, 'Fehler beim Löschen der Liste');
+      applyReturnedInstance(payload);
+      await Promise.all([fetchListOverview(slug), fetchInstances()]);
+      if (!resp.ok || failure) {
+        throw createListActionError(
+          failure ?? { message: 'Fehler beim Löschen der Liste', details: payload }
+        );
       }
-      await fetchListOverview(slug);
-      await fetchInstances();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unbekannter Fehler';
       const detailLines = getErrorDetailLines(err);
@@ -955,15 +1059,21 @@ const AdminInstancesPage = () => {
         ].some((value) => value?.toLocaleLowerCase('de-CH').includes(normalizedInstanceQuery))
       )
     : instances;
+  const hasListHealthIssues = (instance: RoadmapInstanceSummary) =>
+    Boolean(
+      instance.health?.lists.missing.length ||
+      Object.keys(instance.health?.lists.errors ?? {}).length ||
+      Object.keys(instance.health?.lists.schemaMismatches ?? {}).length
+    );
   const healthyInstanceCount = instances.filter(
-    (instance) => instance.health?.permissions.status === 'ok'
+    (instance) => instance.health?.permissions.status === 'ok' && !hasListHealthIssues(instance)
   ).length;
   const attentionInstanceCount = instances.filter((instance) => {
     const permissionStatus = instance.health?.permissions.status;
     return (
       permissionStatus === 'error' ||
       permissionStatus === 'insufficient' ||
-      Boolean(instance.health?.lists.missing.length)
+      hasListHealthIssues(instance)
     );
   }).length;
 

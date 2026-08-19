@@ -682,6 +682,33 @@ const InstanceHealthPage = () => {
             </section>
           )}
 
+          {lists?.fieldsUpdated && Object.keys(lists.fieldsUpdated).length > 0 && (
+            <section className="rounded-3xl border border-slate-800 bg-slate-950/60 p-6 shadow-lg shadow-slate-950/40">
+              <h3 className="text-sm font-semibold text-white">Abgeglichene Felder</h3>
+              <p className="mt-1 text-xs text-slate-400">
+                Bestehende SharePoint-Spalten, deren Eigenschaften aktualisiert und anschließend
+                verifiziert wurden.
+              </p>
+              <div className="mt-4 space-y-4 text-sm text-slate-200">
+                {Object.entries(lists.fieldsUpdated).map(([listName, fields]) => (
+                  <div
+                    key={listName}
+                    className="rounded-xl border border-slate-800/60 bg-slate-900/70 p-4"
+                  >
+                    <h4 className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+                      {listName}
+                    </h4>
+                    <ul className="mt-2 list-disc space-y-1 pl-4">
+                      {fields.map((field) => (
+                        <li key={field}>{field}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {(hasSchema || hasIgnoredSchema) && (
             <section className="rounded-3xl border border-slate-800 bg-slate-950/60 p-6 shadow-lg shadow-slate-950/40">
               <div className="flex flex-wrap items-center justify-between gap-3">

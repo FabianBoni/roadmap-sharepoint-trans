@@ -11,6 +11,30 @@ type ProvisionResult = {
   message?: string;
 };
 
+const getProvisioningIssues = (health: RoadmapInstanceHealth): string[] => {
+  const issues = Object.entries(health.lists.errors).map(([key, message]) => `${key}: ${message}`);
+  if (health.permissions.status !== 'ok') {
+    issues.push(
+      health.permissions.message || `SharePoint permissions: ${health.permissions.status}`
+    );
+  }
+  if (health.compatibility?.status === 'error') {
+    issues.push(...(health.compatibility.errors ?? ['SharePoint compatibility check failed']));
+  }
+  if (health.lists.missing.length > 0) {
+    issues.push(`Missing lists: ${health.lists.missing.join(', ')}`);
+  }
+  for (const [listName, mismatch] of Object.entries(health.lists.schemaMismatches ?? {})) {
+    if (mismatch.missing.length > 0) {
+      issues.push(`${listName}: missing fields ${mismatch.missing.join(', ')}`);
+    }
+    for (const field of mismatch.typeMismatches) {
+      issues.push(`${listName}.${field.field}: type ${field.actual}, expected ${field.expected}`);
+    }
+  }
+  return issues;
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     await requireSuperAdminAccess(req);
@@ -57,7 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           errors: { __provision: message },
         },
       };
-      // eslint-disable-next-line no-console
+
       console.error(`[instances:provision] provisioning failed for ${mapped.slug}`, error);
     }
 
@@ -69,10 +93,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
 
+    const issues = getProvisioningIssues(health);
     results.push({
       slug: mapped.slug,
-      ok: health.permissions.status === 'ok' || health.permissions.status === 'insufficient',
-      message: health.permissions.message,
+      ok: issues.length === 0,
+      message: issues.length > 0 ? issues.join('; ') : undefined,
     });
   }
 

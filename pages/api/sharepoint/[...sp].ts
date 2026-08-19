@@ -26,6 +26,11 @@ import {
   SHAREPOINT_PEOPLE_PICKER_GLOBAL_SCOPE,
   SHAREPOINT_PEOPLE_PICKER_SCOPE_PARAM,
 } from '@/utils/sharePointPeoplePickerSource';
+import {
+  extractSharePointDigest,
+  getSafeRequestDigest,
+  normalizeSharePointODataPayload,
+} from '@/utils/sharePointOData';
 
 export const config = {
   api: {
@@ -409,9 +414,11 @@ async function getDigest(site: string, auth: SharePointAuthContext): Promise<str
   const r = await fetch(url, makeFetchOpts() as any);
   if (!r.ok) throw new Error('Failed to get contextinfo');
   const j = await r.json();
+  const digest = extractSharePointDigest(j);
+  if (!digest) throw new Error('SharePoint contextinfo did not contain a FormDigestValue');
   digestCache[cacheKey] = {
-    value: j.FormDigestValue,
-    expires: now + j.FormDigestTimeoutSeconds * 1000 - 60000,
+    value: digest.value,
+    expires: now + Math.max(1, digest.timeoutSeconds - 60) * 1000,
   };
   return digestCache[cacheKey].value;
 }
@@ -820,9 +827,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           };
         };
 
-        // If not contextinfo, fetch a FormDigest via curl first
-        let formDigest: string | null = null;
-        if (!isContextInfo) {
+        // Reuse the caller's digest when available. Provisioning already obtains
+        // one, so this avoids a contextinfo round-trip for every list/field write.
+        let formDigest = isContextInfo
+          ? null
+          : getSafeRequestDigest(req.headers['x-requestdigest']);
+        if (!isContextInfo && !formDigest) {
           const buildContextInfoArgs = (authScheme: CurlAuthScheme) => {
             const ciArgs = makeCurlArgs(authScheme, 'POST');
             ciArgs.push('-H', 'Accept: application/json;odata=nometadata');
@@ -845,8 +855,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               }
             }
             try {
-              const j = JSON.parse(ciAttempt.status.payloadText);
-              formDigest = j.FormDigestValue || null;
+              const digest = extractSharePointDigest(JSON.parse(ciAttempt.status.payloadText));
+              formDigest = digest?.value || null;
             } catch {
               formDigest = null;
             }
@@ -958,7 +968,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             });
           }
 
-          const parsed = writeAttempt.payload;
+          const parsed = normalizeSharePointODataPayload(
+            writeAttempt.payload,
+            /odata=nometadata/i.test(clientAccept)
+          );
           res.setHeader('x-sp-proxy-mode', 'curl');
           invalidateCurlCache();
           return res.status(200).json(parsed);
@@ -1397,16 +1410,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Shape response to look like native SharePoint depending on Accept header
         const wantsNoMeta = /odata=nometadata/i.test(clientAccept);
-        let bodyToSend: any = normalized;
-        if (normalized && typeof normalized === 'object' && !Array.isArray(normalized)) {
-          if ((normalized as any).d && (normalized as any).d.results && wantsNoMeta) {
-            bodyToSend = { value: (normalized as any).d.results };
-          } else if (Array.isArray((normalized as any).d)) {
-            bodyToSend = wantsNoMeta ? { value: (normalized as any).d } : normalized;
-          }
-        } else if (Array.isArray(normalized)) {
-          bodyToSend = wantsNoMeta ? { value: normalized } : { d: { results: normalized } };
-        }
+        const bodyToSend = normalizeSharePointODataPayload(normalized, wantsNoMeta);
         // Provide minimal telemetry via headers
         res.setHeader('x-sp-proxy-mode', 'curl');
         res.setHeader('x-sp-proxy-ms', String(duration));
@@ -1494,10 +1498,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (isWrite && apiPath !== '/_api/contextinfo') {
-      try {
-        headers['X-RequestDigest'] = await getDigest(site, authContext || { headers: authHeaders });
-      } catch (e) {
-        console.warn('Digest retrieval failed', e);
+      const incomingDigest = getSafeRequestDigest(req.headers['x-requestdigest']);
+      if (incomingDigest) {
+        headers['X-RequestDigest'] = incomingDigest;
+      } else {
+        try {
+          headers['X-RequestDigest'] = await getDigest(
+            site,
+            authContext || { headers: authHeaders }
+          );
+        } catch (e) {
+          console.warn('Digest retrieval failed', e);
+        }
       }
       // Support MERGE (update) if client sets X-HTTP-Method header externally (we could map here if needed)
       if (method === 'PATCH') {
@@ -1649,7 +1661,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         /* ignore */
       }
     }
-    res.status(spResp.status).json(payload);
+    const wantsNoMetadata =
+      typeof clientAccept === 'string' && /odata=nometadata/i.test(clientAccept);
+    res.status(spResp.status).json(normalizeSharePointODataPayload(payload, wantsNoMetadata));
   } catch (err: any) {
     const cause: any = err?.cause || {};
     const diagnostic = {

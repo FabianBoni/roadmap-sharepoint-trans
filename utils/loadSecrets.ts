@@ -109,6 +109,12 @@ export function validateSecretsConfiguration(): {
     errors.push('JWT_SECRET must be at least 32 characters long');
   }
 
+  if (!process.env.INTERNAL_API_SECRET) {
+    errors.push('INTERNAL_API_SECRET is not set');
+  } else if (process.env.INTERNAL_API_SECRET.length < 32) {
+    errors.push('INTERNAL_API_SECRET must be at least 32 characters long');
+  }
+
   // Check for placeholder values (from .env.example)
   if (process.env.SP_USERNAME === 'your-username' || process.env.SP_USERNAME === '') {
     errors.push('SP_USERNAME contains placeholder value');

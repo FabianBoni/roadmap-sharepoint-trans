@@ -35,10 +35,7 @@ const probeCompatibility = async (health: RoadmapInstanceHealth) => {
     }
 
     const data = (await resp.json().catch(() => null)) as unknown;
-    const obj =
-      data && typeof data === 'object' && !Array.isArray(data)
-        ? (data as Record<string, unknown>)
-        : ({} as Record<string, unknown>);
+    const obj = unwrapODataEntity(data);
     const msts = resp.headers.get('microsoftsharepointteamservices') ?? undefined;
     const webTitle = typeof obj.Title === 'string' ? obj.Title : undefined;
     const webUrl = typeof obj.Url === 'string' ? obj.Url : undefined;
@@ -192,134 +189,336 @@ const removeDeletedFieldIfPresent = async (
   }
 };
 
+type SharePointFieldSnapshot = {
+  internalName: string;
+  title: string;
+  type: string;
+  schemaAttributes: Record<string, string>;
+  values: Record<string, unknown>;
+};
+
+const FIELD_SELECT =
+  '?$select=InternalName,Title,TypeAsString,Required,Hidden,ReadOnlyField,Indexed,EnforceUniqueValues,Description,DefaultValue,SchemaXml';
+
+const unwrapODataEntity = (value: unknown): Record<string, unknown> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const root = value as Record<string, unknown>;
+  if (Array.isArray(root.value)) {
+    const first = root.value[0];
+    return first && typeof first === 'object' && !Array.isArray(first)
+      ? (first as Record<string, unknown>)
+      : {};
+  }
+  const d = root.d;
+  if (d && typeof d === 'object' && !Array.isArray(d)) {
+    const dRecord = d as Record<string, unknown>;
+    if (Array.isArray(dRecord.results)) {
+      const first = dRecord.results[0];
+      return first && typeof first === 'object' && !Array.isArray(first)
+        ? (first as Record<string, unknown>)
+        : {};
+    }
+    return dRecord;
+  }
+  return root;
+};
+
+const parseSchemaAttributes = (schemaXml: unknown): Record<string, string> => {
+  if (typeof schemaXml !== 'string') return {};
+  const attributes: Record<string, string> = {};
+  const pattern = /([A-Za-z][A-Za-z0-9_.:-]*)\s*=\s*(["'])([\s\S]*?)\2/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(schemaXml))) attributes[match[1].toLowerCase()] = match[3];
+  return attributes;
+};
+
+const normalizeBoolean = (value: unknown): boolean =>
+  value === true || value === 1 || /^(true|1)$/i.test(String(value ?? '').trim());
+
+const normalizeNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const readFieldSnapshot = async (
+  listTitle: string,
+  fieldName: string
+): Promise<{ response: Response; snapshot?: SharePointFieldSnapshot }> => {
+  const encodedList = encodeSharePointValue(listTitle);
+  const encodedField = encodeSharePointValue(fieldName);
+  const response = await clientDataService.sharePointFetch(
+    `/api/sharepoint/_api/web/lists/getByTitle('${encodedList}')/fields/getByInternalNameOrTitle('${encodedField}')${FIELD_SELECT}`,
+    { headers: jsonHeaders }
+  );
+  if (!response.ok) return { response };
+  const entity = unwrapODataEntity(await response.json());
+  return {
+    response,
+    snapshot: {
+      internalName: String(entity.InternalName || fieldName),
+      title: String(entity.Title || entity.InternalName || fieldName),
+      type: String(entity.TypeAsString || ''),
+      schemaAttributes: parseSchemaAttributes(entity.SchemaXml),
+      values: entity,
+    },
+  };
+};
+
+const desiredFieldState = (field: SharePointFieldDefinition) => {
+  const attributes = parseSchemaAttributes(field.schemaXml);
+  return {
+    attributes,
+    title: attributes.displayname || field.name,
+    type: attributes.type || '',
+  };
+};
+
+const getFieldDifferences = (
+  field: SharePointFieldDefinition,
+  snapshot: SharePointFieldSnapshot
+): string[] => {
+  const desired = desiredFieldState(field);
+  const current = snapshot.schemaAttributes;
+  const differences: string[] = [];
+  const currentString = (attribute: string, property?: string): string => {
+    const propertyValue = property ? snapshot.values[property] : undefined;
+    if (propertyValue !== undefined && propertyValue !== null) return String(propertyValue);
+    return current[attribute] || '';
+  };
+  const compareBoolean = (attribute: string, property: string) => {
+    const expected = normalizeBoolean(desired.attributes[attribute]);
+    if (normalizeBoolean(currentString(attribute, property)) !== expected)
+      differences.push(attribute);
+  };
+  const compareOptionalNumber = (attribute: string, property?: string) => {
+    if (desired.attributes[attribute] === undefined) return;
+    if (
+      normalizeNumber(currentString(attribute, property)) !==
+      normalizeNumber(desired.attributes[attribute])
+    ) {
+      differences.push(attribute);
+    }
+  };
+
+  if (snapshot.type.toLowerCase() !== desired.type.toLowerCase()) differences.push('type');
+  if (snapshot.title !== desired.title) differences.push('title');
+  compareBoolean('required', 'Required');
+  compareBoolean('hidden', 'Hidden');
+  compareBoolean('readonly', 'ReadOnlyField');
+  compareBoolean('indexed', 'Indexed');
+  compareBoolean('enforceuniquevalues', 'EnforceUniqueValues');
+  compareOptionalNumber('maxlength', 'MaxLength');
+  compareOptionalNumber('numlines', 'NumberOfLines');
+  compareOptionalNumber('minvalue', 'MinimumValue');
+  compareOptionalNumber('maxvalue', 'MaximumValue');
+  if (
+    desired.attributes.richtext !== undefined &&
+    normalizeBoolean(currentString('richtext', 'RichText')) !==
+      normalizeBoolean(desired.attributes.richtext)
+  ) {
+    differences.push('richtext');
+  }
+  if (
+    desired.attributes.format !== undefined &&
+    currentString('format').toLowerCase() !== desired.attributes.format.toLowerCase()
+  ) {
+    differences.push('format');
+  }
+  return Array.from(new Set(differences));
+};
+
+const fieldMetadataType = (type: string): string => {
+  const normalized = type.toLowerCase();
+  if (normalized === 'text') return 'SP.FieldText';
+  if (normalized === 'note') return 'SP.FieldMultiLineText';
+  if (normalized === 'number') return 'SP.FieldNumber';
+  if (normalized === 'datetime') return 'SP.FieldDateTime';
+  if (normalized === 'boolean') return 'SP.FieldBoolean';
+  if (normalized === 'url') return 'SP.FieldUrl';
+  return 'SP.Field';
+};
+
+const buildFieldUpdatePayload = (
+  field: SharePointFieldDefinition,
+  differences: string[]
+): Record<string, unknown> => {
+  const desired = desiredFieldState(field);
+  const attrs = desired.attributes;
+  const include = (name: string) => differences.includes(name);
+  const payload: Record<string, unknown> = {
+    __metadata: { type: fieldMetadataType(desired.type) },
+  };
+  if (include('title')) payload.Title = desired.title;
+  if (include('required')) payload.Required = normalizeBoolean(attrs.required);
+  if (include('hidden')) payload.Hidden = normalizeBoolean(attrs.hidden);
+  if (include('readonly')) payload.ReadOnlyField = normalizeBoolean(attrs.readonly);
+  if (include('indexed')) payload.Indexed = normalizeBoolean(attrs.indexed);
+  if (include('enforceuniquevalues')) {
+    payload.EnforceUniqueValues = normalizeBoolean(attrs.enforceuniquevalues);
+  }
+  if (include('maxlength')) payload.MaxLength = normalizeNumber(attrs.maxlength);
+  if (include('numlines')) payload.NumberOfLines = normalizeNumber(attrs.numlines);
+  if (include('richtext')) payload.RichText = normalizeBoolean(attrs.richtext);
+  if (include('minvalue')) payload.MinimumValue = normalizeNumber(attrs.minvalue);
+  if (include('maxvalue')) payload.MaximumValue = normalizeNumber(attrs.maxvalue);
+  if (include('format')) {
+    if (desired.type.toLowerCase() === 'datetime') {
+      payload.DisplayFormat = attrs.format.toLowerCase() === 'dateonly' ? 0 : 1;
+    } else if (desired.type.toLowerCase() === 'url') {
+      payload.DisplayFormat = attrs.format.toLowerCase() === 'image' ? 1 : 0;
+    }
+  }
+  return payload;
+};
+
+const markFieldUpdated = (health: RoadmapInstanceHealth, listTitle: string, fieldName: string) => {
+  if (!health.lists.fieldsUpdated) health.lists.fieldsUpdated = {};
+  const updated = health.lists.fieldsUpdated[listTitle] || [];
+  if (!updated.includes(fieldName)) updated.push(fieldName);
+  health.lists.fieldsUpdated[listTitle] = updated;
+};
+
+const reconcileExistingField = async (
+  listTitle: string,
+  field: SharePointFieldDefinition,
+  digest: string,
+  health: RoadmapInstanceHealth,
+  snapshot: SharePointFieldSnapshot
+) => {
+  const differences = getFieldDifferences(field, snapshot);
+  if (differences.length === 0) return;
+  const errorKey = `${listTitle}.${field.name}`;
+  if (differences.includes('type')) {
+    health.lists.errors[errorKey] =
+      `Inkompatibler Spaltentyp: erwartet ${desiredFieldState(field).type}, vorhanden ${snapshot.type}. ` +
+      'Die Spalte wurde zum Schutz bestehender Daten nicht automatisch gelöscht.';
+    return;
+  }
+
+  const encodedList = encodeSharePointValue(listTitle);
+  const encodedField = encodeSharePointValue(snapshot.internalName || field.name);
+  const endpoint = `/api/sharepoint/_api/web/lists/getByTitle('${encodedList}')/fields/getByInternalNameOrTitle('${encodedField}')`;
+  const updateResponse = await clientDataService.sharePointFetch(endpoint, {
+    method: 'POST',
+    headers: {
+      ...verboseHeaders(digest),
+      'X-HTTP-Method': 'MERGE',
+      'IF-MATCH': '*',
+    },
+    body: JSON.stringify(buildFieldUpdatePayload(field, differences)),
+  });
+  if (!updateResponse.ok) {
+    const message = await readError(updateResponse);
+    if (isAuthStatus(updateResponse.status)) {
+      const context = `field:update ${listTitle}.${field.name}`;
+      recordAuthFailure(health, updateResponse.status, message, { context });
+      throw new SharePointAuthError(updateResponse.status, message, context);
+    }
+    health.lists.errors[errorKey] = `Spaltenabgleich fehlgeschlagen: ${message}`;
+    return;
+  }
+
+  clientDataService.invalidateListSchemaCache(listTitle);
+  const verified = await readFieldSnapshot(listTitle, field.name);
+  if (!verified.response.ok || !verified.snapshot) {
+    health.lists.errors[errorKey] = verified.response.ok
+      ? 'Spaltenabgleich konnte nicht verifiziert werden.'
+      : `Spaltenabgleich konnte nicht verifiziert werden: ${await readError(verified.response)}`;
+    return;
+  }
+  const remaining = getFieldDifferences(field, verified.snapshot);
+  if (remaining.length > 0) {
+    health.lists.errors[errorKey] =
+      `Spaltenabgleich unvollständig; weiterhin abweichend: ${remaining.join(', ')}`;
+    return;
+  }
+  markFieldUpdated(health, listTitle, field.name);
+};
+
 const ensureField = async (
   listTitle: string,
   field: SharePointFieldDefinition,
   digest: string,
   health: RoadmapInstanceHealth
 ) => {
-  const encodedList = encodeSharePointValue(listTitle);
-  const encodedField = encodeSharePointValue(field.name);
-  const fieldCheck = await clientDataService.sharePointFetch(
-    `/api/sharepoint/_api/web/lists/getByTitle('${encodedList}')/fields/getByInternalNameOrTitle('${encodedField}')?$select=InternalName`,
-    { headers: jsonHeaders }
-  );
-  if (fieldCheck.ok) return;
-
-  if (isAuthStatus(fieldCheck.status)) {
-    const message = await readError(fieldCheck);
-    const ctx = `field:check ${listTitle}.${field.name}`;
-    recordAuthFailure(health, fieldCheck.status, message, { context: ctx });
-    throw new SharePointAuthError(fieldCheck.status, message, ctx);
+  const initial = await readFieldSnapshot(listTitle, field.name);
+  if (initial.response.ok && initial.snapshot) {
+    await reconcileExistingField(listTitle, field, digest, health, initial.snapshot);
+    return;
   }
-
-  let allowCreation = fieldCheck.status === 404;
-  let lastErrorMessage: string | null = null;
-
-  if (allowCreation) {
-    await removeDeletedFieldIfPresent(listTitle, field.name, digest);
+  if (isAuthStatus(initial.response.status)) {
+    const message = await readError(initial.response);
+    const context = `field:check ${listTitle}.${field.name}`;
+    recordAuthFailure(health, initial.response.status, message, { context });
+    throw new SharePointAuthError(initial.response.status, message, context);
   }
-
-  if (!allowCreation) {
-    const message = await readError(fieldCheck);
-    lastErrorMessage = message;
-    if (
+  const initialError = initial.response.status === 404 ? null : await readError(initial.response);
+  const canCreate =
+    initial.response.status === 404 ||
+    Boolean(
+      initialError &&
       /InvalidClientQuery|Invalid argument|does not exist|PropertyNotFound|Could not find a property named|is not present|wurde sie von einem anderen Benutzer gelöscht/i.test(
-        message
+        initialError
       )
-    ) {
-      allowCreation = true;
-      await removeDeletedFieldIfPresent(listTitle, field.name, digest);
-    } else {
-      health.lists.errors[`${listTitle}.${field.name}`] = message;
-    }
-  }
-
-  if (!allowCreation) {
+    );
+  if (!canCreate) {
+    health.lists.errors[`${listTitle}.${field.name}`] =
+      initialError || 'Spaltenprüfung fehlgeschlagen';
     return;
   }
 
+  await removeDeletedFieldIfPresent(listTitle, field.name, digest);
+  const encodedList = encodeSharePointValue(listTitle);
   const endpoint = `/api/sharepoint/_api/web/lists/getByTitle('${encodedList}')/fields/CreateFieldAsXml`;
-  const bodyWithParameters = JSON.stringify({
-    parameters: {
+  const bodies = [
+    JSON.stringify({
+      parameters: {
+        __metadata: { type: 'SP.XmlSchemaFieldCreationInformation' },
+        SchemaXml: field.schemaXml,
+        Options: 0,
+      },
+    }),
+    JSON.stringify({
       __metadata: { type: 'SP.XmlSchemaFieldCreationInformation' },
       SchemaXml: field.schemaXml,
       Options: 0,
-    },
-  });
-  const fallbackBody = JSON.stringify({
-    __metadata: { type: 'SP.XmlSchemaFieldCreationInformation' },
-    SchemaXml: field.schemaXml,
-    Options: 0,
-  });
-
-  const attemptCreate = (body: string) =>
-    clientDataService.sharePointFetch(endpoint, {
+    }),
+  ];
+  const errors: string[] = [];
+  for (const body of bodies) {
+    const response = await clientDataService.sharePointFetch(endpoint, {
       method: 'POST',
       headers: verboseHeaders(digest),
       body,
     });
-
-  let createResp = await attemptCreate(bodyWithParameters);
-  let primaryError: string | null = null;
-  let cleanupAttempted = false;
-
-  if (!createResp.ok) {
-    if (isAuthStatus(createResp.status)) {
-      const message = await readError(createResp);
-      const ctx = `field:create ${listTitle}.${field.name}`;
-      recordAuthFailure(health, createResp.status, message, { context: ctx });
-      throw new SharePointAuthError(createResp.status, message, ctx);
+    if (response.ok) {
+      clientDataService.invalidateListSchemaCache(listTitle);
+      const created = health.lists.fieldsCreated[listTitle] || [];
+      if (!created.includes(field.name)) created.push(field.name);
+      health.lists.fieldsCreated[listTitle] = created;
+      return;
     }
-    primaryError = await readError(createResp);
-    if (shouldAttemptDeletedFieldCleanup(primaryError)) {
-      cleanupAttempted = await removeDeletedFieldIfPresent(listTitle, field.name, digest);
-      if (cleanupAttempted) {
-        createResp = await attemptCreate(bodyWithParameters);
-      }
+    if (isAuthStatus(response.status)) {
+      const message = await readError(response);
+      const context = `field:create ${listTitle}.${field.name}`;
+      recordAuthFailure(health, response.status, message, { context });
+      throw new SharePointAuthError(response.status, message, context);
+    }
+    const message = await readError(response);
+    errors.push(message);
+
+    // A concurrent provisioner may have created the field after our initial check.
+    const raced = await readFieldSnapshot(listTitle, field.name);
+    if (raced.response.ok && raced.snapshot) {
+      await reconcileExistingField(listTitle, field, digest, health, raced.snapshot);
+      return;
+    }
+    if (shouldAttemptDeletedFieldCleanup(message)) {
+      await removeDeletedFieldIfPresent(listTitle, field.name, digest);
     }
   }
-
-  if (!createResp.ok) {
-    if (!primaryError) primaryError = await readError(createResp);
-    let fallbackResp = await attemptCreate(fallbackBody);
-    if (!fallbackResp.ok) {
-      if (isAuthStatus(fallbackResp.status)) {
-        const message = await readError(fallbackResp);
-        const ctx = `field:create(fallback) ${listTitle}.${field.name}`;
-        recordAuthFailure(health, fallbackResp.status, message, { context: ctx });
-        throw new SharePointAuthError(fallbackResp.status, message, ctx);
-      }
-      const fallbackError = await readError(fallbackResp);
-      if (
-        shouldAttemptDeletedFieldCleanup(fallbackError) &&
-        !cleanupAttempted &&
-        (await removeDeletedFieldIfPresent(listTitle, field.name, digest))
-      ) {
-        cleanupAttempted = true;
-        fallbackResp = await attemptCreate(fallbackBody);
-      }
-      if (!fallbackResp.ok) {
-        health.lists.errors[`${listTitle}.${field.name}`] = [
-          lastErrorMessage,
-          primaryError,
-          fallbackError,
-          cleanupAttempted ? 'Automatische Bereinigung gelöschter Spalten fehlgeschlagen' : null,
-        ]
-          .filter(Boolean)
-          .join('\n')
-          .trim();
-        return;
-      }
-    }
-    createResp = fallbackResp;
-  }
-
-  const listFields = health.lists.fieldsCreated[listTitle] || [];
-  if (!listFields.includes(field.name)) {
-    listFields.push(field.name);
-    health.lists.fieldsCreated[listTitle] = listFields;
-  }
+  health.lists.errors[`${listTitle}.${field.name}`] = errors.join('\n').trim();
 };
 
 const extractFieldTypeFromSchema = (schemaXml: string): string => {
@@ -357,9 +556,10 @@ const validateListSchema = async (
           entry.actual &&
           entry.expected.toLowerCase() !== entry.actual.toLowerCase()
       );
-    const unexpected = Array.from(fieldNames).filter(
-      (name) => !expected.some((f) => f.name === name)
-    );
+    // SharePoint templates contain many built-in fields. Additional fields are harmless and
+    // cannot be classified reliably without loading their base-field metadata, so health only
+    // reports missing or incompatible fields from our authoritative definition.
+    const unexpected: string[] = [];
 
     if (!health.lists.schemaMismatches) health.lists.schemaMismatches = {};
     const hasIssues = missing.length || typeMismatches.length || unexpected.length;
@@ -418,6 +618,7 @@ const ensureList = async (
 ): Promise<string | null> => {
   const candidates = getListCandidates(def);
   let resolved: string | null = null;
+  let checkFailed = false;
 
   for (const candidate of candidates) {
     const check = await clientDataService.sharePointFetch(
@@ -442,8 +643,11 @@ const ensureList = async (
     if (check.status !== 404) {
       const message = await readError(check);
       health.lists.errors[candidate] = message;
+      checkFailed = true;
     }
   }
+
+  if (!resolved && checkFailed) return null;
 
   if (!resolved) {
     const createResp = await clientDataService.sharePointFetch(`/api/sharepoint/_api/web/lists`, {
@@ -465,13 +669,29 @@ const ensureList = async (
         recordAuthFailure(health, createResp.status, message, { context: ctx });
         throw new SharePointAuthError(createResp.status, message, ctx);
       }
-      health.lists.errors[def.title] = message;
-      return null;
+      // A concurrent request may have created the list after our checks.
+      for (const candidate of candidates) {
+        const raced = await clientDataService.sharePointFetch(
+          `/api/sharepoint/_api/web/lists/getByTitle('${encodeSharePointValue(candidate)}')?$select=Id`,
+          { headers: jsonHeaders }
+        );
+        if (raced.ok) {
+          resolved = candidate;
+          if (!health.lists.ensured.includes(candidate)) health.lists.ensured.push(candidate);
+          break;
+        }
+      }
+      if (!resolved) {
+        health.lists.errors[def.title] = message;
+        return null;
+      }
+    } else {
+      health.lists.created.push(def.title);
+      resolved = def.title;
     }
-    health.lists.created.push(def.title);
-    resolved = def.title;
   }
 
+  clientDataService.invalidateListSchemaCache(resolved);
   for (const field of def.fields) {
     await ensureField(resolved, field, digest, health);
   }
@@ -480,7 +700,7 @@ const ensureList = async (
 };
 
 const deleteListByTitle = async (title: string, digest: string) => {
-  await clientDataService.sharePointFetch(
+  const response = await clientDataService.sharePointFetch(
     `/api/sharepoint/_api/web/lists/getByTitle('${encodeSharePointValue(title)}')`,
     {
       method: 'POST',
@@ -491,6 +711,12 @@ const deleteListByTitle = async (title: string, digest: string) => {
       },
     }
   );
+  if (!response.ok) {
+    throw new Error(
+      `SharePoint-Liste "${title}" konnte nicht gelöscht werden: ${await readError(response)}`
+    );
+  }
+  clientDataService.invalidateListSchemaCache(title);
 };
 
 const probePermissions = async (
@@ -523,23 +749,45 @@ const probePermissions = async (
     if (!createResp.ok) {
       message = await readError(createResp);
       status = createResp.status === 403 ? 'insufficient' : 'error';
-      return { status, message, probeList };
+    } else {
+      created = true;
+      status = 'ok';
     }
-    created = true;
-    status = 'ok';
-    return { status, probeList };
   } catch (error) {
     status = 'error';
     message = error instanceof Error ? error.message : 'Unbekannter Fehler';
-    return { status, message, probeList };
   } finally {
     if (created) {
       try {
         await deleteListByTitle(probeList, digest);
-      } catch {
+      } catch (error) {
+        status = 'error';
+        message =
+          error instanceof Error
+            ? error.message
+            : 'Temporäre Prüfliste konnte nicht gelöscht werden';
         console.warn('[sharePointProvisioning] Failed to delete probe list');
       }
     }
+  }
+  return { status, message, probeList };
+};
+
+const provisioningLocks = new Map<string, Promise<void>>();
+
+const withProvisioningLock = async <T>(slug: string, operation: () => Promise<T>): Promise<T> => {
+  const previous = provisioningLocks.get(slug) ?? Promise.resolve();
+  let release = () => undefined;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  provisioningLocks.set(slug, current);
+  await previous.catch(() => undefined);
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (provisioningLocks.get(slug) === current) provisioningLocks.delete(slug);
   }
 };
 
@@ -562,18 +810,27 @@ export async function getSharePointListOverview(
           { headers: jsonHeaders }
         );
         if (resp.ok) {
-          const data = await resp.json();
+          const data = unwrapODataEntity(await resp.json());
           entry.exists = true;
           entry.resolvedTitle = typeof data.Title === 'string' ? data.Title : candidate;
           entry.matchedAlias = candidate;
-          if (typeof data.ItemCount === 'number') entry.itemCount = data.ItemCount;
+          const itemCount = Number(data.ItemCount);
+          if (Number.isFinite(itemCount)) entry.itemCount = itemCount;
           if (typeof data.Created === 'string') entry.created = data.Created;
           if (typeof data.LastItemModifiedDate === 'string') {
             entry.modified = data.LastItemModifiedDate;
           }
           if (typeof data.DefaultViewUrl === 'string') entry.defaultViewUrl = data.DefaultViewUrl;
-          if (typeof data?.RootFolder?.ServerRelativeUrl === 'string') {
-            entry.serverRelativeUrl = data.RootFolder.ServerRelativeUrl;
+          const rootFolder = data.RootFolder;
+          if (
+            rootFolder &&
+            typeof rootFolder === 'object' &&
+            !Array.isArray(rootFolder) &&
+            typeof (rootFolder as Record<string, unknown>).ServerRelativeUrl === 'string'
+          ) {
+            entry.serverRelativeUrl = String(
+              (rootFolder as Record<string, unknown>).ServerRelativeUrl
+            );
           }
           break;
         }
@@ -591,7 +848,7 @@ export async function getSharePointListOverview(
   return overview;
 }
 
-export async function ensureSharePointListForInstance(
+async function ensureSharePointListForInstanceUnlocked(
   instance: RoadmapInstanceConfig,
   key: string
 ): Promise<SharePointListEnsureResult> {
@@ -669,7 +926,16 @@ export async function ensureSharePointListForInstance(
   };
 }
 
-export async function deleteSharePointListForInstance(
+export async function ensureSharePointListForInstance(
+  instance: RoadmapInstanceConfig,
+  key: string
+): Promise<SharePointListEnsureResult> {
+  return withProvisioningLock(instance.slug, () =>
+    ensureSharePointListForInstanceUnlocked(instance, key)
+  );
+}
+
+async function deleteSharePointListForInstanceUnlocked(
   instance: RoadmapInstanceConfig,
   key: string
 ): Promise<SharePointListDeleteResult> {
@@ -712,6 +978,9 @@ export async function deleteSharePointListForInstance(
       }
     }
 
+    if (!resolved && errors.length > 0) {
+      throw new Error(errors.join('; '));
+    }
     if (!resolved) {
       return;
     }
@@ -733,7 +1002,16 @@ export async function deleteSharePointListForInstance(
   return result;
 }
 
-export async function provisionSharePointForInstance(
+export async function deleteSharePointListForInstance(
+  instance: RoadmapInstanceConfig,
+  key: string
+): Promise<SharePointListDeleteResult> {
+  return withProvisioningLock(instance.slug, () =>
+    deleteSharePointListForInstanceUnlocked(instance, key)
+  );
+}
+
+async function provisionSharePointForInstanceUnlocked(
   instance: RoadmapInstanceConfig
 ): Promise<RoadmapInstanceHealth> {
   const health: RoadmapInstanceHealth = {
@@ -797,4 +1075,12 @@ export async function provisionSharePointForInstance(
   });
 
   return health;
+}
+
+export async function provisionSharePointForInstance(
+  instance: RoadmapInstanceConfig
+): Promise<RoadmapInstanceHealth> {
+  return withProvisioningLock(instance.slug, () =>
+    provisionSharePointForInstanceUnlocked(instance)
+  );
 }

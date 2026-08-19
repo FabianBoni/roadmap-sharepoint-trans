@@ -33,6 +33,7 @@ export interface RoadmapInstanceHealth {
     created: string[];
     missing: string[];
     fieldsCreated: Record<string, string[]>;
+    fieldsUpdated?: Record<string, string[]>;
     errors: Record<string, string>;
     schemaMismatches?: Record<
       string,

@@ -225,8 +225,13 @@ class ClientDataService {
       // Never sign with JWT_SECRET: that produces signatures the receiver
       // rejects and obscures a deployment configuration error.
       const secret = String(process.env.INTERNAL_API_SECRET || '');
+      if (secret.length < 32) {
+        throw new Error(
+          'INTERNAL_API_SECRET is required and must contain at least 32 characters for internal SharePoint requests.'
+        );
+      }
       const req = nodeRequire();
-      if (secret.length >= 32 && req) {
+      if (req) {
         const { createHmac } = req('node:crypto') as typeof import('node:crypto');
         const timestamp = String(Date.now());
         const method = String(prepared.method || 'GET').toUpperCase();
@@ -667,6 +672,27 @@ class ClientDataService {
   async getListFieldTypes(listName: string): Promise<Record<string, string>> {
     await this.ensureListFieldSchema(listName);
     return this.listFieldTypeCache[this.getInstanceCacheKey(listName)] || {};
+  }
+
+  invalidateListSchemaCache(listName?: string): void {
+    const instancePrefix = `${this.getInstanceCacheKey()}:`;
+    if (listName) {
+      const cacheKey = this.getInstanceCacheKey(listName);
+      delete this.listFieldsCache[cacheKey];
+      delete this.listFieldTypeCache[cacheKey];
+      delete this.listFieldSchemaInFlight[cacheKey];
+      return;
+    }
+
+    for (const cacheKey of Object.keys(this.listFieldsCache)) {
+      if (cacheKey.startsWith(instancePrefix)) delete this.listFieldsCache[cacheKey];
+    }
+    for (const cacheKey of Object.keys(this.listFieldTypeCache)) {
+      if (cacheKey.startsWith(instancePrefix)) delete this.listFieldTypeCache[cacheKey];
+    }
+    for (const cacheKey of Object.keys(this.listFieldSchemaInFlight)) {
+      if (cacheKey.startsWith(instancePrefix)) delete this.listFieldSchemaInFlight[cacheKey];
+    }
   }
 
   private async getRequestDigest(): Promise<string> {
