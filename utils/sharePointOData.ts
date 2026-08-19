@@ -91,6 +91,49 @@ export interface SharePointDigestInfo {
   timeoutSeconds: number;
 }
 
+export interface SharePointWriteFailure {
+  reason: 'invalid-status' | 'redirect' | 'http-error' | 'error-payload';
+  upstreamStatus: number;
+}
+
+const containsODataError = (payload: unknown): boolean => {
+  if (typeof payload === 'string') {
+    const value = payload.trim();
+    return (
+      /<(?:m:)?error(?:\s|>)/i.test(value) ||
+      /"(?:odata\.)?error"\s*:/i.test(value) ||
+      (/<html/i.test(value) && /(login|sign[ -]?in|authenticate)/i.test(value))
+    );
+  }
+  if (!isObject(payload)) return false;
+  if (payload.error != null || payload['odata.error'] != null) return true;
+  return isObject(payload.d) && (payload.d.error != null || payload.d['odata.error'] != null);
+};
+
+/**
+ * Classifies upstream write responses before the proxy turns them into a local
+ * response. Redirects, malformed status markers and OData errors in a 2xx body
+ * must not be reported as successful mutations.
+ */
+export function getSharePointWriteFailure(
+  upstreamStatus: number,
+  payload: unknown
+): SharePointWriteFailure | null {
+  if (!Number.isInteger(upstreamStatus) || upstreamStatus < 100) {
+    return { reason: 'invalid-status', upstreamStatus };
+  }
+  if (upstreamStatus >= 300 && upstreamStatus < 400) {
+    return { reason: 'redirect', upstreamStatus };
+  }
+  if (upstreamStatus < 200 || upstreamStatus >= 400) {
+    return { reason: 'http-error', upstreamStatus };
+  }
+  if (containsODataError(payload)) {
+    return { reason: 'error-payload', upstreamStatus };
+  }
+  return null;
+}
+
 /** Extracts contextinfo from flat, verbose and collection-style OData envelopes. */
 export function extractSharePointDigest(payload: unknown): SharePointDigestInfo | null {
   const container = findDigestContainer(payload);

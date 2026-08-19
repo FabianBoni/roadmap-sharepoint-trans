@@ -223,6 +223,22 @@ const unwrapODataEntity = (value: unknown): Record<string, unknown> => {
   return root;
 };
 
+const normalizeSharePointGuid = (value: unknown): string | null => {
+  const candidate = String(value ?? '')
+    .trim()
+    .replace(/^\{/, '')
+    .replace(/\}$/, '');
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate)
+    ? candidate
+    : null;
+};
+
+const readListGuid = async (response: Response): Promise<string | null> => {
+  if (!response.ok) return null;
+  const entity = unwrapODataEntity(await response.json().catch(() => null));
+  return normalizeSharePointGuid(entity.Id ?? entity.ID);
+};
+
 const parseSchemaAttributes = (schemaXml: unknown): Record<string, string> => {
   if (typeof schemaXml !== 'string') return {};
   const attributes: Record<string, string> = {};
@@ -721,9 +737,9 @@ const ensureList = async (
   return resolved;
 };
 
-const deleteListByTitle = async (title: string, digest: string) => {
+const deleteListById = async (id: string, title: string, digest: string) => {
   const response = await clientDataService.sharePointFetch(
-    `/api/sharepoint/_api/web/lists/getByTitle('${encodeSharePointValue(title)}')`,
+    `/api/sharepoint/_api/web/lists(guid'${id}')`,
     {
       method: 'POST',
       headers: {
@@ -739,6 +755,23 @@ const deleteListByTitle = async (title: string, digest: string) => {
     );
   }
   clientDataService.invalidateListSchemaCache(title);
+};
+
+const deleteListByTitle = async (title: string, digest: string) => {
+  const lookup = await clientDataService.sharePointFetch(
+    `/api/sharepoint/_api/web/lists/getByTitle('${encodeSharePointValue(title)}')?$select=Id`,
+    { headers: jsonHeaders }
+  );
+  if (!lookup.ok) {
+    throw new Error(
+      `SharePoint-Liste "${title}" konnte vor dem Löschen nicht gelesen werden: ${await readError(lookup)}`
+    );
+  }
+  const id = await readListGuid(lookup);
+  if (!id) {
+    throw new Error(`SharePoint-Liste "${title}" lieferte keine gültige Listen-ID.`);
+  }
+  await deleteListById(id, title, digest);
 };
 
 const probePermissions = async (
@@ -985,6 +1018,7 @@ async function deleteSharePointListForInstanceUnlocked(
 
     const candidates = getListCandidates(def);
     let resolved: string | null = null;
+    let resolvedId: string | null = null;
     for (const candidate of candidates) {
       const check = await clientDataService.sharePointFetch(
         `/api/sharepoint/_api/web/lists/getByTitle('${encodeSharePointValue(candidate)}')?$select=Id`,
@@ -992,6 +1026,10 @@ async function deleteSharePointListForInstanceUnlocked(
       );
       if (check.ok) {
         resolved = candidate;
+        resolvedId = await readListGuid(check);
+        if (!resolvedId) {
+          errors.push(`${candidate}: SharePoint lieferte keine gültige Listen-ID`);
+        }
         break;
       }
       if (check.status !== 404) {
@@ -1000,15 +1038,18 @@ async function deleteSharePointListForInstanceUnlocked(
       }
     }
 
-    if (!resolved && errors.length > 0) {
+    if ((!resolved || !resolvedId) && errors.length > 0) {
       throw new Error(errors.join('; '));
     }
     if (!resolved) {
       return;
     }
+    if (!resolvedId) {
+      throw new Error(`${resolved}: SharePoint lieferte keine gültige Listen-ID`);
+    }
 
     try {
-      await deleteListByTitle(resolved, digest);
+      await deleteListById(resolvedId, resolved, digest);
       result.status = 'deleted';
       result.resolvedTitle = resolved;
     } catch (error) {

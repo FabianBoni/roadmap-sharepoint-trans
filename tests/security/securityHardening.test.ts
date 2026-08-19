@@ -156,6 +156,10 @@ test('SharePoint operation allowlist rejects arbitrary list subresources', () =>
   assert.equal(isAllowedPath('/_api/web/lists', 'GET', true), false);
   assert.equal(isAllowedPath('/_api/web/lists', 'POST', false), false);
   assert.equal(isAllowedPath('/_api/web/lists', 'POST', true), true);
+  const listByGuid = "/_api/web/lists(guid'11111111-2222-4333-8444-555555555555')";
+  assert.equal(isAllowedPath(listByGuid, 'GET', true), false);
+  assert.equal(isAllowedPath(listByGuid, 'POST', false), false);
+  assert.equal(isAllowedPath(listByGuid, 'POST', true), true);
   const probe = "/_api/web/lists/getByTitle('RoadmapHealthProbe_mszx62ep')";
   assert.equal(isAllowedPath(probe, 'POST', false), false);
   assert.equal(isAllowedPath(probe, 'POST', true), true);

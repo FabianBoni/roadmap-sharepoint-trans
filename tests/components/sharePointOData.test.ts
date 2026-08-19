@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   extractSharePointDigest,
+  getSharePointWriteFailure,
   getSafeRequestDigest,
   normalizeSharePointODataPayload,
 } from '../../utils/sharePointOData';
@@ -11,6 +12,23 @@ test('normalizes flat and verbose list entities for nometadata clients', () => {
 
   assert.deepEqual(normalizeSharePointODataPayload(list, true), list);
   assert.deepEqual(normalizeSharePointODataPayload({ d: list }, true), list);
+});
+
+test('write responses reject redirects, missing statuses and OData error payloads', () => {
+  assert.deepEqual(getSharePointWriteFailure(302, '<html>login</html>'), {
+    reason: 'redirect',
+    upstreamStatus: 302,
+  });
+  assert.deepEqual(getSharePointWriteFailure(0, ''), {
+    reason: 'invalid-status',
+    upstreamStatus: 0,
+  });
+  assert.deepEqual(getSharePointWriteFailure(200, { error: { message: 'not deleted' } }), {
+    reason: 'error-payload',
+    upstreamStatus: 200,
+  });
+  assert.equal(getSharePointWriteFailure(204, ''), null);
+  assert.equal(getSharePointWriteFailure(200, { d: { Id: 'created' } }), null);
 });
 
 test('normalizes d.results, d arrays, value arrays and raw arrays', () => {

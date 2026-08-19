@@ -114,6 +114,7 @@ test('list overview normalizes verbose and value OData envelopes', async () => {
 });
 
 test('delete propagates a non-successful SharePoint response', async () => {
+  const listId = '11111111-2222-4333-8444-555555555555';
   await mockService(
     {
       withInstance: async (_slug: string, run: () => Promise<unknown>) => run(),
@@ -122,7 +123,7 @@ test('delete propagates a non-successful SharePoint response', async () => {
         if (init?.method === 'POST') {
           return new Response('cannot delete list', { status: 500 });
         }
-        return jsonResponse({ Id: 'list-id' });
+        return jsonResponse({ d: { Id: `{${listId}}` } });
       },
     },
     async () => {
@@ -130,6 +131,36 @@ test('delete propagates a non-successful SharePoint response', async () => {
         deleteSharePointListForInstance(instance, 'Roadmap Settings'),
         /cannot delete list|500/i
       );
+    }
+  );
+});
+
+test('delete addresses an existing list by its SharePoint GUID', async () => {
+  const listId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  let deletedUrl = '';
+  let deletedHeaders: HeadersInit | undefined;
+
+  await mockService(
+    {
+      withInstance: async (_slug: string, run: () => Promise<unknown>) => run(),
+      requestDigest: async () => 'digest',
+      invalidateListSchemaCache: () => undefined,
+      sharePointFetch: async (url: string, init?: RequestInit) => {
+        if (init?.method === 'POST') {
+          deletedUrl = url;
+          deletedHeaders = init.headers;
+          return new Response(null, { status: 204 });
+        }
+        return jsonResponse({ value: [{ Id: listId }] });
+      },
+    },
+    async () => {
+      const result = await deleteSharePointListForInstance(instance, 'Roadmap Settings');
+
+      assert.equal(deletedUrl, `/api/sharepoint/_api/web/lists(guid'${listId}')`);
+      assert.equal(headerValue(deletedHeaders, 'X-HTTP-Method'), 'DELETE');
+      assert.equal(headerValue(deletedHeaders, 'IF-MATCH'), '*');
+      assert.equal(result.status, 'deleted');
     }
   );
 });

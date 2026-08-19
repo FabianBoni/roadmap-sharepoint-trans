@@ -28,6 +28,7 @@ import {
 } from '@/utils/sharePointPeoplePickerSource';
 import {
   extractSharePointDigest,
+  getSharePointWriteFailure,
   getSafeRequestDigest,
   normalizeSharePointODataPayload,
 } from '@/utils/sharePointOData';
@@ -361,6 +362,9 @@ export function isAllowedPath(path: string, method = 'GET', trustedInternal = fa
   }
 
   if (cleaned === '/_api/web/lists') return trustedInternal && method === 'POST';
+  if (/^\/_api\/web\/lists\(guid'[0-9a-f-]{36}'\)$/i.test(cleaned)) {
+    return trustedInternal && method === 'POST';
+  }
   if (!cleaned.startsWith('/_api/web/lists/getByTitle')) return false;
   const match = cleaned.match(/^\/_api\/web\/lists\/getByTitle\('([^']+)'\)(.*)$/i);
   if (!match) return false;
@@ -967,9 +971,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             });
           }
 
-          if (writeAttempt.status.statusCode >= 400) {
-            return res.status(writeAttempt.status.statusCode).json({
+          const writeFailure = getSharePointWriteFailure(
+            writeAttempt.status.statusCode,
+            writeAttempt.payload
+          );
+          if (writeFailure) {
+            const responseStatus =
+              writeFailure.reason === 'http-error' && writeFailure.upstreamStatus >= 400
+                ? writeFailure.upstreamStatus
+                : 502;
+            return res.status(responseStatus).json({
               error: 'SharePoint write failed',
+              upstreamStatus: writeFailure.upstreamStatus,
+              reason: writeFailure.reason,
             });
           }
 
@@ -1087,11 +1101,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               const items: Record<string, any>[] = [];
               for (const block of entries) {
                 const idMatch =
-                  block.match(/<d:Id[^>]*>(\d+)<\/d:Id>/i) ||
-                  block.match(/<d:ID[^>]*>(\d+)<\/d:ID>/i);
+                  block.match(/<d:Id[^>]*>([^<]+)<\/d:Id>/i) ||
+                  block.match(/<d:ID[^>]*>([^<]+)<\/d:ID>/i);
                 const titleMatch = block.match(/<d:Title>([\s\S]*?)<\/d:Title>/i);
                 const item: any = {
-                  Id: idMatch ? parseInt(idMatch[1], 10) : undefined,
+                  Id: idMatch
+                    ? /^\d+$/.test(idMatch[1].trim())
+                      ? parseInt(idMatch[1], 10)
+                      : idMatch[1].trim()
+                    : undefined,
                   Title: titleMatch ? titleMatch[1] : '',
                 };
                 const fieldMatches =
@@ -1559,6 +1577,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         method: effectiveMethod,
         headers: h,
         body: preparedBody,
+        redirect: isWrite ? 'manual' : 'follow',
         // @ts-ignore undici dispatcher (may be root cause for 'Invalid argument' in some builds; keep but could disable via env)
         dispatcher:
           process.env.SP_DISABLE_DISPATCHER === 'true'
@@ -1615,14 +1634,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error('[sharepoint proxy] authorization rejected', { status: spResp.status });
     }
     if (!spResp.ok) {
-      return res.status(spResp.status).json({
+      const responseStatus = spResp.status >= 300 && spResp.status < 400 ? 502 : spResp.status;
+      return res.status(responseStatus).json({
         error:
           spResp.status === 401
             ? 'Unauthorized'
             : spResp.status === 403
               ? 'Forbidden'
               : 'SharePoint request failed',
+        upstreamStatus: spResp.status,
       });
+    }
+    const rawResponseText = buffer.toString('utf8');
+    if (isWrite) {
+      const writeFailure = getSharePointWriteFailure(spResp.status, rawResponseText);
+      if (writeFailure) {
+        return res.status(502).json({
+          error: 'SharePoint write failed',
+          upstreamStatus: writeFailure.upstreamStatus,
+          reason: writeFailure.reason,
+        });
+      }
+      invalidateCurlCache();
     }
     const isJson = /application\/json|text\/json/i.test(ct);
     const isXml = /application\/atom\+xml|text\/xml|application\/xml/i.test(ct);
@@ -1635,7 +1668,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(spResp.status).send(buffer);
     }
 
-    const raw = buffer.toString('utf8');
+    const raw = rawResponseText;
     if (isText && !isJson && !isXml) {
       if (ct) res.setHeader('Content-Type', ct);
       return res.status(spResp.status).send(raw);
@@ -1654,7 +1687,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const matches = raw.match(/<m:properties>[\s\S]*?<\/m:properties>/g) || [];
         for (const block of matches) {
           const idMatch =
-            block.match(/<d:Id[^>]*>(\d+)<\/d:Id>/i) || block.match(/<d:ID[^>]*>(\d+)<\/d:ID>/i);
+            block.match(/<d:Id[^>]*>([^<]+)<\/d:Id>/i) ||
+            block.match(/<d:ID[^>]*>([^<]+)<\/d:ID>/i);
           const titleMatch = block.match(/<d:Title>([\s\S]*?)<\/d:Title>/i);
           ids.push({
             Id: idMatch ? idMatch[1] : undefined,
