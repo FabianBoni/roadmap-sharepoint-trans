@@ -122,8 +122,13 @@ Sicherheitsgrenzen. Die Entra-Identitaet wird im Standardbetrieb nicht an ShareP
 
 - Der normalisierte Instanzmodus `kerberos` ist der Standard.
 - Der SharePoint-Proxy startet `curl --negotiate` und spricht SPNEGO mit SharePoint.
-- Sind `SP_KERBEROS_SERVICE_USER` und `SP_KERBEROS_SERVICE_PASSWORD` gesetzt, wird dieses technische
-  Konto verwendet. Ohne diese Werte wird die Kerberos-Identitaet des Serverprozesses verwendet.
+- Unter Linux bezieht der Proxy mit `kinit` ein eigenes, regelmaessig erneuertes Ticket fuer
+  `SP_KERBEROS_SERVICE_USER`. Das Passwort wird ueber die Standardeingabe uebergeben und nicht in
+  Prozessargumente oder Logs geschrieben. `SP_KERBEROS_REALM` kann den Realm explizit festlegen;
+  andernfalls wird er aus `SP_ONPREM_DOMAIN` oder `DOMAIN\\Benutzer` abgeleitet.
+- Unter Windows verwendet curl die Kerberos-Identitaet des Serverprozesses. Die technischen
+  Zugangsdaten bleiben dort dem NTLM-Fallback vorbehalten, da explizite Negotiate-Zugangsdaten die
+  vorhandene Windows-SSPI-Identitaet ueberschreiben koennen.
 - GET-, HEAD- und Schreiboperationen sowie der SharePoint-Form-Digest laufen ueber diesen Kanal.
 - Die Autorisierung des Entra-Benutzers muss vorher in der Roadmap erfolgen, da SharePoint im
   Service-Account-Modell nur das technische Konto sieht.

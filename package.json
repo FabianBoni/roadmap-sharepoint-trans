@@ -18,6 +18,7 @@
     "security:audit": "yarn audit --level moderate",
     "test:security": "node scripts/run-security-tests.mjs",
     "smoke:people-picker": "node scripts/smoke-test-sharepoint-people-picker.mjs",
+    "smoke:kerberos": "tsx scripts/verify-kerberos-ticket.ts",
     "pre-commit": "lint-staged",
     "pm2:restart": "pm2 startOrRestart ecosystem.config.js --only roadmap-app --update-env",
     "pm2:stop": "pm2 delete roadmap-app",

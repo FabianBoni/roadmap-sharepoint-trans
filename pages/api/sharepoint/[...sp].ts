@@ -34,6 +34,7 @@ import {
   isUsableSharePointContextInfoResponse,
   normalizeSharePointODataPayload,
 } from '@/utils/sharePointOData';
+import { ensureKerberosTicket } from '@/utils/kerberosTicket';
 
 export const config = {
   api: {
@@ -683,6 +684,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const serviceUserRaw = (effectiveCredentials?.username || '').trim();
       const serviceUser = serviceUserRaw.replace(/\\+/g, '\\');
       const servicePass = effectiveCredentials?.password || '';
+      let kerberosTicketIssue: 'kerberos-ticket-unavailable' | null = null;
+      if (process.platform === 'linux' && serviceUser && servicePass) {
+        try {
+          await ensureKerberosTicket({
+            username: serviceUser,
+            password: servicePass,
+            realmHint: process.env.SP_KERBEROS_REALM || process.env.SP_ONPREM_DOMAIN,
+          });
+        } catch (error) {
+          kerberosTicketIssue = 'kerberos-ticket-unavailable';
+          // Do not log credentials, the principal, or kinit output.
+          console.error('[sharepoint proxy] Kerberos ticket initialization failed', {
+            instance: connectionInstance.slug,
+            reason: error instanceof Error ? error.message : 'unknown error',
+          });
+        }
+      }
       if (process.env.SP_PROXY_DEBUG === 'true') {
         // eslint-disable-next-line no-console
         console.info('[sharepoint proxy] kerberos identity', {
@@ -1004,6 +1022,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               error: writeAttempt.authFailure.status === 403 ? 'Forbidden' : 'Unauthorized',
               upstreamStatus: writeAttempt.status.statusCode,
               authScheme: writeAttempt.authScheme,
+              reason: kerberosTicketIssue || undefined,
             });
           }
 
@@ -1461,6 +1480,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         } else {
           return res.status(status).json({
             error: status === 403 ? 'Forbidden' : 'Unauthorized',
+            upstreamStatus: negotiatedStatus.statusCode,
+            reason: kerberosTicketIssue || undefined,
           });
         }
       }

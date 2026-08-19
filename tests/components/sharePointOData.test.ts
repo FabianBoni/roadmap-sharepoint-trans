@@ -8,6 +8,14 @@ import {
   isUsableSharePointContextInfoResponse,
   normalizeSharePointODataPayload,
 } from '../../utils/sharePointOData';
+import { normalizeKerberosPrincipal } from '../../utils/kerberosTicket';
+
+test('normalizes domain service accounts to Linux Kerberos principals', () => {
+  assert.equal(normalizeKerberosPrincipal('BS.CH\\roadmap'), 'roadmap@BS.CH');
+  assert.equal(normalizeKerberosPrincipal('BS\\roadmap', 'bs.ch'), 'roadmap@BS.CH');
+  assert.equal(normalizeKerberosPrincipal('roadmap@BS.CH', 'ignored.example'), 'roadmap@BS.CH');
+  assert.equal(normalizeKerberosPrincipal('roadmap', 'bs.ch'), 'roadmap@BS.CH');
+});
 
 test('classifies only 401 and 403 as HTTP authentication failures', () => {
   assert.equal(getSharePointAuthFailureStatus(400), null);
