@@ -371,8 +371,13 @@ export function isAllowedPath(path: string, method = 'GET', trustedInternal = fa
   } catch {
     /* ignore decode errors */
   }
-  if (!ALLOWED_LISTS.has(decodedTitle) && !ALLOWED_LISTS.has(rawTitle)) return false;
   const operation = match[2] || '';
+  const isPermissionProbe = /^RoadmapHealthProbe_[a-z0-9]+$/i.test(decodedTitle);
+  if (!ALLOWED_LISTS.has(decodedTitle) && !ALLOWED_LISTS.has(rawTitle)) {
+    // Permission probes are created and deleted only by signed internal provisioning calls.
+    // They must never expose list subresources or become available through browser requests.
+    return trustedInternal && method === 'POST' && isPermissionProbe && operation === '';
+  }
   return (
     operation === '' ||
     /^\/items(?:\(\d+\))?$/i.test(operation) ||

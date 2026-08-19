@@ -34,6 +34,7 @@ export interface RoadmapInstanceHealth {
     missing: string[];
     fieldsCreated: Record<string, string[]>;
     fieldsUpdated?: Record<string, string[]>;
+    overwriteRequired?: Record<string, { field: string; expected: string; actual: string }[]>;
     errors: Record<string, string>;
     schemaMismatches?: Record<
       string,

@@ -97,6 +97,7 @@ const buildOverviewHealth = (
       missing: overview.filter((entry) => !entry.exists).map((entry) => entry.title),
       fieldsCreated: operation?.lists.fieldsCreated ?? {},
       fieldsUpdated: operation?.lists.fieldsUpdated ?? {},
+      overwriteRequired: operation?.lists.overwriteRequired ?? {},
       errors,
       schemaMismatches: operation?.lists.schemaMismatches ?? {},
     },

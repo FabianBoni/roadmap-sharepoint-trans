@@ -213,6 +213,54 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+type ListOverwriteTarget = {
+  key: string;
+  title: string;
+  fields: string[];
+};
+
+const getListOverwriteTargets = (payload: unknown): ListOverwriteTarget[] => {
+  const response = asRecord(payload);
+  const result = asRecord(response?.result);
+  const details = asRecord(response?.details);
+  const detailHealth = asRecord(details?.health);
+  const lists = asRecord(result?.lists) ?? asRecord(detailHealth?.lists);
+  const overwriteRequired = asRecord(lists?.overwriteRequired);
+  if (!overwriteRequired) return [];
+
+  return Object.entries(overwriteRequired).flatMap(([listTitle, rawConflicts]) => {
+    if (!Array.isArray(rawConflicts) || rawConflicts.length === 0) return [];
+    const normalizedTitle = listTitle.trim().toLowerCase();
+    const definition = SHAREPOINT_LIST_DEFINITIONS.find((candidate) =>
+      [candidate.key, candidate.title, ...(candidate.aliases ?? [])].some(
+        (name) => name.trim().toLowerCase() === normalizedTitle
+      )
+    );
+    if (!definition) return [];
+    const fields = rawConflicts
+      .map((rawConflict) => asRecord(rawConflict))
+      .filter((conflict): conflict is Record<string, unknown> => Boolean(conflict))
+      .map((conflict) => String(conflict.field ?? '').trim())
+      .filter(Boolean);
+    return [{ key: definition.key, title: listTitle, fields }];
+  });
+};
+
+const buildOverwriteConfirmation = (targets: ListOverwriteTarget[]): string => {
+  const lists = targets
+    .map((target) => {
+      const fields = target.fields.length > 0 ? ` (${target.fields.join(', ')})` : '';
+      return `- ${target.title}${fields}`;
+    })
+    .join('\n');
+  return (
+    'Die folgenden bestehenden SharePoint-Listen haben ein inkompatibles Schema:\n\n' +
+    `${lists}\n\n` +
+    'Dürfen diese Listen vollständig überschrieben werden?\n\n' +
+    'ACHTUNG: Dabei werden alle enthaltenen Elemente und Anhänge dauerhaft gelöscht.'
+  );
+};
+
 const inspectListActionPayload = (
   payload: unknown,
   fallbackMessage: string
@@ -838,28 +886,77 @@ const AdminInstancesPage = () => {
     );
   };
 
+  const deleteListsForConfirmedOverwrite = async (
+    instance: RoadmapInstanceSummary,
+    targets: ListOverwriteTarget[]
+  ): Promise<boolean> => {
+    if (targets.length === 0 || !window.confirm(buildOverwriteConfirmation(targets))) return false;
+
+    for (const target of targets) {
+      const response = await fetch(`/api/instances/${encodeURIComponent(instance.slug)}/lists`, {
+        method: 'DELETE',
+        headers: { ...headersWithAuth(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: target.key }),
+      });
+      const payload = await response.json().catch(() => null);
+      const failure = inspectListActionPayload(
+        payload,
+        `Liste "${target.title}" konnte nicht überschrieben werden`
+      );
+      applyReturnedInstance(payload);
+      if (!response.ok || failure) {
+        throw createListActionError(
+          failure ?? {
+            message: `Liste "${target.title}" konnte nicht überschrieben werden`,
+            details: payload,
+          }
+        );
+      }
+    }
+    return true;
+  };
+
   const ensureAllListsForInstance = async (instance: RoadmapInstanceSummary) => {
     const slug = instance.slug;
     setListActionPending(slug, '__all__', true);
     updateListPanelState(slug, (current) => ({ ...current, error: null, errorDetails: null }));
     try {
-      const resp = await fetch(`/api/instances/${encodeURIComponent(slug)}/lists`, {
+      let resp = await fetch(`/api/instances/${encodeURIComponent(slug)}/lists`, {
         method: 'POST',
         headers: { ...headersWithAuth(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: '__all__' }),
       });
-      const payload = await resp.json().catch(() => null);
-      const failure = inspectListActionPayload(payload, 'Fehler beim Anlegen der Listen');
+      let payload = await resp.json().catch(() => null);
+      let failure = inspectListActionPayload(payload, 'Fehler beim Anlegen der Listen');
       applyReturnedInstance(payload);
-      await Promise.all([fetchListOverview(slug), fetchInstances()]);
       if (!resp.ok || failure) {
-        throw createListActionError(
-          failure ?? { message: 'Fehler beim Anlegen der Listen', details: payload }
-        );
+        const targets = getListOverwriteTargets(payload);
+        const confirmed = await deleteListsForConfirmedOverwrite(instance, targets);
+        if (!confirmed) {
+          throw createListActionError(
+            failure ?? { message: 'Fehler beim Anlegen der Listen', details: payload }
+          );
+        }
+
+        resp = await fetch(`/api/instances/${encodeURIComponent(slug)}/lists`, {
+          method: 'POST',
+          headers: { ...headersWithAuth(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: '__all__' }),
+        });
+        payload = await resp.json().catch(() => null);
+        failure = inspectListActionPayload(payload, 'Fehler beim Überschreiben der Listen');
+        applyReturnedInstance(payload);
+        if (!resp.ok || failure) {
+          throw createListActionError(
+            failure ?? { message: 'Fehler beim Überschreiben der Listen', details: payload }
+          );
+        }
       }
+      await Promise.all([fetchListOverview(slug), fetchInstances()]);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unbekannter Fehler';
       const detailLines = getErrorDetailLines(err);
+      await Promise.allSettled([fetchListOverview(slug), fetchInstances()]);
       updateListPanelState(slug, (current) => ({
         ...current,
         error: message,
@@ -971,23 +1068,44 @@ const AdminInstancesPage = () => {
     setListActionPending(slug, `ensure:${entry.key}`, true);
     updateListPanelState(slug, (current) => ({ ...current, error: null, errorDetails: null }));
     try {
-      const resp = await fetch(`/api/instances/${encodeURIComponent(slug)}/lists`, {
+      let resp = await fetch(`/api/instances/${encodeURIComponent(slug)}/lists`, {
         method: 'POST',
         headers: { ...headersWithAuth(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: entry.key }),
       });
-      const payload = await resp.json().catch(() => null);
-      const failure = inspectListActionPayload(payload, 'Fehler beim Anlegen der Liste');
+      let payload = await resp.json().catch(() => null);
+      let failure = inspectListActionPayload(payload, 'Fehler beim Anlegen der Liste');
       applyReturnedInstance(payload);
-      await Promise.all([fetchListOverview(slug), fetchInstances()]);
       if (!resp.ok || failure) {
-        throw createListActionError(
-          failure ?? { message: 'Fehler beim Anlegen der Liste', details: payload }
+        const targets = getListOverwriteTargets(payload).filter(
+          (target) => target.key === entry.key
         );
+        const confirmed = await deleteListsForConfirmedOverwrite(instance, targets);
+        if (!confirmed) {
+          throw createListActionError(
+            failure ?? { message: 'Fehler beim Anlegen der Liste', details: payload }
+          );
+        }
+
+        resp = await fetch(`/api/instances/${encodeURIComponent(slug)}/lists`, {
+          method: 'POST',
+          headers: { ...headersWithAuth(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: entry.key }),
+        });
+        payload = await resp.json().catch(() => null);
+        failure = inspectListActionPayload(payload, 'Fehler beim Überschreiben der Liste');
+        applyReturnedInstance(payload);
+        if (!resp.ok || failure) {
+          throw createListActionError(
+            failure ?? { message: 'Fehler beim Überschreiben der Liste', details: payload }
+          );
+        }
       }
+      await Promise.all([fetchListOverview(slug), fetchInstances()]);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unbekannter Fehler';
       const detailLines = getErrorDetailLines(err);
+      await Promise.allSettled([fetchListOverview(slug), fetchInstances()]);
       updateListPanelState(slug, (current) => ({
         ...current,
         error: message,

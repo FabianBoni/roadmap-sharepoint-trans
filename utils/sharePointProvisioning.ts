@@ -379,6 +379,26 @@ const markFieldUpdated = (health: RoadmapInstanceHealth, listTitle: string, fiel
   health.lists.fieldsUpdated[listTitle] = updated;
 };
 
+const markListOverwriteRequired = (
+  health: RoadmapInstanceHealth,
+  listTitle: string,
+  field: SharePointFieldDefinition,
+  actualType: string
+) => {
+  if (!health.lists.overwriteRequired) health.lists.overwriteRequired = {};
+  const conflicts = health.lists.overwriteRequired[listTitle] || [];
+  const expected = desiredFieldState(field).type || '(unbekannt)';
+  const actual = actualType.trim() || '(nicht ermittelbar)';
+  const existing = conflicts.find((conflict) => conflict.field === field.name);
+  if (existing) {
+    existing.expected = expected;
+    existing.actual = actual;
+  } else {
+    conflicts.push({ field: field.name, expected, actual });
+  }
+  health.lists.overwriteRequired[listTitle] = conflicts;
+};
+
 const reconcileExistingField = async (
   listTitle: string,
   field: SharePointFieldDefinition,
@@ -390,9 +410,11 @@ const reconcileExistingField = async (
   if (differences.length === 0) return;
   const errorKey = `${listTitle}.${field.name}`;
   if (differences.includes('type')) {
+    markListOverwriteRequired(health, listTitle, field, snapshot.type);
+    const actualType = snapshot.type.trim() || 'nicht ermittelbar';
     health.lists.errors[errorKey] =
-      `Inkompatibler Spaltentyp: erwartet ${desiredFieldState(field).type}, vorhanden ${snapshot.type}. ` +
-      'Die Spalte wurde zum Schutz bestehender Daten nicht automatisch gelöscht.';
+      `Inkompatibler Spaltentyp: erwartet ${desiredFieldState(field).type}, vorhanden ${actualType}. ` +
+      'Die Liste kann nach ausdrücklicher Bestätigung vollständig ersetzt werden.';
     return;
   }
 

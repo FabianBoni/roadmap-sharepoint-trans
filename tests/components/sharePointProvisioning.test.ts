@@ -328,6 +328,9 @@ test('incompatible existing field type is reported without destructive replaceme
       assert.equal(fieldMutationAttempted, false);
       assert.equal(destructiveMutationAttempted, false);
       assert.match(result.lists.errors['Roadmap Settings.Value'], /Inkompatibler Spaltentyp/i);
+      assert.deepEqual(result.lists.overwriteRequired?.['Roadmap Settings'], [
+        { field: 'Value', expected: 'Note', actual: 'Text' },
+      ]);
       assert.deepEqual(result.lists.schemaMismatches?.['Roadmap Settings']?.typeMismatches, [
         { field: 'Value', expected: 'Note', actual: 'Text' },
       ]);
