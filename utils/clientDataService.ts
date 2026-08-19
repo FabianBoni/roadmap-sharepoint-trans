@@ -20,6 +20,7 @@ import {
   parseSharePointPeoplePickerResponse,
 } from '@/utils/sharePointPeoplePicker';
 import { buildGlobalSharePointPeoplePickerProxyUrl } from '@/utils/sharePointPeoplePickerSource';
+import { extractSharePointDigest } from '@/utils/sharePointOData';
 
 type NodeRequireFn = typeof require;
 type AsyncLocalStorageCtor = new <T>() => AsyncLocalStorage<T>;
@@ -717,16 +718,34 @@ class ClientDataService {
       });
 
       if (!response.ok) {
+        const proxyError = (await response.json().catch(() => null)) as {
+          upstreamStatus?: unknown;
+          reason?: unknown;
+        } | null;
+        const diagnostics = [
+          Number.isFinite(Number(proxyError?.upstreamStatus))
+            ? `upstream=${Number(proxyError?.upstreamStatus)}`
+            : null,
+          typeof proxyError?.reason === 'string' ? `reason=${proxyError.reason}` : null,
+        ].filter(Boolean);
         console.error('Request Digest Error Response:', {
           status: response.status,
           statusText: response.statusText,
+          upstreamStatus: proxyError?.upstreamStatus,
+          reason: proxyError?.reason,
         });
-        throw new Error(`Failed to get request digest: ${response.statusText}`);
+        throw new Error(
+          `Failed to get request digest: ${response.statusText}${diagnostics.length ? ` (${diagnostics.join(', ')})` : ''}`
+        );
       }
 
       const data = await response.json();
-      const digestValue = data.FormDigestValue;
-      const expiresIn = data.FormDigestTimeoutSeconds * 1000;
+      const digest = extractSharePointDigest(data);
+      if (!digest) {
+        throw new Error('Failed to get request digest: response contained no valid digest');
+      }
+      const digestValue = digest.value;
+      const expiresIn = digest.timeoutSeconds * 1000;
 
       // Cache the digest
       this.requestDigestCache[cacheKey] = {

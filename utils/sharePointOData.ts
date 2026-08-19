@@ -149,6 +149,15 @@ export function extractSharePointDigest(payload: unknown): SharePointDigestInfo 
   };
 }
 
+/** Curl can occasionally omit its appended status marker while retaining a valid contextinfo body. */
+export function isUsableSharePointContextInfoResponse(
+  upstreamStatus: number,
+  payload: unknown
+): boolean {
+  const statusIsUsable = upstreamStatus === 0 || (upstreamStatus >= 200 && upstreamStatus < 300);
+  return statusIsUsable && Boolean(extractSharePointDigest(payload));
+}
+
 /** Returns a curl/fetch-safe incoming digest header, or null for malformed input. */
 export function getSafeRequestDigest(header: string | string[] | undefined): string | null {
   const candidate = Array.isArray(header) ? header[0] : header;

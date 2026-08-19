@@ -30,6 +30,7 @@ import {
   extractSharePointDigest,
   getSharePointWriteFailure,
   getSafeRequestDigest,
+  isUsableSharePointContextInfoResponse,
   normalizeSharePointODataPayload,
 } from '@/utils/sharePointOData';
 
@@ -971,11 +972,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             });
           }
 
+          const contextInfoDigest = isContextInfo
+            ? extractSharePointDigest(writeAttempt.payload)
+            : null;
           const writeFailure = getSharePointWriteFailure(
             writeAttempt.status.statusCode,
             writeAttempt.payload
           );
-          if (writeFailure) {
+          const contextInfoHasUsablePayloadWithoutStatus =
+            isContextInfo &&
+            writeAttempt.status.statusCode === 0 &&
+            isUsableSharePointContextInfoResponse(
+              writeAttempt.status.statusCode,
+              writeAttempt.payload
+            );
+          if (writeFailure && !contextInfoHasUsablePayloadWithoutStatus) {
             const responseStatus =
               writeFailure.reason === 'http-error' && writeFailure.upstreamStatus >= 400
                 ? writeFailure.upstreamStatus
@@ -984,6 +995,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               error: 'SharePoint write failed',
               upstreamStatus: writeFailure.upstreamStatus,
               reason: writeFailure.reason,
+            });
+          }
+          if (isContextInfo && !contextInfoDigest) {
+            return res.status(502).json({
+              error: 'SharePoint contextinfo returned no valid digest',
+              upstreamStatus: writeAttempt.status.statusCode,
+              reason: 'invalid-contextinfo',
             });
           }
 

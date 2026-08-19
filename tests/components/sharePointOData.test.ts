@@ -4,6 +4,7 @@ import {
   extractSharePointDigest,
   getSharePointWriteFailure,
   getSafeRequestDigest,
+  isUsableSharePointContextInfoResponse,
   normalizeSharePointODataPayload,
 } from '../../utils/sharePointOData';
 
@@ -58,6 +59,10 @@ test('extracts contextinfo digests from current and old SharePoint envelopes', (
     normalizeSharePointODataPayload({ d: { GetContextWebInformation: context } }, true),
     context
   );
+  assert.equal(isUsableSharePointContextInfoResponse(0, { d: context }), true);
+  assert.equal(isUsableSharePointContextInfoResponse(200, context), true);
+  assert.equal(isUsableSharePointContextInfoResponse(302, context), false);
+  assert.equal(isUsableSharePointContextInfoResponse(0, { error: 'missing digest' }), false);
 });
 
 test('accepts safe incoming digests and rejects header injection or oversized values', () => {
