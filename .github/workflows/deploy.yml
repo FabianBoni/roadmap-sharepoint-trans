@@ -479,7 +479,6 @@ jobs:
       - name: Verify SharePoint contextinfo and Kerberos renewal
         env:
           INTERNAL_API_SECRET: ${{ secrets.INTERNAL_API_SECRET }}
-          SP_CONTEXTINFO_SMOKE_HOST: roadmap.bs.ch
         run: yarn smoke:contextinfo
 
       - name: Remove temporary dependency cache
