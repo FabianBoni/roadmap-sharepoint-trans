@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import { clientDataService } from '@/utils/clientDataService';
 import { requireUserSession } from '@/utils/apiAuth';
 import {
@@ -145,7 +146,7 @@ const shouldRetryAsLegacy = (status: number, bodyText: string) => {
   return /InvalidClientQuery|Invalid argument|OData\s+version|unsupported/i.test(bodyText);
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   let projectId: string;
   try {
     projectId = validateProjectId(req.query.id);
@@ -533,3 +534,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Attachment request failed' });
   }
 }
+
+export default withActivityAudit(handler);

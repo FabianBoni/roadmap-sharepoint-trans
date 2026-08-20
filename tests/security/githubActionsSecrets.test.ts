@@ -113,9 +113,12 @@ test('deployment normalizes one database URL for migrations, verification and PM
   );
   assert.match(
     workflow,
-    /- name: Inspect PostgreSQL migration access[\s\S]*?'_prisma_migrations'[\s\S]*?'AuthSession'/
+    /- name: Inspect PostgreSQL migration access[\s\S]*?'_prisma_migrations'[\s\S]*?'AuthSession'[\s\S]*?'AuditEvent'/
   );
-  assert.match(workflow, /- name: Verify PostgreSQL schema[\s\S]*?'AuthSession'/);
+  assert.match(
+    workflow,
+    /- name: Verify PostgreSQL schema[\s\S]*?'AuthSession'[\s\S]*?'AuditEvent'/
+  );
   assert.match(workflow, /PostgreSQL schema is incomplete/);
   assert.match(workflow, /- name: Restart only the roadmap service[\s\S]*?pm2 startOrRestart/);
 });

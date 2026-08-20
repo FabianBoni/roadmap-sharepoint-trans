@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import prisma from '@/lib/prisma';
 import { requireUserSession } from '@/utils/apiAuth';
 
@@ -30,7 +31,7 @@ const parseFeedbackId = (raw: unknown): number | null => {
   return Number.isInteger(id) && id > 0 ? id : null;
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse>) {
+async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse>) {
   disableCache(res);
 
   if (req.method !== 'POST') {
@@ -78,3 +79,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
   return res.status(200).json({ success: true, userVote: value });
 }
+
+export default withActivityAudit(handler);

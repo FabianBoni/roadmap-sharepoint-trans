@@ -103,7 +103,7 @@ const SiteHeader: React.FC<SiteHeaderProps> = ({
     }
     if (typeof window === 'undefined') return;
     const updateFeedbackLink = () => {
-      void getAdminSessionState(true).then((session) =>
+      void getAdminSessionState().then((session) =>
         setShowFeedbackLink(Boolean(session?.authenticated))
       );
     };

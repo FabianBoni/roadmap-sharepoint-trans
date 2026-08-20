@@ -84,17 +84,43 @@ function getSessionStorage(): Storage | null {
   }
 }
 
-function clearStoredSession() {
-  clearAdminSessionStateCache();
+function removeStoredSessionMetadata(): boolean {
   const storage = getSessionStorage();
+  let changed = false;
   if (storage) {
     try {
+      changed = storage.getItem(USERNAME_KEY) !== null;
       storage.removeItem(USERNAME_KEY);
     } catch {
       // ignore
     }
   }
-  dispatchAdminSessionChanged();
+  return changed;
+}
+
+function clearStoredSession() {
+  clearAdminSessionStateCache();
+  if (removeStoredSessionMetadata()) {
+    dispatchAdminSessionChanged();
+  }
+}
+
+function cacheMissingAdminSession(token: string) {
+  // Keep the current request registered as in-flight until it settles. Event listeners triggered
+  // below can then reuse it instead of starting a recursive session check.
+  instanceAdminAccessCache.clear();
+  instanceAdminAccessInFlight.clear();
+  adminSessionStateCache = {
+    token,
+    value: null,
+    expiresAt: Date.now() + ADMIN_SESSION_STATE_TTL_MS,
+  };
+
+  // An anonymous check is not a session change. Notify listeners only when display metadata from
+  // a previously authenticated session was actually removed.
+  if (removeStoredSessionMetadata()) {
+    dispatchAdminSessionChanged();
+  }
 }
 
 function setStoredSession(username: string) {
@@ -271,13 +297,13 @@ export async function getAdminSessionState(
       });
 
       if (!response.ok) {
-        clearStoredSession();
+        cacheMissingAdminSession(token);
         return null;
       }
 
       const state = normalizeAdminSessionState(await response.json().catch(() => null));
       if (!state?.authenticated) {
-        clearStoredSession();
+        cacheMissingAdminSession(token);
         return null;
       }
 

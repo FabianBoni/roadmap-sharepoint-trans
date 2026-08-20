@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import prisma from '@/lib/prisma';
 import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
 import {
@@ -49,7 +50,7 @@ const upsertString = (arr: string[], value: string, op: IgnoreOp): string[] => {
   return Array.from(set);
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const slugParam = req.query.slug;
   const slug =
     typeof slugParam === 'string'
@@ -164,3 +165,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(200).json({ instance: toInstanceSummary(mapInstanceRecord(updated)) });
 }
+
+export default withActivityAudit(handler);

@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import { buildSetCookie, shouldUseSecureCookies } from '@roadmap/entra-sso/next';
 import { resolveNextBasePath } from '@/utils/entraSso';
 import { isSafeCookieRequest } from '@/utils/sessionSecurity';
@@ -21,7 +22,7 @@ function getPostLogoutRedirectUri(): string {
   return `${callback.origin}${resolveNextBasePath()}/admin/login`;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: 'Method not allowed' });
@@ -72,3 +73,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: message });
   }
 }
+
+export default withActivityAudit(handler);

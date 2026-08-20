@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
@@ -54,7 +55,7 @@ const mapRows = (rows: Array<Record<string, unknown>>): SuperAdminRecord[] =>
     updatedAt: String(row.updatedAt),
   }));
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse>) {
+async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse>) {
   disableCache(res);
 
   try {
@@ -181,3 +182,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
   return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 }
+
+export default withActivityAudit(handler);

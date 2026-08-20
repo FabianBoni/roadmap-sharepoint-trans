@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import { clientDataService } from '@/utils/clientDataService';
 import { requireUserSession } from '@/utils/apiAuth';
 import { isAdminSessionAllowedForInstance } from '@/utils/instanceAccessServer';
@@ -8,7 +9,7 @@ import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { isSampleDataInstance } from '@/utils/sampleInstanceData';
 import { normalizeCategoryId, UNCATEGORIZED_ID } from '@/utils/categoryUtils';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const disableCache = () => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -129,3 +130,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Failed to reorder projects' });
   }
 }
+
+export default withActivityAudit(handler);

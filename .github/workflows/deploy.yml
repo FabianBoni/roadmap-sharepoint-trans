@@ -301,6 +301,7 @@ jobs:
             'SupportMessage',
             'RateLimitBucket',
             'AuthSession',
+            'AuditEvent',
           ];
 
           async function main() {
@@ -374,6 +375,7 @@ jobs:
             'SupportMessage',
             'RateLimitBucket',
             'AuthSession',
+            'AuditEvent',
           ];
 
           async function main() {

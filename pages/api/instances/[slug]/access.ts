@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import prisma from '@/lib/prisma';
 import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
 import { mapInstanceRecord, type PrismaInstanceWithHosts } from '@/utils/instanceConfig';
@@ -29,7 +30,7 @@ const ensureRecordObject = (value: unknown): Record<string, unknown> => {
   return {};
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const slugParam = req.query.slug;
   const slug =
     typeof slugParam === 'string'
@@ -112,3 +113,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader('Allow', ['GET', 'PUT']);
   return res.status(405).end(`Method ${req.method} Not Allowed`);
 }
+
+export default withActivityAudit(handler);

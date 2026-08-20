@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import { clientDataService } from '@/utils/clientDataService';
 import { requireUserSession } from '@/utils/apiAuth';
 import {
@@ -11,7 +12,7 @@ import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { getSampleCategories, isSampleDataInstance } from '@/utils/sampleInstanceData';
 import { getMirroredProjectsForInstance } from '@/utils/instanceMirroring';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const disableCache = () => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -112,3 +113,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }
+
+export default withActivityAudit(handler);

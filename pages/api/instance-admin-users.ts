@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import prisma from '@/lib/prisma';
 import { requireUserSession } from '@/utils/apiAuth';
 import { getInstanceConfigFromRequest } from '@/utils/instanceConfig';
@@ -28,7 +29,7 @@ const decodeSettings = (settingsJson: string | null): Record<string, unknown> =>
   return {};
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   let session;
   try {
     session = await requireUserSession(req);
@@ -132,3 +133,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
   return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 }
+
+export default withActivityAudit(handler);

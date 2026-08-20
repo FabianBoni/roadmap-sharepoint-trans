@@ -11,6 +11,7 @@ import Head from 'next/head';
 import { prefixBasePath } from '@/utils/nextBasePath';
 import SupportChatLauncher from '@/components/SupportChatLauncher';
 import AiEndpointHealthBanner from '@/components/AiEndpointHealthBanner';
+import ActivityIndicator from '@/components/ActivityIndicator';
 
 function RoadmapApp({ Component, pageProps }: AppProps): JSX.Element {
   const router = useRouter();
@@ -100,6 +101,7 @@ function RoadmapApp({ Component, pageProps }: AppProps): JSX.Element {
           <div className="fixed bottom-0 w-full">
             <SiteFooter />
           </div>
+          <ActivityIndicator />
         </main>
       </>
     );
@@ -112,6 +114,7 @@ function RoadmapApp({ Component, pageProps }: AppProps): JSX.Element {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <Component {...pageProps} />
+      <ActivityIndicator />
       <SupportChatLauncher />
     </>
   );

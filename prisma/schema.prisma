@@ -137,3 +137,27 @@ model AuthSession {
   @@index([expiresAt])
   @@index([userKey, revokedAt])
 }
+
+/// Append-only record of a successful user-initiated mutation. Audit events only
+/// contain an explicit, small metadata set; request bodies, headers and query
+/// parameters must never be persisted here.
+model AuditEvent {
+  id               String   @id @default(cuid())
+  action           String
+  entityType       String
+  entityId         String?
+  entityLabel      String?
+  actorKey         String
+  actorDisplayName String?
+  actorSource      String?
+  instanceSlug     String?
+  visibility       String   @default("instance")
+  requestMethod    String
+  requestPath      String?
+  occurredAt       DateTime @default(now())
+
+  @@index([occurredAt])
+  @@index([instanceSlug, occurredAt])
+  @@index([visibility, occurredAt])
+  @@index([actorKey, occurredAt])
+}

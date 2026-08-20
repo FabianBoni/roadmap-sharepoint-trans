@@ -1,0 +1,27 @@
+name: roadmap-development
+
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
+    image: roadmap-postgres:16-dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-roadmap}
+      POSTGRES_USER: ${POSTGRES_USER:-roadmap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-roadmap_dev}
+    ports:
+      # Port 5432 is already used by the locally installed PostgreSQL service.
+      - '127.0.0.1:${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - roadmap_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  roadmap_postgres_data:

@@ -34,6 +34,22 @@ SharePoint-backed roadmap application built with Next.js 15 (pages router), Type
 4. **Run dev**: `yarn dev` (port 3000, Turbo mode enabled via `next dev --turbo`).
 5. **Build**: `yarn build`; **start**: `yarn start`.
 
+### Local PostgreSQL with Docker
+
+Start a PostgreSQL 16 development database with the Prisma baseline schema and the sample roadmap seed:
+
+```bash
+docker compose up -d --build
+```
+
+Use this connection string in `.env`:
+
+```dotenv
+DATABASE_URL="postgresql://roadmap:roadmap_dev@localhost:5433/roadmap?schema=public"
+```
+
+The seed creates the `sample` instance. Its `sampleData` feature serves the development categories and projects from `utils/sampleInstanceData.ts`. Initialization runs only for a new Docker volume. To deliberately recreate the database from scratch, run `docker compose down -v` before starting it again. The database name, user, password, and host port can be overridden with `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_PORT`.
+
 ## Auth Modes
 
 - **kerberos**: Server proxy uses `curl --negotiate` (hardcoded; no `SP_USE_CURL` flag required).
@@ -63,6 +79,12 @@ SharePoint-backed roadmap application built with Next.js 15 (pages router), Type
 - The browser receives only a random `HttpOnly` conversation token. The database stores its SHA-256 hash, not the token itself.
 - New deployments must apply the chat tables with `yarn prisma:deploy` before the application is restarted.
 - The widget and support inbox poll the local Next.js API while open, so the existing `next start`/PM2 setup requires no additional realtime process.
+
+## Recent Activity
+
+- Successful authenticated create, update, reorder, upload, vote, and delete requests are stored in `AuditEvent`; request bodies, headers, query values, and IP addresses are never copied into the audit record.
+- The global bottom-left indicator polls every 15 seconds while the tab is visible. Its feed is authenticated, permission-checked, and limited to `visibility = instance` events for the active roadmap instance.
+- Admin, support, and security events remain outside the shared instance feed. New deployments must apply the audit table with `yarn prisma:deploy` before restarting the application.
 
 ## Conventions and Guardrails
 

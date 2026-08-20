@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import prisma from '@/lib/prisma';
 import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
 import { mapInstanceRecord } from '@/utils/instanceConfig';
@@ -35,7 +36,7 @@ const getProvisioningIssues = (health: RoadmapInstanceHealth): string[] => {
   return issues;
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     await requireSuperAdminAccess(req);
   } catch (e: unknown) {
@@ -113,3 +114,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     },
   });
 }
+
+export default withActivityAudit(handler);

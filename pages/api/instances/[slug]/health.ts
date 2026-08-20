@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import prisma from '@/lib/prisma';
 import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
 import { mapInstanceRecord, toInstanceSummary } from '@/utils/instanceConfig';
@@ -6,7 +7,7 @@ import { provisionSharePointForInstance } from '@/utils/sharePointProvisioning';
 import type { RoadmapInstanceHealth } from '@/types/roadmapInstance';
 import { sanitizeSlug } from '../helpers';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const slugParam = req.query.slug;
   const slug =
     typeof slugParam === 'string'
@@ -54,7 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         errors: { __provision: message },
       },
     };
-    // eslint-disable-next-line no-console
+
     console.error('[instances:health] sharepoint provisioning failed', error);
   }
 
@@ -70,3 +71,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const summary = toInstanceSummary(mapInstanceRecord(updated));
   return res.status(200).json({ instance: summary });
 }
+
+export default withActivityAudit(handler);

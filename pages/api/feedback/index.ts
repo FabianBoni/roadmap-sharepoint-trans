@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import prisma from '@/lib/prisma';
 import { requireUserSession } from '@/utils/apiAuth';
 
@@ -77,7 +78,7 @@ const loadFeedbackItems = async (userKey: string): Promise<FeedbackItem[]> => {
   return items.map((item) => mapFeedbackItem(item, userKey));
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse>) {
+async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse>) {
   disableCache(res);
 
   let userKey = '';
@@ -130,3 +131,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   res.setHeader('Allow', ['GET', 'POST']);
   return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 }
+
+export default withActivityAudit(handler);

@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import prisma from '@/lib/prisma';
 import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
 import { mapInstanceRecord, toInstanceSummary } from '@/utils/instanceConfig';
@@ -161,7 +162,7 @@ const persistActionFailure = async (
   }
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const slugParam = req.query.slug;
   const slug =
     typeof slugParam === 'string'
@@ -352,3 +353,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
+
+export default withActivityAudit(handler);

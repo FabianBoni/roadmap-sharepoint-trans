@@ -286,7 +286,7 @@ Normalize the Prisma target schema:
 
 Inspect the deployment role's current-schema privileges and relevant table permissions. In particular, if `_prisma_migrations` exists, fail unless the role has SELECT plus INSERT/UPDATE/DELETE on it. Log only privilege booleans and identifiers, not credentials.
 
-The current permission inspection considers `_prisma_migrations` plus these application tables: `RoadmapInstance`, `RoadmapInstanceHost`, `SuperAdmin`, `InstanceDepartmentAccess`, `FeedbackRequest`, `FeedbackVote`, `SupportConversation`, `SupportMessage`, `RateLimitBucket`, and `AuthSession`. The post-migration completeness check requires those ten application tables. Replace both lists from the target schema; the lists serve different checks and must remain consistent with the same schema version.
+The current permission inspection considers `_prisma_migrations` plus these application tables: `RoadmapInstance`, `RoadmapInstanceHost`, `SuperAdmin`, `InstanceDepartmentAccess`, `FeedbackRequest`, `FeedbackVote`, `SupportConversation`, `SupportMessage`, `RateLimitBucket`, `AuthSession`, and `AuditEvent`. The post-migration completeness check requires those eleven application tables. Replace both lists from the target schema; the lists serve different checks and must remain consistent with the same schema version.
 
 Apply reviewed migrations with exactly:
 

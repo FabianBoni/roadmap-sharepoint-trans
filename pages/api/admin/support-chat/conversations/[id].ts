@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import prisma from '@/lib/prisma';
 import {
   SUPPORT_CHAT_MESSAGE_MAX_LENGTH,
@@ -20,7 +21,7 @@ const parseConversationId = (raw: string | string[] | undefined): string => {
   return typeof value === 'string' && /^[a-z0-9]{10,40}$/i.test(value) ? value : '';
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse>) {
+async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse>) {
   disableSupportChatCache(res);
 
   let session;
@@ -111,3 +112,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   res.setHeader('Allow', ['GET', 'POST', 'PATCH', 'DELETE']);
   return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
 }
+
+export default withActivityAudit(handler);

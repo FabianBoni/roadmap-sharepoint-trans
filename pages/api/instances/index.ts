@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import prisma from '@/lib/prisma';
 import { requireSuperAdminAccess } from '@/utils/superAdminAccessServer';
 import {
@@ -19,7 +20,7 @@ import {
 import { clearInstanceAccessDecisionCache } from '@/utils/instanceAccessServer';
 import { invalidateRoadmapDataCache } from '@/utils/roadmapData';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     await requireSuperAdminAccess(req);
   } catch (e: unknown) {
@@ -179,3 +180,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
+
+export default withActivityAudit(handler);

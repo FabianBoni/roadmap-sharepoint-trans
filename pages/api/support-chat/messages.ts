@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { withActivityAudit } from '@/utils/auditLog';
 import prisma from '@/lib/prisma';
 import {
   SUPPORT_CHAT_MESSAGE_MAX_LENGTH,
@@ -29,7 +30,7 @@ const loadConversation = async (token: string | null) => {
   });
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse>) {
+async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse>) {
   disableSupportChatCache(res);
   await cleanupExpiredSupportChats().catch(() => 0);
 
@@ -117,3 +118,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   setSupportChatCookie(res, token);
   return res.status(201).json({ conversation: mapSupportChatConversation(conversation) });
 }
+
+export default withActivityAudit(handler);
