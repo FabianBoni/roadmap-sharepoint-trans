@@ -70,5 +70,75 @@ ON CONFLICT ("normalizedUsername") DO UPDATE SET
   "note" = EXCLUDED."note",
   "updatedAt" = CURRENT_TIMESTAMP;
 
-COMMIT;
+INSERT INTO "FeedbackRequest" (
+  "title",
+  "description",
+  "createdBy",
+  "createdByName",
+  "status",
+  "completedAt",
+  "completedBy",
+  "createdAt",
+  "updatedAt"
+)
+VALUES
+  (
+    'Roadmap als PDF exportieren',
+    'Eine kompakte PDF-Ansicht soll sich für Sitzungen und den Versand an Stakeholder exportieren lassen.',
+    'seed:sample:feedback-pdf-export',
+    'Roadmap Demo',
+    'OPEN',
+    NULL,
+    NULL,
+    '2026-08-10 09:00:00+00',
+    CURRENT_TIMESTAMP
+  ),
+  (
+    'Favoriten und persönliche Ansichten',
+    'Nutzerinnen und Nutzer möchten häufig verwendete Projekte markieren und als persönliche Ansicht speichern.',
+    'seed:sample:feedback-favorites',
+    'Roadmap Demo',
+    'OPEN',
+    NULL,
+    NULL,
+    '2026-08-14 13:30:00+00',
+    CURRENT_TIMESTAMP
+  ),
+  (
+    'Direkter Excel-Export der Roadmap',
+    'Die gefilterte Roadmap kann jetzt direkt als Excel-Datei heruntergeladen und weiterverarbeitet werden.',
+    'seed:sample:feedback-excel-export',
+    'Roadmap Demo',
+    'COMPLETED',
+    '2026-08-20 10:00:00+00',
+    'fabian.boni@jsd.bs.ch',
+    '2026-07-28 08:15:00+00',
+    CURRENT_TIMESTAMP
+  );
 
+INSERT INTO "FeedbackVote" (
+  "feedbackId",
+  "userKey",
+  "value",
+  "createdAt",
+  "updatedAt"
+)
+SELECT request."id", vote."userKey", 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+FROM (
+  VALUES
+    ('seed:sample:feedback-pdf-export', 'seed:sample:user:anna'),
+    ('seed:sample:feedback-pdf-export', 'seed:sample:user:marco'),
+    ('seed:sample:feedback-pdf-export', 'seed:sample:user:samira'),
+    ('seed:sample:feedback-favorites', 'seed:sample:user:anna'),
+    ('seed:sample:feedback-favorites', 'seed:sample:user:marco'),
+    ('seed:sample:feedback-excel-export', 'seed:sample:user:anna'),
+    ('seed:sample:feedback-excel-export', 'seed:sample:user:marco'),
+    ('seed:sample:feedback-excel-export', 'seed:sample:user:samira'),
+    ('seed:sample:feedback-excel-export', 'seed:sample:user:noah')
+) AS vote("createdBy", "userKey")
+JOIN "FeedbackRequest" request ON request."createdBy" = vote."createdBy"
+ON CONFLICT ("feedbackId", "userKey") DO UPDATE SET
+  "value" = EXCLUDED."value",
+  "updatedAt" = CURRENT_TIMESTAMP;
+
+COMMIT;

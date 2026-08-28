@@ -179,6 +179,11 @@ const ProjectDetailPage: FC<{ accessDenied?: boolean }> = ({ accessDenied }) => 
         setAccessDeniedState(false);
         setProject(data);
 
+        if (data?.isReadOnlyMirror) {
+          setAttachments([]);
+          return;
+        }
+
         const attachmentsUrl = instanceSlug
           ? `/api/attachments/${encodeURIComponent(String(id))}?${INSTANCE_QUERY_PARAM}=${encodeURIComponent(instanceSlug)}`
           : `/api/attachments/${encodeURIComponent(String(id))}`;
@@ -353,7 +358,7 @@ const ProjectDetailPage: FC<{ accessDenied?: boolean }> = ({ accessDenied }) => 
               </div>
 
               <div className="ds-project-actions [display:grid] [gap:var(--ds-space-4)] [min-width:190px]">
-                {isAdmin && (
+                {isAdmin && !project.isReadOnlyMirror && (
                   <Link
                     href={`/admin/projects/edit/${project.id}`}
                     className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)]"
@@ -361,12 +366,14 @@ const ProjectDetailPage: FC<{ accessDenied?: boolean }> = ({ accessDenied }) => 
                     Projekt bearbeiten
                   </Link>
                 )}
-                <a
-                  href="#anhange"
-                  className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)]"
-                >
-                  Anhänge ansehen
-                </a>
+                {!project.isReadOnlyMirror && (
+                  <a
+                    href="#anhange"
+                    className="ds-button [display:inline-flex] [min-height:54px] [align-items:center] [justify-content:center] [gap:10px] [padding-inline:22px] [border:1px_solid_transparent] [border-radius:16px] [font-weight:800] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_box-shadow_var(--ds-duration-base)_var(--ds-ease-out),_border-color_var(--ds-duration-base)_var(--ds-ease-out),_background_var(--ds-duration-base)_var(--ds-ease-out)] hover:[transform:translateY(-2px)] active:[transform:translateY(0)] disabled:[cursor:not-allowed] disabled:[opacity:0.6] disabled:[transform:none] ds-button-secondary [border-color:var(--ds-border-default)] [background:var(--ds-bg-elevated)] [box-shadow:var(--ds-shadow-card)] [color:var(--ds-text-strong)]"
+                  >
+                    Anhänge ansehen
+                  </a>
+                )}
               </div>
             </div>
           </section>
@@ -506,35 +513,41 @@ const ProjectDetailPage: FC<{ accessDenied?: boolean }> = ({ accessDenied }) => 
 
               <InfoCard title="Anhänge" id="anhange">
                 <ul className="ds-project-list [display:grid] [gap:var(--ds-space-3)] [margin:0] [padding:0] [list-style:none]">
-                  {attachments.length === 0 && (
+                  {project.isReadOnlyMirror ? (
+                    <li className="ds-project-list-item [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:var(--ds-bg-soft)] [padding:14px_16px] [&.is-empty]:[color:var(--ds-text-muted)] is-empty">
+                      Anhänge werden nicht in andere Roadmaps gespiegelt. Öffnen Sie dafür das
+                      Projekt in der Quell-Roadmap.
+                    </li>
+                  ) : attachments.length === 0 ? (
                     <li className="ds-project-list-item [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:var(--ds-bg-soft)] [padding:14px_16px] [&.is-empty]:[color:var(--ds-text-muted)] is-empty">
                       Keine Anhänge vorhanden.
                     </li>
-                  )}
-                  {attachments.map((attachment) => (
-                    <li
-                      key={attachment.DocumentId}
-                      className="ds-project-attachment-item [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:var(--ds-bg-soft)] [display:flex] [align-items:center] [justify-content:space-between] [gap:var(--ds-space-3)] [padding:14px_16px] [&_.ds-project-inline-link]:[flex:0_0_auto] [&_.ds-project-inline-link]:[margin-top:0] [&_.ds-project-inline-link]:[margin-left:auto]"
-                    >
-                      <div className="ds-project-attachment-label [display:flex] [flex:1_1_auto] [min-width:0] [align-items:center] [gap:9px] [color:var(--ds-text-default)] [&_svg]:[flex:0_0_auto] [&_svg]:[color:var(--ds-accent-strong)]">
-                        <FiExternalLink
-                          className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]"
-                          aria-hidden="true"
-                        />
-                        <span className="ds-project-attachment-name [display:block] [min-width:0] [overflow:hidden] [text-overflow:ellipsis] [white-space:nowrap]">
-                          {attachment.FileName}
-                        </span>
-                      </div>
-                      <a
-                        href={buildAttachmentDownloadUrl(String(id), attachment.DocumentId)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="ds-project-inline-link [display:inline-flex] [align-items:center] [gap:8px] [margin-top:8px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:850] [letter-spacing:0.18em] [text-transform:uppercase] [transition:color_var(--ds-duration-fast)_var(--ds-ease-out)] hover:[color:var(--ds-text-strong)]"
+                  ) : null}
+                  {!project.isReadOnlyMirror &&
+                    attachments.map((attachment) => (
+                      <li
+                        key={attachment.DocumentId}
+                        className="ds-project-attachment-item [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:var(--ds-bg-soft)] [display:flex] [align-items:center] [justify-content:space-between] [gap:var(--ds-space-3)] [padding:14px_16px] [&_.ds-project-inline-link]:[flex:0_0_auto] [&_.ds-project-inline-link]:[margin-top:0] [&_.ds-project-inline-link]:[margin-left:auto]"
                       >
-                        Öffnen
-                      </a>
-                    </li>
-                  ))}
+                        <div className="ds-project-attachment-label [display:flex] [flex:1_1_auto] [min-width:0] [align-items:center] [gap:9px] [color:var(--ds-text-default)] [&_svg]:[flex:0_0_auto] [&_svg]:[color:var(--ds-accent-strong)]">
+                          <FiExternalLink
+                            className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]"
+                            aria-hidden="true"
+                          />
+                          <span className="ds-project-attachment-name [display:block] [min-width:0] [overflow:hidden] [text-overflow:ellipsis] [white-space:nowrap]">
+                            {attachment.FileName}
+                          </span>
+                        </div>
+                        <a
+                          href={buildAttachmentDownloadUrl(String(id), attachment.DocumentId)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ds-project-inline-link [display:inline-flex] [align-items:center] [gap:8px] [margin-top:8px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:850] [letter-spacing:0.18em] [text-transform:uppercase] [transition:color_var(--ds-duration-fast)_var(--ds-ease-out)] hover:[color:var(--ds-text-strong)]"
+                        >
+                          Öffnen
+                        </a>
+                      </li>
+                    ))}
                 </ul>
               </InfoCard>
             </div>

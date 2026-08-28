@@ -1010,6 +1010,7 @@ class ClientDataService {
       'ProjectFields',
       'Badges',
       'ProjectBadges',
+      'MirrorTargetInstanceSlugs',
       'Projektphase',
       'NaechsterMeilenstein',
     ];
@@ -1372,6 +1373,7 @@ class ClientDataService {
       }
       const projectFields = this.normalizeStringList(item.ProjectFields);
       const badges = this.normalizeStringList(item.Badges ?? item.ProjectBadges);
+      const mirrorTargetInstanceSlugs = this.normalizeStringList(item.MirrorTargetInstanceSlugs);
       const normalizedCategory = getNormalizedCategoryFromEntity(item);
       if (normalizedCategory) item.Category = normalizedCategory;
 
@@ -1397,6 +1399,7 @@ class ClientDataService {
         status: String(item.Status || 'planned').toLowerCase() as any,
         ProjectFields: projectFields,
         badges,
+        mirrorTargetInstanceSlugs,
         projektleitung: item.Projektleitung || '',
         bisher: item.Bisher || '',
         zukunft: item.Zukunft || '',
@@ -1543,6 +1546,8 @@ class ClientDataService {
       if (listFields?.has('ProjectType')) baseSelectFields.push('ProjectType');
       if (listFields?.has('Badges')) baseSelectFields.push('Badges');
       if (listFields?.has('ProjectBadges')) baseSelectFields.push('ProjectBadges');
+      if (listFields?.has('MirrorTargetInstanceSlugs'))
+        baseSelectFields.push('MirrorTargetInstanceSlugs');
       if (listFields?.has('Projektphase')) baseSelectFields.push('Projektphase');
       if (listFields?.has('NaechsterMeilenstein')) baseSelectFields.push('NaechsterMeilenstein');
 
@@ -1633,6 +1638,11 @@ class ClientDataService {
             if (!built.ProjectFields?.length && fromList.ProjectFields?.length)
               built.ProjectFields = fromList.ProjectFields;
             if (!built.badges?.length && fromList.badges?.length) built.badges = fromList.badges;
+            if (
+              !built.mirrorTargetInstanceSlugs?.length &&
+              fromList.mirrorTargetInstanceSlugs?.length
+            )
+              built.mirrorTargetInstanceSlugs = fromList.mirrorTargetInstanceSlugs;
             if (!built.projektphase && fromList.projektphase)
               built.projektphase = fromList.projektphase;
             if (!built.naechster_meilenstein && fromList.naechster_meilenstein)
@@ -1654,6 +1664,7 @@ class ClientDataService {
     if (!item) return null;
     const projectFields = this.normalizeStringList(item.ProjectFields);
     const badges = this.normalizeStringList(item.Badges ?? item.ProjectBadges);
+    const mirrorTargetInstanceSlugs = this.normalizeStringList(item.MirrorTargetInstanceSlugs);
 
     const teamMembers = await this.getTeamMembersForProject(id);
     const links = await this.getProjectLinks(id);
@@ -1673,6 +1684,7 @@ class ClientDataService {
       status: (item.Status?.toLowerCase?.() || 'planned') as any,
       ProjectFields: projectFields,
       badges,
+      mirrorTargetInstanceSlugs,
       projektleitung: item.Projektleitung || '',
       projektleitungImageUrl: null,
       teamMembers: teamMembers,
@@ -1791,6 +1803,10 @@ class ClientDataService {
           : existingProject.ProjectFields;
       const badgesSource =
         projectData.badges !== undefined ? projectData.badges : existingProject.badges;
+      const mirrorTargetInstanceSlugsSource =
+        projectData.mirrorTargetInstanceSlugs !== undefined
+          ? projectData.mirrorTargetInstanceSlugs
+          : existingProject.mirrorTargetInstanceSlugs;
       const projectFieldsValue = this.serializeStringList(projectFieldsSource);
 
       // Create a clean request body with all fields included
@@ -1838,6 +1854,12 @@ class ClientDataService {
           body['ProjectBadges'] = this.formatStringListForSharePoint(
             badgesSource,
             fieldTypes['ProjectBadges']
+          );
+        }
+        if (fields.has('MirrorTargetInstanceSlugs')) {
+          body['MirrorTargetInstanceSlugs'] = this.formatStringListForSharePoint(
+            mirrorTargetInstanceSlugsSource,
+            fieldTypes['MirrorTargetInstanceSlugs']
           );
         }
         if (fields.has('Projektphase')) {
@@ -2758,6 +2780,12 @@ class ClientDataService {
           body['ProjectBadges'] = this.formatStringListForSharePoint(
             (projectData as any).badges,
             fieldTypes['ProjectBadges']
+          );
+        }
+        if (fields.has('MirrorTargetInstanceSlugs')) {
+          body['MirrorTargetInstanceSlugs'] = this.formatStringListForSharePoint(
+            projectData.mirrorTargetInstanceSlugs,
+            fieldTypes['MirrorTargetInstanceSlugs']
           );
         }
         if (fields.has('Projektphase')) {

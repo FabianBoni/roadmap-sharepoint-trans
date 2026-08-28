@@ -10,6 +10,7 @@ import withAdminAuth from '@/components/withAdminAuth';
 import { Category, InstanceBadgeOption, Project } from '@/types';
 import { buildInstanceAwareUrl } from '@/utils/auth';
 import { INSTANCE_QUERY_PARAM } from '@/utils/instanceConfig';
+import { buildProjectSaveNoticeQuery, countUniqueMirrorTargets } from '@/utils/projectSaveNotice';
 
 const NewProjectPage: FC = () => {
   const router = useRouter();
@@ -17,6 +18,7 @@ const NewProjectPage: FC = () => {
   const instanceSlug = Array.isArray(instanceQuery) ? instanceQuery[0] : instanceQuery || null;
   const [categories, setCategories] = useState<Category[]>([]);
   const [instanceBadgeOptions, setInstanceBadgeOptions] = useState<InstanceBadgeOption[]>([]);
+  const [instanceBadgeOptionsError, setInstanceBadgeOptionsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,16 +46,36 @@ const NewProjectPage: FC = () => {
         const instancesPayload = await instancesResponse.json().catch(() => null);
         if (cancelled) return;
         setCategories(categoriesData);
-        setInstanceBadgeOptions(
+        const accessibleInstanceSlugs = new Set<string>(
           Array.isArray(instancesPayload?.instances)
-            ? instancesPayload.instances.filter(
-                (instance): instance is InstanceBadgeOption =>
-                  typeof instance?.slug === 'string' &&
-                  typeof instance?.displayName === 'string' &&
-                  typeof instance?.badge === 'string' &&
-                  instance.badge.trim().length > 0
-              )
+            ? instancesPayload.instances
+                .map((instance: unknown) =>
+                  instance && typeof instance === 'object' && 'slug' in instance
+                    ? String(instance.slug).trim().toLowerCase()
+                    : ''
+                )
+                .filter(Boolean)
             : []
+        );
+        const validBadgeOptions = Array.isArray(instancesPayload?.badgeOptions)
+          ? instancesPayload.badgeOptions.filter(
+              (instance): instance is InstanceBadgeOption =>
+                typeof instance?.slug === 'string' &&
+                typeof instance?.displayName === 'string' &&
+                typeof instance?.badge === 'string' &&
+                instance.badge.trim().length > 0
+            )
+          : [];
+        setInstanceBadgeOptions(
+          validBadgeOptions.map((option) => ({
+            ...option,
+            hasDirectAccess: accessibleInstanceSlugs.has(option.slug.trim().toLowerCase()),
+          }))
+        );
+        setInstanceBadgeOptionsError(
+          instancesResponse.ok
+            ? null
+            : 'Spiegelziele konnten nicht geladen werden. Laden Sie die Seite erneut.'
         );
       } catch (err) {
         console.error('Error fetching categories:', err);
@@ -93,10 +115,25 @@ const NewProjectPage: FC = () => {
         throw new Error(payload?.error || 'Projekt konnte nicht gespeichert werden.');
       }
 
-      router.push({ pathname: '/admin', query: router.query });
+      const mirrorTargetInstanceSlugs = (
+        project as Project & { mirrorTargetInstanceSlugs?: unknown }
+      ).mirrorTargetInstanceSlugs;
+      await router.push({
+        pathname: '/admin',
+        query: buildProjectSaveNoticeQuery(router.query, {
+          action: 'created',
+          publishedCount: countUniqueMirrorTargets(mirrorTargetInstanceSlugs, instanceSlug),
+        }),
+      });
     } catch (err) {
       console.error('Error saving project:', err);
-      setError('Projekt konnte nicht gespeichert werden. Bitte prüfen Sie die Eingaben.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Projekt konnte nicht gespeichert werden. Bitte prüfen Sie die Eingaben.'
+      );
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      throw err instanceof Error ? err : new Error('Projekt konnte nicht gespeichert werden.');
     }
   };
 
@@ -113,13 +150,18 @@ const NewProjectPage: FC = () => {
       ) : (
         <section className="rounded-3xl border border-slate-800/70 bg-slate-950/70 px-6 py-8 shadow-lg shadow-slate-950/40 sm:px-9">
           {error && (
-            <div className="mb-6 rounded-2xl border border-rose-500/50 bg-rose-500/15 px-4 py-3 text-sm text-rose-100">
+            <div
+              className="mb-6 rounded-2xl border border-rose-500/50 bg-rose-500/15 px-4 py-3 text-sm text-rose-100"
+              role="alert"
+              aria-live="assertive"
+            >
               {error}
             </div>
           )}
           <ProjectForm
             categories={categories}
             instanceBadgeOptions={instanceBadgeOptions}
+            instanceBadgeOptionsError={instanceBadgeOptionsError}
             instanceSlug={instanceSlug}
             onSubmit={handleSubmit}
             onCancel={handleCancel}

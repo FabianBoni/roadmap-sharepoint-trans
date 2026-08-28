@@ -239,9 +239,12 @@ const ProjekteVerwalten = () => {
             Gespiegelte Projekte in der Quellinstanz pflegen
           </h2>
           <p className="ds-section-copy [max-width:620px] [margin:10px_0_0] [color:var(--ds-text-muted)] [line-height:1.65]">
-            Bei einem gespiegelten Projekt zeigt die Adminliste „Nur lesen“. Suchen Sie die im
-            Projekt-Detail genannte Quellinstanz und nehmen Sie die Änderung dort vor. Falls Ihnen
-            dort die Berechtigung fehlt, wenden Sie sich an deren zuständige Administration.
+            Unter „Sichtbarkeit und Badges“ wählen Sie die Roadmaps aus, in denen ein Projekt
+            schreibgeschützt erscheinen soll. Sie sehen dabei auch mögliche Ziele, auf die Sie
+            selbst keinen direkten Zugriff haben. Bei einem gespiegelten Projekt zeigt die
+            Adminliste „Read-only Spiegelung“. Änderungen nehmen Sie immer in der im Projekt-Detail
+            genannten Quellinstanz vor. Falls Ihnen dort die Berechtigung fehlt, wenden Sie sich an
+            deren zuständige Administration.
           </p>
         </div>
         <div className="ds-actions [display:flex] [flex-wrap:wrap] [align-items:center] [gap:var(--ds-space-4)] [margin-top:30px] max-[760px]:[&_.ds-button]:[width:100%] ds-help-support-actions [flex:0_0_auto] [margin-top:0]">

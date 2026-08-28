@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma';
-import type { Category, InstanceBadgeOption, Project } from '@/types';
+import type { Category, InstanceBadgeOption, MirroringSourceFailure, Project } from '@/types';
 import type { RoadmapInstanceConfig } from '@/types/roadmapInstance';
 import { clientDataService } from '@/utils/clientDataService';
 import { mapInstanceRecord, type PrismaInstanceWithHosts } from '@/utils/instanceConfig';
@@ -11,6 +11,7 @@ type MirroredProjectsResult = {
   mirroredProjects: Project[];
   mirroredCategories: Category[];
   badgeOptions: InstanceBadgeOption[];
+  mirroringFailures: MirroringSourceFailure[];
 };
 
 type MirroringIndexEntry = {
@@ -20,7 +21,9 @@ type MirroringIndexEntry = {
 
 type MirroringIndex = {
   badgeOptions: InstanceBadgeOption[];
+  projectsByTargetSlug: Map<string, MirroringIndexEntry[]>;
   projectsByBadge: Map<string, MirroringIndexEntry[]>;
+  mirroringFailures: MirroringSourceFailure[];
 };
 
 let mirroringIndexCache: { expiresAt: number; value: MirroringIndex } | null = null;
@@ -122,6 +125,42 @@ const normalizeBadgeList = (badges: unknown): string[] => {
     .filter((badge): badge is string => Boolean(badge));
 };
 
+export const normalizeMirrorTargetInstanceSlugs = (slugs: unknown): string[] => {
+  if (!Array.isArray(slugs)) return [];
+  return slugs
+    .filter((slug): slug is string => typeof slug === 'string')
+    .map((slug) => slug.trim().toLowerCase())
+    .filter(Boolean)
+    .filter((slug, index, list) => list.indexOf(slug) === index);
+};
+
+/**
+ * Explicit target slugs are authoritative. Badge matching is only used for projects
+ * created before MirrorTargetInstanceSlugs existed.
+ */
+export const isProjectMirroredToInstance = (opts: {
+  project: Pick<Project, 'badges' | 'mirrorTargetInstanceSlugs'>;
+  targetSlug: string;
+  targetBadge?: string | null;
+}): boolean => {
+  const explicitTargets = normalizeMirrorTargetInstanceSlugs(
+    opts.project.mirrorTargetInstanceSlugs
+  );
+  const targetSlug = String(opts.targetSlug || '')
+    .trim()
+    .toLowerCase();
+  if (explicitTargets.length > 0)
+    return Boolean(targetSlug) && explicitTargets.includes(targetSlug);
+
+  const normalizedTargetBadge = normalizeInstanceBadge(opts.targetBadge)?.toLowerCase();
+  return (
+    Boolean(normalizedTargetBadge) &&
+    normalizeBadgeList(opts.project.badges).some(
+      (badge) => badge.toLowerCase() === normalizedTargetBadge
+    )
+  );
+};
+
 const mapMirroredProject = (
   project: Project,
   sourceInstance: Pick<RoadmapInstanceConfig, 'slug' | 'displayName'>
@@ -187,6 +226,8 @@ const buildMirroringIndex = async (
     .filter((entry): entry is InstanceBadgeOption => Boolean(entry.badge));
 
   const projectsByBadge = new Map<string, MirroringIndexEntry[]>();
+  const projectsByTargetSlug = new Map<string, MirroringIndexEntry[]>();
+  const mirroringFailures: MirroringSourceFailure[] = [];
   const concurrency = Math.min(
     4,
     Math.max(1, Number.parseInt(process.env.ROADMAP_MIRRORING_CONCURRENCY || '3', 10) || 3)
@@ -198,20 +239,35 @@ const buildMirroringIndex = async (
       try {
         const projects = await loadProjectsForInstance(sourceInstance, forwardedHeaders);
         for (const project of projects) {
-          for (const badge of normalizeBadgeList(project.badges)) {
-            const key = badge.toLowerCase();
-            const entries = projectsByBadge.get(key) || [];
-            entries.push({ sourceInstance, project });
-            projectsByBadge.set(key, entries);
+          const targetSlugs = normalizeMirrorTargetInstanceSlugs(project.mirrorTargetInstanceSlugs);
+          if (targetSlugs.length > 0) {
+            for (const targetSlug of targetSlugs) {
+              const entries = projectsByTargetSlug.get(targetSlug) || [];
+              entries.push({ sourceInstance, project });
+              projectsByTargetSlug.set(targetSlug, entries);
+            }
+          } else {
+            for (const badge of normalizeBadgeList(project.badges)) {
+              const key = badge.toLowerCase();
+              const entries = projectsByBadge.get(key) || [];
+              entries.push({ sourceInstance, project });
+              projectsByBadge.set(key, entries);
+            }
           }
         }
       } catch {
-        console.warn('[instanceMirroring] failed to index source projects');
+        mirroringFailures.push({
+          slug: sourceInstance.slug,
+          displayName: sourceInstance.displayName,
+        });
+        console.warn('[instanceMirroring] failed to index source projects', {
+          slug: sourceInstance.slug,
+        });
       }
     }
   });
   await Promise.all(workers);
-  return { badgeOptions, projectsByBadge };
+  return { badgeOptions, projectsByTargetSlug, projectsByBadge, mirroringFailures };
 };
 
 const getMirroringIndex = async (
@@ -240,13 +296,12 @@ export async function getMirroredProjectsForInstance(opts: {
   forwardedHeaders?: ForwardedRequestHeaders;
 }): Promise<MirroredProjectsResult> {
   const targetBadge = getInstanceBadge(opts.instance);
-  if (!targetBadge) {
-    const badgeOptions = await getInstanceBadgeOptions();
-    return { mirroredProjects: [], mirroredCategories: [], badgeOptions };
-  }
-
   const index = await getMirroringIndex(opts.forwardedHeaders);
-  const matches = (index.projectsByBadge.get(targetBadge.toLowerCase()) || []).filter(
+  const explicitMatches = index.projectsByTargetSlug.get(opts.instance.slug.toLowerCase()) || [];
+  const legacyMatches = targetBadge
+    ? index.projectsByBadge.get(targetBadge.toLowerCase()) || []
+    : [];
+  const matches = [...explicitMatches, ...legacyMatches].filter(
     (entry) => entry.sourceInstance.slug !== opts.instance.slug
   );
   const mirroredProjects = matches.map(({ project, sourceInstance }) =>
@@ -256,7 +311,14 @@ export async function getMirroredProjectsForInstance(opts: {
     new Map(matches.map((entry) => [entry.sourceInstance.slug, entry.sourceInstance])).values()
   );
   const mirroredCategories = sourceInstances.map(buildMirrorCategory);
-  return { mirroredProjects, mirroredCategories, badgeOptions: index.badgeOptions };
+  return {
+    mirroredProjects,
+    mirroredCategories,
+    badgeOptions: index.badgeOptions,
+    mirroringFailures: index.mirroringFailures.filter(
+      (failure) => failure.slug !== opts.instance.slug
+    ),
+  };
 }
 
 export async function getMirroredProjectById(opts: {
@@ -266,7 +328,7 @@ export async function getMirroredProjectById(opts: {
 }): Promise<Project | null> {
   const parsed = parseMirroredProjectId(opts.mirroredId);
   const targetBadge = getInstanceBadge(opts.targetInstance);
-  if (!parsed || !targetBadge) return null;
+  if (!parsed) return null;
 
   const sourceRecord = await prisma.roadmapInstance.findUnique({
     where: { slug: parsed.sourceSlug },
@@ -285,10 +347,14 @@ export async function getMirroredProjectById(opts: {
 
   if (!sourceProject) return null;
 
-  const hasTargetBadge = normalizeBadgeList(sourceProject.badges).some(
-    (badge) => badge.toLowerCase() === targetBadge.toLowerCase()
-  );
-  if (!hasTargetBadge) return null;
+  if (
+    !isProjectMirroredToInstance({
+      project: sourceProject,
+      targetSlug: opts.targetInstance.slug,
+      targetBadge,
+    })
+  )
+    return null;
 
   return mapMirroredProject(sourceProject, sourceInstance);
 }

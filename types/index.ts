@@ -12,6 +12,8 @@ export interface Project {
   status: 'planned' | 'in-progress' | 'completed' | 'paused' | 'cancelled';
   ProjectFields: string[];
   badges?: string[];
+  /** Stable instance slugs used as explicit cross-instance publication targets. */
+  mirrorTargetInstanceSlugs?: string[];
   isReadOnlyMirror?: boolean;
   mirrorSourceInstanceSlug?: string;
   mirrorSourceInstanceName?: string;
@@ -28,12 +30,7 @@ export interface Project {
   links?: { id: string; title: string; url: string }[]; // Neues Feld für Links
   // Optional neue Felder für phasenbasierten Fortschritt & Meilenstein
   projektphase?:
-    | 'initialisierung'
-    | 'konzept'
-    | 'realisierung'
-    | 'einführung'
-    | 'einfuehrung'
-    | 'abschluss';
+    'initialisierung' | 'konzept' | 'realisierung' | 'einführung' | 'einfuehrung' | 'abschluss';
   naechster_meilenstein?: string;
 }
 
@@ -82,4 +79,10 @@ export interface InstanceBadgeOption {
   slug: string;
   displayName: string;
   badge: string;
+  hasDirectAccess?: boolean;
+}
+
+export interface MirroringSourceFailure {
+  slug: string;
+  displayName: string;
 }

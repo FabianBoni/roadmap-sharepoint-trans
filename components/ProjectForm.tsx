@@ -10,6 +10,11 @@ import { getCurrentBrowserInstanceSlug } from '@/utils/auth';
 import RichTextEditor from './RichTextEditor';
 import ToggleSwitch from './ToggleSwitch';
 import {
+  buildMirrorTargetGroups,
+  removeBadgeCaseInsensitive,
+  toggleBadgeCaseInsensitive,
+} from '@/utils/projectBadgeUi';
+import {
   getRichTextPlainText,
   normalizeRichTextEditorValue,
   sanitizeRichTextHtml,
@@ -19,8 +24,9 @@ interface ProjectFormProps {
   initialProject?: Project;
   categories: Category[];
   instanceBadgeOptions?: InstanceBadgeOption[];
+  instanceBadgeOptionsError?: string | null;
   instanceSlug?: string | null;
-  onSubmit: (project: Project) => void;
+  onSubmit: (project: Project) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -94,6 +100,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   initialProject,
   categories,
   instanceBadgeOptions = [],
+  instanceBadgeOptionsError = null,
   instanceSlug = null,
   onSubmit,
   onCancel,
@@ -305,7 +312,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   };
 
   const removeBadge = (badgeToRemove: string) => {
-    setBadges((prev) => prev.filter((badge) => badge !== badgeToRemove));
+    setBadges((prev) => removeBadgeCaseInsensitive(prev, badgeToRemove));
+  };
+
+  const toggleBadge = (badgeToToggle: string) => {
+    setBadges((prev) => toggleBadgeCaseInsensitive(prev, badgeToToggle));
   };
 
   // Kategorie auswählen
@@ -407,7 +418,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   };
 
   // Formular absenden
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
@@ -455,7 +466,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       ProjectFields: selectedFields,
     };
 
-    onSubmit(projectData);
+    try {
+      await onSubmit(projectData);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   // Definieren Sie die verfügbaren Felder
   const availableFields = [
@@ -467,102 +482,152 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     { id: 'infrastructure', name: 'Infrastruktur', description: 'Infrastrukturaspekte' },
   ];
 
-  const badgesEditor = (
-    <div className="mt-2">
-      <h3 className="text-lg font-medium mb-2">Badges (optional)</h3>
-      <div className="rounded-3xl border border-slate-800/70 bg-slate-950/70 p-5">
-        <p className="mb-4 text-sm text-slate-300">
-          Badges werden nur in der Kachelansicht angezeigt und können dort zusätzlich gefiltert
-          werden.
-        </p>
+  const mirrorTargetGroups = buildMirrorTargetGroups(instanceBadgeOptions, pickerInstanceSlug);
+  const mirrorTargetByBadge = new Map(
+    mirrorTargetGroups.map((group) => [group.badge.toLowerCase(), group])
+  );
 
-        {instanceBadgeOptions.length > 0 && (
-          <div className="mb-4 space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-              Instanz-Badges
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {instanceBadgeOptions.map((option) => {
+  const badgesEditor = (
+    <section className="mt-2" aria-labelledby="publishing-heading">
+      <h3 id="publishing-heading" className="mb-2 text-lg font-medium">
+        Sichtbarkeit und Badges (optional)
+      </h3>
+      <div className="space-y-6 rounded-3xl border border-slate-800/70 bg-slate-950/70 p-5">
+        <div>
+          <h4 className="text-sm font-semibold text-slate-100">In anderen Roadmaps anzeigen</h4>
+          <p className="mt-1 text-sm leading-6 text-slate-300">
+            Das Projekt erscheint nach dem Speichern schreibgeschützt in den ausgewählten Roadmaps.
+            Die Auswahl gibt Ihnen keinen direkten Zugriff auf diese Roadmaps.
+          </p>
+          {mirrorTargetGroups.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2" aria-label="Ziel-Roadmaps">
+              {mirrorTargetGroups.map((group) => {
                 const selected = badges.some(
-                  (badge) => badge.toLowerCase() === option.badge.toLowerCase()
+                  (badge) => badge.toLowerCase() === group.badge.toLowerCase()
                 );
+                const targetNames = group.targets.map((target) => target.displayName).join(', ');
+                const inaccessibleCount = group.targets.filter(
+                  (target) => target.hasDirectAccess === false
+                ).length;
                 return (
                   <button
-                    key={`${option.slug}:${option.badge}`}
+                    key={group.badge.toLowerCase()}
                     type="button"
-                    onClick={() => {
-                      setNewBadge(option.badge);
-                      if (!selected) {
-                        setBadges((prev) => [...prev, option.badge]);
-                      }
-                    }}
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                    onClick={() => toggleBadge(group.badge)}
+                    aria-pressed={selected}
+                    className={`min-h-11 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition ${
                       selected
-                        ? 'border-sky-400/60 bg-sky-500/15 text-sky-100'
+                        ? 'border-sky-400 bg-sky-500/20 text-sky-50 ring-2 ring-sky-400/25'
                         : 'border-slate-700 bg-slate-900/70 text-slate-300 hover:border-sky-400 hover:text-white'
                     }`}
-                    title={option.displayName}
+                    title={`Spiegelung nach ${targetNames} ${selected ? 'entfernen' : 'aktivieren'}`}
                   >
-                    {option.displayName}: {option.badge}
+                    <span aria-hidden="true">{selected ? '✓ ' : ''}</span>
+                    {targetNames}
+                    {group.targets.length > 1 && (
+                      <span className="ml-1 text-slate-400">({group.targets.length} Roadmaps)</span>
+                    )}
+                    {inaccessibleCount > 0 && (
+                      <span className="ml-1 text-slate-400">· kein Direktzugriff</span>
+                    )}
                   </button>
                 );
               })}
             </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-7">
-          <div className="md:col-span-6">
-            <input
-              type="text"
-              value={newBadge}
-              onChange={(e) => setNewBadge(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ',') {
-                  e.preventDefault();
-                  addBadge();
-                }
-              }}
-              placeholder="Badge eingeben, z.B. Pilot, Priorität, KI"
-              className="w-full rounded-2xl border border-slate-800/70 bg-slate-950 px-4 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-400/30"
-            />
-          </div>
-          <div className="md:col-span-1">
-            <button
-              type="button"
-              onClick={addBadge}
-              className="flex w-full items-center justify-center rounded-full bg-sky-500 px-4 py-2 text-white transition hover:bg-sky-400 disabled:opacity-60"
-              disabled={!newBadge.trim()}
+          ) : instanceBadgeOptionsError ? (
+            <p
+              className="mt-3 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-100"
+              role="alert"
             >
-              <FaPlus />
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {badges.length > 0 ? (
-            badges.map((badge) => (
-              <span
-                key={badge}
-                className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-100"
-              >
-                {badge}
-                <button
-                  type="button"
-                  onClick={() => removeBadge(badge)}
-                  className="rounded-full border border-amber-300/20 px-1 text-[10px] leading-none text-amber-100 transition hover:bg-amber-400/10"
-                  aria-label={`${badge} entfernen`}
-                >
-                  ×
-                </button>
-              </span>
-            ))
+              {instanceBadgeOptionsError}
+            </p>
           ) : (
-            <p className="text-sm text-slate-400">Keine Badges angelegt</p>
+            <p className="mt-3 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2 text-sm text-slate-400">
+              Keine andere Roadmap ist als Spiegelziel konfiguriert.
+            </p>
           )}
         </div>
+
+        <div>
+          <h4 className="text-sm font-semibold text-slate-100">Weitere Badges</h4>
+          <p className="mt-1 text-sm leading-6 text-slate-300">
+            Diese Badges sind auf Projektkacheln sichtbar und können als Filter verwendet werden.
+          </p>
+          <label htmlFor="new-project-badge" className="mt-3 block text-xs text-slate-400">
+            Neues Badge
+          </label>
+          <div className="mt-1 grid grid-cols-1 gap-3 md:grid-cols-7">
+            <div className="md:col-span-6">
+              <input
+                id="new-project-badge"
+                type="text"
+                value={newBadge}
+                onChange={(e) => setNewBadge(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ',') {
+                    e.preventDefault();
+                    addBadge();
+                  }
+                }}
+                placeholder="z. B. Pilot, Priorität oder KI"
+                className="min-h-11 w-full rounded-xl border border-slate-800/70 bg-slate-950 px-4 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-400/30"
+              />
+            </div>
+            <div className="md:col-span-1">
+              <button
+                type="button"
+                onClick={addBadge}
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!newBadge.trim()}
+                aria-label="Badge hinzufügen"
+              >
+                <FaPlus aria-hidden="true" />
+                <span className="md:sr-only">Hinzufügen</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-sm font-semibold text-slate-100">Aktive Auswahl</h4>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {badges.length > 0 ? (
+              badges.map((badge) => {
+                const mirrorTarget = mirrorTargetByBadge.get(badge.toLowerCase());
+                const mirrorNames = mirrorTarget?.targets
+                  .map((target) => target.displayName)
+                  .join(', ');
+                return (
+                  <span
+                    key={badge}
+                    className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${
+                      mirrorTarget
+                        ? 'border-sky-400/40 bg-sky-500/10 text-sky-100'
+                        : 'border-amber-400/30 bg-amber-500/10 text-amber-100'
+                    }`}
+                  >
+                    <span>
+                      {badge}
+                      {mirrorNames && <span className="ml-1 text-slate-400">→ {mirrorNames}</span>}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeBadge(badge)}
+                      className="grid size-6 place-items-center rounded-full border border-white/20 text-sm leading-none transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+                      aria-label={`${badge} entfernen`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                );
+              })
+            ) : (
+              <p className="text-sm text-slate-400">Noch keine Badges ausgewählt.</p>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
   );
 
   return (
@@ -687,17 +752,25 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
       {/* Kategorien */}
       <div>
-        <label className="block text-sm font-medium mb-2">
+        <div id="category-label" className="mb-2 block text-sm font-medium">
           Kategorie <span className="text-red-500">*</span>
-        </label>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+        </div>
+        <div
+          className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3"
+          role="radiogroup"
+          aria-labelledby="category-label"
+          aria-describedby={errors.category ? 'category-error' : undefined}
+        >
           {categories.map((category) => (
-            <div
+            <button
               key={category.id}
-              className={`flex items-center p-2 rounded cursor-pointer transition-all ${
+              type="button"
+              role="radio"
+              aria-checked={selectedCategory === category.id}
+              className={`flex min-h-11 items-center rounded border-l-4 p-2 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${
                 selectedCategory === category.id
-                  ? 'bg-slate-900/70 border-l-4 border-sky-500/60'
-                  : 'bg-slate-950/60 opacity-70'
+                  ? 'bg-slate-900/70 text-white'
+                  : 'bg-slate-950/60 text-slate-300 opacity-80 hover:opacity-100'
               }`}
               style={{
                 borderLeftColor: selectedCategory === category.id ? category.color : 'transparent',
@@ -709,11 +782,17 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 style={{ backgroundColor: category.color }}
               />
               <span>{category.name}</span>
-            </div>
+            </button>
           ))}
         </div>
-        {errors.category && <p className="text-red-500 text-sm mt-1">{errors.category}</p>}
+        {errors.category && (
+          <p id="category-error" className="mt-1 text-sm text-red-500" role="alert">
+            {errors.category}
+          </p>
+        )}
       </div>
+
+      {badgesEditor}
 
       {/* Erweiterte Angaben (Langzeit Pflicht / Kurzzeit optional) */}
       {isShortTerm ? (
@@ -797,8 +876,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               />
             </div>
 
-            {badgesEditor}
-
             {/* Bisher */}
             <ProjectRichTextField
               id="bisher"
@@ -849,7 +926,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                   Wählen Sie die Felder aus, die für dieses Projekt relevant sind:
                 </p>
                 <p className="mb-2 text-xs text-slate-500">
-                  Selected fields: {selectedFields.join(', ')}
+                  Ausgewählt: {selectedFields.length ? selectedFields.join(', ') : 'noch nichts'}
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {availableFields.map((field) => (
@@ -1080,8 +1157,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
             />
           </div>
 
-          {badgesEditor}
-
           {/* Bisher */}
           <ProjectRichTextField
             id="bisher"
@@ -1135,7 +1210,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 Wählen Sie die Felder aus, die für dieses Projekt relevant sind:
               </p>
               <p className="mb-2 text-xs text-slate-500">
-                Selected fields: {selectedFields.join(', ')}
+                Ausgewählt: {selectedFields.length ? selectedFields.join(', ') : 'noch nichts'}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {availableFields.map((field) => (
@@ -1300,8 +1375,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
           type="submit"
           className="rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-400 disabled:opacity-60"
           disabled={isSubmitting}
+          aria-live="polite"
         >
-          {initialProject ? 'Aktualisieren' : 'Erstellen'}
+          {isSubmitting ? 'Wird gespeichert …' : initialProject ? 'Aktualisieren' : 'Erstellen'}
         </button>
       </div>
     </form>

@@ -60,10 +60,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse<ApiResponse>) {
 
   const existingRequest = await prisma.feedbackRequest.findUnique({
     where: { id: feedbackId },
-    select: { id: true },
+    select: { id: true, status: true },
   });
   if (!existingRequest) {
     return res.status(404).json({ error: 'Feedback request not found' });
+  }
+  if (existingRequest.status === 'COMPLETED') {
+    return res
+      .status(409)
+      .json({ error: 'Für umgesetzte Features kann nicht mehr abgestimmt werden.' });
   }
 
   if (value === 0) {

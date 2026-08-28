@@ -12,6 +12,8 @@ type FeedbackItem = {
   createdByName: string | null;
   createdAt: string;
   updatedAt: string;
+  status: 'OPEN' | 'COMPLETED';
+  completedAt: string | null;
   upVotes: number;
   downVotes: number;
   score: number;
@@ -63,6 +65,8 @@ const mapFeedbackItem = (
     createdByName: item.createdByName,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
+    status: item.status === 'COMPLETED' ? 'COMPLETED' : 'OPEN',
+    completedAt: item.completedAt?.toISOString() || null,
     upVotes,
     downVotes,
     score: upVotes - downVotes,

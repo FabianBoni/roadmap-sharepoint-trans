@@ -28,6 +28,12 @@ import {
 } from '@/utils/auth';
 import { normalizeCategoryId, resolveCategoryName, UNCATEGORIZED_ID } from '@/utils/categoryUtils';
 import { INSTANCE_QUERY_PARAM } from '@/utils/instanceConfig';
+import {
+  getProjectSaveNoticeMessage,
+  parseProjectSaveNotice,
+  PROJECT_SAVE_NOTICE_PARAM,
+  PROJECT_SAVE_PUBLISHED_PARAM,
+} from '@/utils/projectSaveNotice';
 
 type AdminTab = 'projects' | 'categories' | 'settings';
 
@@ -114,8 +120,32 @@ const AdminPage: React.FC = () => {
   const [instanceAdminLoading, setInstanceAdminLoading] = useState(false);
   const [instanceAdminSaving, setInstanceAdminSaving] = useState(false);
   const [instanceAdminError, setInstanceAdminError] = useState<string | null>(null);
+  const [projectSaveNotice, setProjectSaveNotice] = useState<string | null>(null);
   const fetchRequestIdRef = useRef(0);
   const effectiveInstanceSlug = instanceSlug || getCurrentBrowserInstanceSlug() || '';
+
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const notice = parseProjectSaveNotice(router.query);
+    if (!notice) return;
+
+    setProjectSaveNotice(getProjectSaveNoticeMessage(notice));
+
+    const cleanedQuery = { ...router.query };
+    delete cleanedQuery[PROJECT_SAVE_NOTICE_PARAM];
+    delete cleanedQuery[PROJECT_SAVE_PUBLISHED_PARAM];
+    void router.replace({ pathname: router.pathname, query: cleanedQuery }, undefined, {
+      shallow: true,
+      scroll: false,
+    });
+  }, [router.isReady, router.query, router.pathname, router]);
+
+  useEffect(() => {
+    if (!projectSaveNotice) return;
+    const timeoutId = window.setTimeout(() => setProjectSaveNotice(null), 10000);
+    return () => window.clearTimeout(timeoutId);
+  }, [projectSaveNotice]);
 
   const buildApiUrl = useCallback(
     (path: string) => {
@@ -267,6 +297,8 @@ const AdminPage: React.FC = () => {
   }, [categories]);
 
   const handleAddProject = () => pushWithInstance('/admin/projects/new');
+  const handleViewProject = (projectId: string) =>
+    pushWithInstance(`/project/${encodeURIComponent(projectId)}`);
   const handleEditProject = (projectId: string) =>
     pushWithInstance(`/admin/projects/edit/${encodeURIComponent(projectId)}`);
 
@@ -503,6 +535,23 @@ const AdminPage: React.FC = () => {
     <AdminShell>
       <main className="ds-page-main [flex:1] ds-admin-page-main [flex:1] [padding-block:clamp(34px,_5vw,_64px)_72px]">
         <div className="ds-container [width:min(1280px,_calc(100%_-_48px))] [margin-inline:auto] max-[760px]:[width:min(100%_-_32px,_1280px)] ds-admin-dashboard [display:grid] [gap:var(--ds-space-6)]">
+          {projectSaveNotice && (
+            <div
+              className="ds-message [display:flex] [align-items:center] [justify-content:space-between] [gap:var(--ds-space-4)] [padding:16px_18px] [border:1px_solid_color-mix(in_srgb,_var(--ds-success)_42%,_var(--ds-border-default))] [border-radius:var(--ds-radius-md)] [background:color-mix(in_srgb,_var(--ds-success)_13%,_var(--ds-bg-elevated))] [color:var(--ds-text-strong)] [box-shadow:var(--ds-shadow-card)]"
+              role="status"
+              aria-live="polite"
+            >
+              <span>{projectSaveNotice}</span>
+              <button
+                type="button"
+                onClick={() => setProjectSaveNotice(null)}
+                className="[min-height:44px] [padding-inline:14px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-pill)] [color:var(--ds-text-default)] [font-size:0.8125rem] [font-weight:800] hover:[border-color:var(--ds-border-strong)] hover:[color:var(--ds-text-strong)]"
+                aria-label="Erfolgsmeldung schließen"
+              >
+                Schließen
+              </button>
+            </div>
+          )}
           <header className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-admin-hero [display:grid] [grid-template-columns:minmax(0,_1fr)_minmax(220px,_280px)] [gap:clamp(24px,_4vw,_48px)] [align-items:start] [padding:clamp(28px,_4vw,_42px)] [border-radius:var(--ds-radius-xl)]">
             <div className="ds-admin-hero-content">
               <div className="ds-eyebrow [display:inline-flex] [width:fit-content] [align-items:center] [gap:10px] [padding:9px_15px] [border:1px_solid_var(--ds-border-strong)] [border-radius:var(--ds-radius-pill)] [background:var(--ds-accent-soft)] [box-shadow:var(--ds-shadow-glow)] [color:var(--ds-text-strong)] [font-size:0.75rem] [font-weight:850] [letter-spacing:0.22em] [text-transform:uppercase] [&_svg]:[color:var(--ds-accent-strong)]">
@@ -720,9 +769,13 @@ const AdminPage: React.FC = () => {
                           </td>
                           <td className="is-right">
                             {project.isReadOnlyMirror ? (
-                              <span className="ds-admin-muted [color:var(--ds-text-muted)]">
-                                Nur lesen
-                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleViewProject(project.id)}
+                                className="ds-admin-action-link [color:var(--ds-accent-strong)] [font-size:0.8125rem] [font-weight:850] [transition:color_var(--ds-duration-fast)_var(--ds-ease-out)] hover:[color:var(--ds-text-strong)]"
+                              >
+                                Details ansehen
+                              </button>
                             ) : (
                               <div className="ds-admin-table-actions [display:inline-flex] [flex-wrap:wrap] [justify-content:flex-end] [gap:var(--ds-space-3)]">
                                 <button

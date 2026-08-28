@@ -84,15 +84,25 @@ const resolveFrontendTarget = (settingsJson: string | null, hosts: string[]): st
   return buildTargetFromHost(hostCandidate, pathCandidate);
 };
 
-const toInstanceOption = (record: {
+type InstanceOptionRecord = {
   slug: string;
   displayName: string | null;
   settingsJson?: string | null;
-}) => ({
+};
+
+const toInstanceOption = (record: InstanceOptionRecord) => ({
   slug: record.slug,
   displayName: record.displayName || record.slug,
   badge: getInstanceBadge(parseMetadata(record.settingsJson ?? null)),
 });
+
+export const buildInstanceBadgeOptions = (records: InstanceOptionRecord[]) =>
+  records
+    .map((record) => toInstanceOption(record))
+    .filter(
+      (option): option is ReturnType<typeof toInstanceOption> & { badge: string } =>
+        typeof option.badge === 'string' && option.badge.trim().length > 0
+    );
 
 const toLandingInstance = (record: {
   slug: string;
@@ -140,7 +150,8 @@ const instanceQuery = {
 } as const;
 
 /**
- * Public endpoint: returns minimal instance identifiers (slug + displayName) for UI switching.
+ * Authenticated endpoint: returns authorized instances for navigation plus all configured
+ * instance badges for project mirroring. Badge visibility does not grant instance access.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -166,12 +177,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ...instanceQuery,
       orderBy: { slug: 'asc' },
     });
+    const badgeOptions = buildInstanceBadgeOptions(allRecords);
 
     if (isSuperAdmin) {
       const instances = details
         ? allRecords.map((r) => toLandingInstance(r))
         : allRecords.map((r) => toInstanceOption(r));
-      return res.status(200).json({ instances });
+      return res.status(200).json({ instances, badgeOptions });
     }
 
     const resolvedDepartment = await resolveSessionDepartmentAcrossInstances({
@@ -198,7 +210,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .filter((c) => c.allowed)
       .map((c) => (details ? toLandingInstance(c.record) : toInstanceOption(c.record)));
 
-    return res.status(200).json({ instances });
+    return res.status(200).json({ instances, badgeOptions });
   } catch (error) {
     console.error('[instances:slugs] failed to load slugs', error);
     return res.status(500).json({ error: 'Failed to load instances' });

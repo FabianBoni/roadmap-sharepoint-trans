@@ -12,6 +12,7 @@ import { buildInstanceAwareUrl } from '@/utils/auth';
 import { clientDataService } from '@/utils/clientDataService';
 import { INSTANCE_QUERY_PARAM } from '@/utils/instanceConfig';
 import { parseMirroredProjectId } from '@/utils/instanceMirroring';
+import { buildProjectSaveNoticeQuery, countUniqueMirrorTargets } from '@/utils/projectSaveNotice';
 
 type Attachment = {
   DocumentId: string;
@@ -28,6 +29,7 @@ const EditProjectPage: FC = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [instanceBadgeOptions, setInstanceBadgeOptions] = useState<InstanceBadgeOption[]>([]);
+  const [instanceBadgeOptionsError, setInstanceBadgeOptionsError] = useState<string | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,16 +113,36 @@ const EditProjectPage: FC = () => {
 
         setProject(projectData);
         setCategories(categoriesData);
-        setInstanceBadgeOptions(
+        const accessibleInstanceSlugs = new Set<string>(
           Array.isArray(instancesPayload?.instances)
-            ? instancesPayload.instances.filter(
-                (instance): instance is InstanceBadgeOption =>
-                  typeof instance?.slug === 'string' &&
-                  typeof instance?.displayName === 'string' &&
-                  typeof instance?.badge === 'string' &&
-                  instance.badge.trim().length > 0
-              )
+            ? instancesPayload.instances
+                .map((instance: unknown) =>
+                  instance && typeof instance === 'object' && 'slug' in instance
+                    ? String(instance.slug).trim().toLowerCase()
+                    : ''
+                )
+                .filter(Boolean)
             : []
+        );
+        const validBadgeOptions = Array.isArray(instancesPayload?.badgeOptions)
+          ? instancesPayload.badgeOptions.filter(
+              (instance): instance is InstanceBadgeOption =>
+                typeof instance?.slug === 'string' &&
+                typeof instance?.displayName === 'string' &&
+                typeof instance?.badge === 'string' &&
+                instance.badge.trim().length > 0
+            )
+          : [];
+        setInstanceBadgeOptions(
+          validBadgeOptions.map((option) => ({
+            ...option,
+            hasDirectAccess: accessibleInstanceSlugs.has(option.slug.trim().toLowerCase()),
+          }))
+        );
+        setInstanceBadgeOptionsError(
+          instancesResponse.ok
+            ? null
+            : 'Spiegelziele konnten nicht geladen werden. Laden Sie die Seite erneut.'
         );
         setTeamMembers(Array.isArray(projectData?.teamMembers) ? projectData.teamMembers : []);
         setAttachments(attachmentsData);
@@ -288,10 +310,25 @@ const EditProjectPage: FC = () => {
         throw new Error(payload?.error || 'Projekt konnte nicht gespeichert werden.');
       }
 
-      router.push({ pathname: '/admin', query: router.query });
+      const mirrorTargetInstanceSlugs = (
+        updatedProject as Project & { mirrorTargetInstanceSlugs?: unknown }
+      ).mirrorTargetInstanceSlugs;
+      await router.push({
+        pathname: '/admin',
+        query: buildProjectSaveNoticeQuery(router.query, {
+          action: 'updated',
+          publishedCount: countUniqueMirrorTargets(mirrorTargetInstanceSlugs, instanceSlug),
+        }),
+      });
     } catch (err) {
       console.error('Error saving project:', err);
-      setError('Projekt konnte nicht gespeichert werden. Bitte prüfen Sie die Eingaben.');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Projekt konnte nicht gespeichert werden. Bitte prüfen Sie die Eingaben.'
+      );
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      throw err instanceof Error ? err : new Error('Projekt konnte nicht gespeichert werden.');
     }
   };
 
@@ -433,18 +470,31 @@ const EditProjectPage: FC = () => {
       ) : !project || !id || typeof id !== 'string' ? (
         <section className="flex items-center justify-center rounded-3xl border border-slate-800/70 bg-slate-950/70 px-6 py-16 text-center shadow-lg shadow-slate-950/30">
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-white">Projekt nicht gefunden</h2>
+            <h2 className="text-xl font-semibold text-white">
+              {error ? 'Projekt konnte nicht geladen werden' : 'Projekt nicht gefunden'}
+            </h2>
             <p className="text-sm text-slate-300">
-              Das gewünschte Projekt konnte nicht geladen werden. Bitte kehren Sie zum Dashboard
-              zurück und wählen Sie ein anderes Projekt aus.
+              {error ||
+                'Das gewünschte Projekt konnte nicht geladen werden. Bitte kehren Sie zum Dashboard zurück und wählen Sie ein anderes Projekt aus.'}
             </p>
-            <button
-              type="button"
-              onClick={() => router.push({ pathname: '/admin', query: router.query })}
-              className="rounded-full bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-400"
-            >
-              Zurück zum Dashboard
-            </button>
+            <div className="flex flex-wrap justify-center gap-3">
+              {error && (
+                <button
+                  type="button"
+                  onClick={() => router.reload()}
+                  className="rounded-full bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-400"
+                >
+                  Erneut versuchen
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => router.push({ pathname: '/admin', query: router.query })}
+                className="rounded-full border border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-sky-400 hover:text-white"
+              >
+                Zurück zum Dashboard
+              </button>
+            </div>
           </div>
         </section>
       ) : project.isReadOnlyMirror ? (
@@ -456,20 +506,38 @@ const EditProjectPage: FC = () => {
               {project.mirrorSourceInstanceName || project.mirrorSourceInstanceSlug || 'Quelle'}{' '}
               gespiegelt und kann hier nur gelesen werden.
             </p>
-            <button
-              type="button"
-              onClick={() => router.push({ pathname: '/admin', query: router.query })}
-              className="rounded-full bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-400"
-            >
-              Zurück zur Übersicht
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  router.push({
+                    pathname: `/project/${encodeURIComponent(project.id)}`,
+                    query: instanceSlug ? { [INSTANCE_QUERY_PARAM]: instanceSlug } : {},
+                  })
+                }
+                className="rounded-full bg-sky-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-400"
+              >
+                Projekt ansehen
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push({ pathname: '/admin', query: router.query })}
+                className="rounded-full border border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-sky-400 hover:text-white"
+              >
+                Zurück zur Übersicht
+              </button>
+            </div>
           </div>
         </section>
       ) : (
         <>
           <section className="rounded-3xl border border-slate-800/70 bg-slate-950/70 px-6 py-8 shadow-lg shadow-slate-950/40 sm:px-9">
             {error && (
-              <div className="mb-6 rounded-2xl border border-rose-500/50 bg-rose-500/15 px-4 py-3 text-sm text-rose-100">
+              <div
+                className="mb-6 rounded-2xl border border-rose-500/50 bg-rose-500/15 px-4 py-3 text-sm text-rose-100"
+                role="alert"
+                aria-live="assertive"
+              >
                 {error}
               </div>
             )}
@@ -485,6 +553,7 @@ const EditProjectPage: FC = () => {
               }}
               categories={categories}
               instanceBadgeOptions={instanceBadgeOptions}
+              instanceBadgeOptionsError={instanceBadgeOptionsError}
               instanceSlug={instanceSlug}
               onSubmit={handleSubmit}
               onCancel={handleCancel}

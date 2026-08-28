@@ -99,6 +99,11 @@ export const SHAREPOINT_LIST_DEFINITIONS: SharePointListDefinition[] = [
           '<Field DisplayName="Badges" Name="Badges" Type="Note" NumLines="6" RichText="FALSE" />',
       },
       {
+        name: 'MirrorTargetInstanceSlugs',
+        schemaXml:
+          '<Field DisplayName="MirrorTargetInstanceSlugs" Name="MirrorTargetInstanceSlugs" Type="Note" NumLines="6" RichText="FALSE" />',
+      },
+      {
         name: 'Projektphase',
         schemaXml:
           '<Field DisplayName="Projektphase" Name="Projektphase" Type="Text" MaxLength="60" />',

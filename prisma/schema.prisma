@@ -67,11 +67,15 @@ model FeedbackRequest {
   description   String?
   createdBy     String
   createdByName String?
+  status        String         @default("OPEN")
+  completedAt   DateTime?
+  completedBy   String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   votes         FeedbackVote[]
 
   @@index([createdAt])
+  @@index([status, completedAt])
 }
 
 model FeedbackVote {

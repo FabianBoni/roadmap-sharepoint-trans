@@ -48,7 +48,7 @@ Use this connection string in `.env`:
 DATABASE_URL="postgresql://roadmap:roadmap_dev@localhost:5433/roadmap?schema=public"
 ```
 
-The seed creates the `sample` instance. Its `sampleData` feature serves the development categories and projects from `utils/sampleInstanceData.ts`. Initialization runs only for a new Docker volume. To deliberately recreate the database from scratch, run `docker compose down -v` before starting it again. The database name, user, password, and host port can be overridden with `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_PORT`.
+The seed creates the `sample` instance, sample feedback including one completed feature, and votes. Its `sampleData` feature serves the development categories and projects from `utils/sampleInstanceData.ts`. Initialization runs only for a new Docker volume. To deliberately recreate the database from scratch, run `docker compose down -v` before starting it again. The database name, user, password, and host port can be overridden with `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_PORT`.
 
 ## Auth Modes
 

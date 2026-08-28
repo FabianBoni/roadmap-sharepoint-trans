@@ -7,10 +7,16 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FiArrowDown,
   FiArrowUp,
+  FiCheck,
+  FiCheckCircle,
+  FiEdit2,
   FiLock,
   FiMessageSquare,
   FiPlus,
+  FiRotateCcw,
+  FiTrash2,
   FiTrendingUp,
+  FiX,
 } from 'react-icons/fi';
 import JSDoITLoader from '@/components/JSDoITLoader';
 import SiteFooter from '@/components/SiteFooter';
@@ -26,6 +32,8 @@ type FeedbackItem = {
   createdByName: string | null;
   createdAt: string;
   updatedAt: string;
+  status: 'OPEN' | 'COMPLETED';
+  completedAt: string | null;
   upVotes: number;
   downVotes: number;
   score: number;
@@ -51,11 +59,16 @@ const FeedbackPage = () => {
   const router = useRouter();
   const [checkingSession, setCheckingSession] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [entraStatus, setEntraStatus] = useState<EntraStatus>({ enabled: false });
   const [items, setItems] = useState<FeedbackItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [saving, setSaving] = useState(false);
   const [votingId, setVotingId] = useState<number | null>(null);
+  const [managingId, setManagingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
@@ -65,12 +78,26 @@ const FeedbackPage = () => {
     return raw.split('#')[0] || '/feedback';
   }, [router.asPath]);
 
-  const sortedItems = useMemo(
+  const activeItems = useMemo(
     () =>
-      [...items].sort((left, right) => {
-        if (right.score !== left.score) return right.score - left.score;
-        return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
-      }),
+      items
+        .filter((item) => item.status !== 'COMPLETED')
+        .sort((left, right) => {
+          if (right.score !== left.score) return right.score - left.score;
+          return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+        }),
+    [items]
+  );
+
+  const completedItems = useMemo(
+    () =>
+      items
+        .filter((item) => item.status === 'COMPLETED')
+        .sort(
+          (left, right) =>
+            new Date(right.completedAt || right.updatedAt).getTime() -
+            new Date(left.completedAt || left.updatedAt).getTime()
+        ),
     [items]
   );
 
@@ -105,7 +132,10 @@ const FeedbackPage = () => {
       setCheckingSession(true);
       try {
         const session = await getAdminSessionState(true);
-        if (!cancelled) setAuthenticated(Boolean(session?.authenticated));
+        if (!cancelled) {
+          setAuthenticated(Boolean(session?.authenticated));
+          setIsSuperAdmin(Boolean(session?.isSuperAdmin));
+        }
 
         try {
           const response = await fetch(buildInstanceAwareUrl('/api/auth/entra/status'));
@@ -163,6 +193,7 @@ const FeedbackPage = () => {
 
       if (response.status === 401) {
         setAuthenticated(false);
+        setIsSuperAdmin(false);
         throw new Error('Bitte melde dich erneut an.');
       }
       if (!response.ok || !data?.item) {
@@ -207,6 +238,237 @@ const FeedbackPage = () => {
     }
   };
 
+  const updateFeedback = async (
+    item: FeedbackItem,
+    changes: { title?: string; description?: string; status?: FeedbackItem['status'] }
+  ): Promise<boolean> => {
+    setManagingId(item.id);
+    setError('');
+    try {
+      const response = await fetch(buildInstanceAwareUrl(`/api/feedback/${item.id}`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify(changes),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (response.status === 401) {
+        setAuthenticated(false);
+        setIsSuperAdmin(false);
+        throw new Error('Bitte melde dich erneut an.');
+      }
+      if (!response.ok) {
+        throw new Error(data?.error || 'Feedback konnte nicht aktualisiert werden.');
+      }
+      await loadFeedback();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Feedback konnte nicht aktualisiert werden.');
+      return false;
+    } finally {
+      setManagingId(null);
+    }
+  };
+
+  const startEditing = (item: FeedbackItem) => {
+    setEditingId(item.id);
+    setEditTitle(item.title);
+    setEditDescription(item.description || '');
+    setError('');
+  };
+
+  const saveEdit = async (item: FeedbackItem) => {
+    const trimmedTitle = editTitle.trim();
+    if (trimmedTitle.length < 4) {
+      setError('Bitte gib einen Titel mit mindestens 4 Zeichen ein.');
+      return;
+    }
+    const updated = await updateFeedback(item, {
+      title: trimmedTitle,
+      description: editDescription.trim(),
+    });
+    if (updated) setEditingId(null);
+  };
+
+  const deleteFeedback = async (item: FeedbackItem) => {
+    if (!window.confirm(`Feedback „${item.title}“ wirklich löschen?`)) return;
+    setManagingId(item.id);
+    setError('');
+    try {
+      const response = await fetch(buildInstanceAwareUrl(`/api/feedback/${item.id}`), {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (response.status === 401) {
+        setAuthenticated(false);
+        setIsSuperAdmin(false);
+        throw new Error('Bitte melde dich erneut an.');
+      }
+      if (!response.ok) throw new Error(data?.error || 'Feedback konnte nicht gelöscht werden.');
+      setItems((current) => current.filter((entry) => entry.id !== item.id));
+      if (editingId === item.id) setEditingId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Feedback konnte nicht gelöscht werden.');
+    } finally {
+      setManagingId(null);
+    }
+  };
+
+  const renderFeedbackItem = (item: FeedbackItem) => {
+    const isCompleted = item.status === 'COMPLETED';
+    const isEditing = editingId === item.id;
+    const isManaging = managingId === item.id;
+
+    return (
+      <article
+        key={item.id}
+        className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-feedback-item [display:grid] [grid-template-columns:76px_minmax(0,_1fr)] [gap:var(--ds-space-4)] [padding:24px] [border-radius:var(--ds-radius-xl)] max-[760px]:[grid-template-columns:1fr]"
+      >
+        {isCompleted ? (
+          <div className="[display:grid] [align-content:start] [justify-items:center] [gap:8px] max-[760px]:[grid-template-columns:auto_auto] max-[760px]:[justify-content:start] max-[760px]:[align-items:center]">
+            <span className="[display:grid] [width:48px] [height:48px] [place-items:center] [border-radius:16px] [background:color-mix(in_srgb,_var(--ds-success)_16%,_transparent)] [color:var(--ds-success)]">
+              <FiCheckCircle className="[width:1.5rem] [height:1.5rem]" />
+            </span>
+            <span className="[color:var(--ds-success)] [font-size:0.7rem] [font-weight:900] [letter-spacing:0.12em] [text-transform:uppercase]">
+              Neu
+            </span>
+          </div>
+        ) : (
+          <div
+            className="ds-vote-stack [display:grid] [justify-items:center] [gap:8px] max-[760px]:[grid-template-columns:repeat(3,_auto)] max-[760px]:[justify-content:start]"
+            aria-label={`Abstimmung für ${item.title}`}
+          >
+            <button
+              type="button"
+              className={`ds-vote-button [display:grid] [width:42px] [height:42px] [place-items:center] [border:1px_solid_var(--ds-border-default)] [border-radius:14px] [background:var(--ds-bg-soft)] [color:var(--ds-text-muted)] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_border-color_var(--ds-duration-fast)_var(--ds-ease-out),_background_var(--ds-duration-fast)_var(--ds-ease-out),_color_var(--ds-duration-fast)_var(--ds-ease-out)] hover:[transform:translateY(-1px)] hover:[border-color:var(--ds-border-strong)] hover:[color:var(--ds-text-strong)] disabled:[cursor:wait] disabled:[opacity:0.6] disabled:[transform:none] [&.is-active]:[border-color:var(--ds-border-strong)] [&.is-active]:[background:var(--ds-accent-soft)] [&.is-active]:[color:var(--ds-accent-strong)] ${item.userVote === 1 ? 'is-active' : ''}`}
+              onClick={() => vote(item, 1)}
+              disabled={votingId === item.id || isManaging}
+              aria-label="Upvote"
+            >
+              <FiArrowUp className="ds-icon-sm [width:1rem] [height:1rem]" />
+            </button>
+            <span className="ds-vote-score [color:var(--ds-text-strong)] [font-size:1.35rem] [font-weight:880] [line-height:1]">
+              {item.score}
+            </span>
+            <button
+              type="button"
+              className={`ds-vote-button [display:grid] [width:42px] [height:42px] [place-items:center] [border:1px_solid_var(--ds-border-default)] [border-radius:14px] [background:var(--ds-bg-soft)] [color:var(--ds-text-muted)] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_border-color_var(--ds-duration-fast)_var(--ds-ease-out),_background_var(--ds-duration-fast)_var(--ds-ease-out),_color_var(--ds-duration-fast)_var(--ds-ease-out)] hover:[transform:translateY(-1px)] hover:[border-color:var(--ds-border-strong)] hover:[color:var(--ds-text-strong)] disabled:[cursor:wait] disabled:[opacity:0.6] disabled:[transform:none] [&.is-active]:[border-color:var(--ds-border-strong)] [&.is-active]:[background:var(--ds-accent-soft)] [&.is-active]:[color:var(--ds-accent-strong)] ${item.userVote === -1 ? 'is-active' : ''}`}
+              onClick={() => vote(item, -1)}
+              disabled={votingId === item.id || isManaging}
+              aria-label="Downvote"
+            >
+              <FiArrowDown className="ds-icon-sm [width:1rem] [height:1rem]" />
+            </button>
+          </div>
+        )}
+
+        <div className="ds-feedback-body [min-width:0]">
+          <div className="ds-feedback-meta [display:flex] [flex-wrap:wrap] [gap:8px_14px] [margin-bottom:8px] [color:var(--ds-text-muted)] [font-size:0.75rem] [font-weight:750] [letter-spacing:0.06em] [text-transform:uppercase]">
+            <span>
+              {isCompleted && item.completedAt ? 'Umgesetzt am ' : ''}
+              {formatDate(isCompleted && item.completedAt ? item.completedAt : item.createdAt)}
+            </span>
+            {item.createdByName && <span>von {item.createdByName}</span>}
+          </div>
+
+          {isEditing ? (
+            <div className="[display:grid] [gap:12px]">
+              <input
+                className="ds-input [width:100%] [height:48px] [padding-inline:14px] [border:1px_solid_var(--ds-border-default)] [border-radius:14px] [outline:none] [background:var(--ds-bg-elevated)] [color:var(--ds-text-strong)] focus:[border-color:var(--ds-border-strong)]"
+                value={editTitle}
+                onChange={(event) => setEditTitle(event.target.value)}
+                maxLength={120}
+                aria-label="Titel bearbeiten"
+              />
+              <textarea
+                className="ds-input [width:100%] [min-height:120px] [padding:13px_14px] [border:1px_solid_var(--ds-border-default)] [border-radius:14px] [outline:none] [background:var(--ds-bg-elevated)] [color:var(--ds-text-strong)] [resize:vertical] focus:[border-color:var(--ds-border-strong)]"
+                value={editDescription}
+                onChange={(event) => setEditDescription(event.target.value)}
+                maxLength={1200}
+                aria-label="Beschreibung bearbeiten"
+              />
+              <div className="[display:flex] [flex-wrap:wrap] [gap:10px]">
+                <button
+                  type="button"
+                  className="ds-button [display:inline-flex] [min-height:40px] [align-items:center] [gap:8px] [padding-inline:14px] [border:1px_solid_transparent] [border-radius:12px] [background:var(--ds-accent)] [color:var(--ds-text-inverse)] [font-weight:800] disabled:[opacity:0.6]"
+                  onClick={() => saveEdit(item)}
+                  disabled={isManaging || editTitle.trim().length < 4}
+                >
+                  <FiCheck /> {isManaging ? 'Speichert ...' : 'Speichern'}
+                </button>
+                <button
+                  type="button"
+                  className="ds-button [display:inline-flex] [min-height:40px] [align-items:center] [gap:8px] [padding-inline:14px] [border:1px_solid_var(--ds-border-default)] [border-radius:12px] [background:var(--ds-bg-soft)] [color:var(--ds-text-strong)] [font-weight:800]"
+                  onClick={() => setEditingId(null)}
+                  disabled={isManaging}
+                >
+                  <FiX /> Abbrechen
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <h3 className="ds-feedback-title [margin:0] [color:var(--ds-text-strong)] [font-size:1.2rem] [font-weight:850] [line-height:1.25]">
+                {item.title}
+              </h3>
+              {item.description && (
+                <p className="ds-feedback-description [margin:12px_0_18px] [color:var(--ds-text-default)] [font-size:0.9375rem] [line-height:1.65] [white-space:pre-line]">
+                  {item.description}
+                </p>
+              )}
+              <div className="ds-badge-row [display:flex] [flex-wrap:wrap] [gap:10px]">
+                {isCompleted ? (
+                  <span className="ds-badge [display:inline-flex] [align-items:center] [gap:8px] [padding:7px_10px] [border-radius:var(--ds-radius-pill)] [background:color-mix(in_srgb,_var(--ds-success)_13%,_transparent)] [color:var(--ds-success)] [font-size:0.75rem] [font-weight:800]">
+                    <FiCheckCircle /> Neues Feature
+                  </span>
+                ) : (
+                  <>
+                    <span className="ds-badge [display:inline-flex] [padding:7px_10px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-pill)] [background:var(--ds-bg-soft)] [color:var(--ds-success)] [font-size:0.75rem] [font-weight:750]">
+                      {item.upVotes} Upvotes
+                    </span>
+                    <span className="ds-badge [display:inline-flex] [padding:7px_10px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-pill)] [background:var(--ds-bg-soft)] [color:var(--ds-danger)] [font-size:0.75rem] [font-weight:750]">
+                      {item.downVotes} Downvotes
+                    </span>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+
+          {isSuperAdmin && !isEditing && (
+            <div className="[display:flex] [flex-wrap:wrap] [gap:8px] [margin-top:18px] [padding-top:16px] [border-top:1px_solid_var(--ds-border-default)]">
+              <button
+                type="button"
+                className="ds-button [display:inline-flex] [min-height:38px] [align-items:center] [gap:7px] [padding-inline:12px] [border:1px_solid_var(--ds-border-default)] [border-radius:11px] [background:var(--ds-bg-soft)] [color:var(--ds-text-strong)] [font-size:0.8rem] [font-weight:800] disabled:[opacity:0.6]"
+                onClick={() => startEditing(item)}
+                disabled={isManaging}
+              >
+                <FiEdit2 /> Bearbeiten
+              </button>
+              <button
+                type="button"
+                className="ds-button [display:inline-flex] [min-height:38px] [align-items:center] [gap:7px] [padding-inline:12px] [border:1px_solid_var(--ds-border-default)] [border-radius:11px] [background:var(--ds-bg-soft)] [color:var(--ds-success)] [font-size:0.8rem] [font-weight:800] disabled:[opacity:0.6]"
+                onClick={() => updateFeedback(item, { status: isCompleted ? 'OPEN' : 'COMPLETED' })}
+                disabled={isManaging}
+              >
+                {isCompleted ? <FiRotateCcw /> : <FiCheckCircle />}
+                {isCompleted ? 'Wieder öffnen' : 'Als erledigt markieren'}
+              </button>
+              <button
+                type="button"
+                className="ds-button [display:inline-flex] [min-height:38px] [align-items:center] [gap:7px] [padding-inline:12px] [border:1px_solid_color-mix(in_srgb,_var(--ds-danger)_32%,_transparent)] [border-radius:11px] [background:color-mix(in_srgb,_var(--ds-danger)_9%,_transparent)] [color:var(--ds-danger)] [font-size:0.8rem] [font-weight:800] disabled:[opacity:0.6]"
+                onClick={() => deleteFeedback(item)}
+                disabled={isManaging}
+              >
+                <FiTrash2 /> Löschen
+              </button>
+            </div>
+          )}
+        </div>
+      </article>
+    );
+  };
+
   return (
     <>
       <Head>
@@ -244,7 +506,7 @@ const FeedbackPage = () => {
                   Aktive Wünsche
                 </p>
                 <p className="ds-feedback-count [margin:0] [color:var(--ds-text-strong)] [font-size:clamp(3rem,_8vw,_5rem)] [font-weight:880] [letter-spacing:-0.04em] [line-height:0.9]">
-                  {items.length}
+                  {activeItems.length}
                 </p>
                 <p className="ds-empty-copy [max-width:680px] [margin:10px_auto_0] [color:var(--ds-text-muted)] [font-size:0.875rem] [line-height:1.6]">
                   Votes sortieren die Liste automatisch nach Relevanz. Jede Person hat pro Wunsch
@@ -342,6 +604,33 @@ const FeedbackPage = () => {
                 </form>
 
                 <section className="ds-feedback-list [min-width:0]" aria-label="Feature-Wünsche">
+                  {error && (
+                    <p
+                      role="alert"
+                      className="[margin:0_0_18px] [padding:12px_14px] [border:1px_solid_color-mix(in_srgb,_var(--ds-danger)_36%,_transparent)] [border-radius:var(--ds-radius-sm)] [background:color-mix(in_srgb,_var(--ds-danger)_12%,_transparent)] [color:var(--ds-danger)] [font-size:0.875rem] [line-height:1.5]"
+                    >
+                      {error}
+                    </p>
+                  )}
+                  {completedItems.length > 0 && (
+                    <div className="[margin-bottom:42px]" aria-labelledby="new-features-heading">
+                      <div className="[margin-bottom:18px]">
+                        <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-success)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
+                          Umgesetzt
+                        </p>
+                        <h2
+                          id="new-features-heading"
+                          className="ds-section-title [margin:0] [color:var(--ds-text-strong)] [font-size:2rem] [letter-spacing:-0.04em]"
+                        >
+                          Neue Features
+                        </h2>
+                      </div>
+                      <div className="ds-feedback-items [display:grid] [gap:var(--ds-space-4)]">
+                        {completedItems.map(renderFeedbackItem)}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="ds-section-header [display:flex] [align-items:end] [justify-content:space-between] [gap:var(--ds-space-6)] [margin-bottom:24px] ds-feedback-list-header [margin-bottom:18px]">
                     <div>
                       <p className="ds-panel-label [margin:0_0_12px] [color:var(--ds-accent-strong)] [font-size:0.75rem] [font-weight:900] [letter-spacing:0.23em] [text-transform:uppercase]">
@@ -365,63 +654,9 @@ const FeedbackPage = () => {
                     <div className="ds-centered-state [display:flex] [justify-content:center] [padding-block:var(--ds-space-8)]">
                       <JSDoITLoader sizeRem={2} message="Feature-Wünsche werden geladen ..." />
                     </div>
-                  ) : sortedItems.length ? (
+                  ) : activeItems.length ? (
                     <div className="ds-feedback-items [display:grid] [gap:var(--ds-space-4)]">
-                      {sortedItems.map((item) => (
-                        <article
-                          key={item.id}
-                          className="ds-card [position:relative] [overflow:hidden] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-md)] [background:linear-gradient(180deg,_var(--ds-bg-elevated-strong),_var(--ds-bg-elevated))] [box-shadow:var(--ds-shadow-card)] before:[position:absolute] before:[inset:0] before:[pointer-events:none] before:[background:radial-gradient(circle_at_12%_0%,_var(--ds-accent-soft),_transparent_35%)] [&>*]:[position:relative] ds-feedback-item [display:grid] [grid-template-columns:76px_minmax(0,_1fr)] [gap:var(--ds-space-4)] [padding:24px] [border-radius:var(--ds-radius-xl)] max-[760px]:[grid-template-columns:1fr]"
-                        >
-                          <div
-                            className="ds-vote-stack [display:grid] [justify-items:center] [gap:8px] max-[760px]:[grid-template-columns:repeat(3,_auto)] max-[760px]:[justify-content:start]"
-                            aria-label={`Abstimmung für ${item.title}`}
-                          >
-                            <button
-                              type="button"
-                              className={`ds-vote-button [display:grid] [width:42px] [height:42px] [place-items:center] [border:1px_solid_var(--ds-border-default)] [border-radius:14px] [background:var(--ds-bg-soft)] [color:var(--ds-text-muted)] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_border-color_var(--ds-duration-fast)_var(--ds-ease-out),_background_var(--ds-duration-fast)_var(--ds-ease-out),_color_var(--ds-duration-fast)_var(--ds-ease-out)] hover:[transform:translateY(-1px)] hover:[border-color:var(--ds-border-strong)] hover:[color:var(--ds-text-strong)] disabled:[cursor:wait] disabled:[opacity:0.6] disabled:[transform:none] [&.is-active]:[border-color:var(--ds-border-strong)] [&.is-active]:[background:var(--ds-accent-soft)] [&.is-active]:[color:var(--ds-accent-strong)] ${item.userVote === 1 ? 'is-active' : ''}`}
-                              onClick={() => vote(item, 1)}
-                              disabled={votingId === item.id}
-                              aria-label="Upvote"
-                            >
-                              <FiArrowUp className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
-                            </button>
-                            <span className="ds-vote-score [color:var(--ds-text-strong)] [font-size:1.35rem] [font-weight:880] [line-height:1]">
-                              {item.score}
-                            </span>
-                            <button
-                              type="button"
-                              className={`ds-vote-button [display:grid] [width:42px] [height:42px] [place-items:center] [border:1px_solid_var(--ds-border-default)] [border-radius:14px] [background:var(--ds-bg-soft)] [color:var(--ds-text-muted)] [transition:transform_var(--ds-duration-fast)_var(--ds-ease-out),_border-color_var(--ds-duration-fast)_var(--ds-ease-out),_background_var(--ds-duration-fast)_var(--ds-ease-out),_color_var(--ds-duration-fast)_var(--ds-ease-out)] hover:[transform:translateY(-1px)] hover:[border-color:var(--ds-border-strong)] hover:[color:var(--ds-text-strong)] disabled:[cursor:wait] disabled:[opacity:0.6] disabled:[transform:none] [&.is-active]:[border-color:var(--ds-border-strong)] [&.is-active]:[background:var(--ds-accent-soft)] [&.is-active]:[color:var(--ds-accent-strong)] ${item.userVote === -1 ? 'is-active' : ''}`}
-                              onClick={() => vote(item, -1)}
-                              disabled={votingId === item.id}
-                              aria-label="Downvote"
-                            >
-                              <FiArrowDown className="ds-icon-sm [flex:0_0_auto] [width:1rem] [height:1rem]" />
-                            </button>
-                          </div>
-                          <div className="ds-feedback-body [min-width:0]">
-                            <div className="ds-feedback-meta [display:flex] [flex-wrap:wrap] [gap:8px_14px] [margin-bottom:8px] [color:var(--ds-text-muted)] [font-size:0.75rem] [font-weight:750] [letter-spacing:0.06em] [text-transform:uppercase]">
-                              <span>{formatDate(item.createdAt)}</span>
-                              {item.createdByName && <span>von {item.createdByName}</span>}
-                            </div>
-                            <h3 className="ds-feedback-title [margin:0] [color:var(--ds-text-strong)] [font-size:1.2rem] [font-weight:850] [line-height:1.25]">
-                              {item.title}
-                            </h3>
-                            {item.description && (
-                              <p className="ds-feedback-description [margin:12px_0_18px] [color:var(--ds-text-default)] [font-size:0.9375rem] [line-height:1.65] [white-space:pre-line]">
-                                {item.description}
-                              </p>
-                            )}
-                            <div className="ds-badge-row [display:flex] [flex-wrap:wrap] [gap:10px]">
-                              <span className="ds-badge [display:inline-flex] [align-items:center] [gap:var(--ds-space-2)] [padding:7px_10px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-pill)] [background:var(--ds-bg-soft)] [color:var(--ds-text-default)] [font-size:0.75rem] [font-weight:750] ds-badge-success [background:color-mix(in_srgb,_var(--ds-success)_13%,_transparent)] [color:var(--ds-success)]">
-                                {item.upVotes} Upvotes
-                              </span>
-                              <span className="ds-badge [display:inline-flex] [align-items:center] [gap:var(--ds-space-2)] [padding:7px_10px] [border:1px_solid_var(--ds-border-default)] [border-radius:var(--ds-radius-pill)] [background:var(--ds-bg-soft)] [color:var(--ds-text-default)] [font-size:0.75rem] [font-weight:750] ds-badge-danger [background:color-mix(in_srgb,_var(--ds-danger)_13%,_transparent)] [color:var(--ds-danger)]">
-                                {item.downVotes} Downvotes
-                              </span>
-                            </div>
-                          </div>
-                        </article>
-                      ))}
+                      {activeItems.map(renderFeedbackItem)}
                     </div>
                   ) : (
                     <div className="ds-empty-state [margin-top:48px] [padding:32px] [border:1px_dashed_var(--ds-border-default)] [border-radius:var(--ds-radius-xl)] [background:color-mix(in_srgb,_var(--ds-bg-elevated-strong)_72%,_transparent)] [color:var(--ds-text-default)] [text-align:center]">
